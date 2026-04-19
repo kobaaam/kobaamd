@@ -38,6 +38,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.backgroundColor = paperColor
         scrollView.drawsBackground = true
         scrollView.documentView = textView
+        // Force light appearance so NSColor.labelColor always resolves to dark ink
+        scrollView.appearance = NSAppearance(named: .aqua)
 
         NotificationCenter.default.addObserver(
             context.coordinator,

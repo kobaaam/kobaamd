@@ -12,9 +12,12 @@ final class HighlightService {
         let boldFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
         let codeFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
-        // Reset to defaults
+        // Reset to defaults — use fixed dark ink, not dynamic labelColor
+        // (labelColor resolves to white when NSTextView has dark effective appearance,
+        //  which makes text invisible against the light paper background)
+        let inkColor = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1.0) // #1a1a1a
         textStorage.removeAttribute(.foregroundColor, range: fullRange)
-        textStorage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+        textStorage.addAttribute(.foregroundColor, value: inkColor, range: fullRange)
         textStorage.addAttribute(.font, value: editorFont, range: fullRange)
 
         // ATX Headings
