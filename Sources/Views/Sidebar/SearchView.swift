@@ -36,15 +36,27 @@ struct SearchView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     appViewModel.selectedFileURL = result.fileURL
+                    AppState.saveLastFile(result.fileURL)
                     if let text = try? FileService().readFile(at: result.fileURL) {
                         appViewModel.editorText = text
+                        appViewModel.markSaved()
                     }
                 }
             }
             .listStyle(.plain)
         }
         .onChange(of: searchViewModel.query) { _, newValue in
-            if newValue.isEmpty { searchViewModel.results = [] }
+            if newValue.isEmpty {
+                searchViewModel.results = []
+            } else {
+                // Debounce: wait 300ms before searching
+                let captured = newValue
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard searchViewModel.query == captured else { return }
+                    searchViewModel.search(in: fileTreeViewModel.rootURL)
+                }
+            }
         }
     }
 }
