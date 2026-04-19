@@ -18,9 +18,6 @@ struct MarkdownWebView: NSViewRepresentable {
         configuration.userContentController.addUserScript(script)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.setValue(false, forKey: "drawsBackground")
         return webView
     }
 
