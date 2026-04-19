@@ -16,7 +16,7 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
-        textView.isRichText = false
+        textView.isRichText = true
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
@@ -47,14 +47,17 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NSTextViewWrapper
+        private let highlightService = HighlightService()
 
         init(parent: NSTextViewWrapper) {
             self.parent = parent
         }
 
         func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
+            guard let textView = notification.object as? NSTextView,
+                  let textStorage = textView.textStorage else { return }
             parent.binding.wrappedValue = textView.string
+            highlightService.highlight(textStorage)
         }
     }
 }
