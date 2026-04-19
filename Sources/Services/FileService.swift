@@ -12,6 +12,25 @@ final class FileService {
         try String(contentsOf: url, encoding: .utf8)
     }
 
+    func saveFile(at url: URL, content: String) throws {
+        try Data(content.utf8).write(to: url, options: .atomic)
+    }
+
+    func createNewFile(in directory: URL, named name: String) throws -> URL {
+        var targetURL = directory.appendingPathComponent(name)
+        if targetURL.pathExtension.isEmpty {
+            targetURL = targetURL.appendingPathExtension("md")
+        }
+        try saveFile(at: targetURL, content: "")
+        return targetURL
+    }
+
+    func createNewFolder(in directory: URL, named name: String) throws -> URL {
+        let folderURL = directory.appendingPathComponent(name, isDirectory: true)
+        try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true, attributes: nil)
+        return folderURL
+    }
+
     private func children(of directory: URL) -> [FileNode] {
         do {
             let contents = try fileManager.contentsOfDirectory(
