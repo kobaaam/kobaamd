@@ -5,7 +5,7 @@ struct PreviewView: View {
     @State private var previewViewModel = PreviewViewModel()
 
     var body: some View {
-        MarkdownWebView(html: previewViewModel.html)
+        MarkdownWebView(html: previewViewModel.html, scrollRatio: appViewModel.previewScrollRatio)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: appViewModel.editorText) { _, newValue in
                 previewViewModel.update(text: newValue)

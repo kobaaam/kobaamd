@@ -5,13 +5,15 @@ struct NSTextViewWrapper: NSViewRepresentable {
     typealias NSViewType = NSScrollView
 
     let binding: Binding<String>
+    let scrollRatio: Binding<Double>
 
-    init(binding: Binding<String>) {
+    init(binding: Binding<String>, scrollRatio: Binding<Double>) {
         self.binding = binding
+        self.scrollRatio = scrollRatio
     }
 
     func makeCoordinator() -> Coordinator {
-        .init(parent: self)
+        .init(binding: binding, scrollRatio: scrollRatio)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -31,6 +33,13 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.documentView = textView
 
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.scrolled(_:)),
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
+
         return scrollView
     }
 
@@ -39,25 +48,38 @@ struct NSTextViewWrapper: NSViewRepresentable {
         if textView.string != binding.wrappedValue {
             let selectedRange = textView.selectedRange()
             textView.string = binding.wrappedValue
-            // Clamp range to avoid out-of-bounds after content change
             let safeRange = NSRange(location: min(selectedRange.location, textView.string.count), length: 0)
             textView.setSelectedRange(safeRange)
+            if let ts = textView.textStorage {
+                context.coordinator.highlightService.highlight(ts)
+            }
         }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: NSTextViewWrapper
-        private let highlightService = HighlightService()
+        let binding: Binding<String>
+        let scrollRatio: Binding<Double>
+        let highlightService = HighlightService()
 
-        init(parent: NSTextViewWrapper) {
-            self.parent = parent
+        init(binding: Binding<String>, scrollRatio: Binding<Double>) {
+            self.binding = binding
+            self.scrollRatio = scrollRatio
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView,
                   let textStorage = textView.textStorage else { return }
-            parent.binding.wrappedValue = textView.string
+            binding.wrappedValue = textView.string
             highlightService.highlight(textStorage)
+        }
+
+        @objc func scrolled(_ notification: Notification) {
+            guard let sv = notification.object as? NSScrollView else { return }
+            let visible = sv.documentVisibleRect.minY
+            let total = sv.documentView?.frame.height ?? 1
+            let viewportH = sv.frame.height
+            let maxScroll = max(total - viewportH, 1)
+            scrollRatio.wrappedValue = min(max(visible / maxScroll, 0), 1)
         }
     }
 }

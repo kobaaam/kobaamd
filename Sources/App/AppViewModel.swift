@@ -7,6 +7,7 @@ final class AppViewModel {
     var editorText: String = ""
     var isDirty: Bool = false
     var savedText: String = ""
+    var previewScrollRatio: Double = 0
     var errorMessage: String? = nil
     var showError: Bool = false
 

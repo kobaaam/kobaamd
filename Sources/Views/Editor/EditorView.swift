@@ -5,11 +5,15 @@ import UniformTypeIdentifiers
 
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @State private var scrollRatio: Double = 0
 
     var body: some View {
         @Bindable var vm = appViewModel
-        NSTextViewWrapper(binding: $vm.editorText)
+        NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: scrollRatio) { _, r in
+                appViewModel.previewScrollRatio = r
+            }
             .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
                 saveCurrentFile()
             }
