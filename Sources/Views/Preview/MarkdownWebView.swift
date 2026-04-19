@@ -2,15 +2,35 @@ import SwiftUI
 import WebKit
 
 struct MarkdownWebView: NSViewRepresentable {
-    typealias NSViewType = WKWebView
-
     let html: String
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> WKWebView {
-        WKWebView()
+        let configuration = WKWebViewConfiguration()
+        let scriptSource = """
+        document.documentElement.style.webkitUserSelect='none';
+        document.documentElement.style.webkitTouchCallout='none';
+        """
+        let script = WKUserScript(source: scriptSource, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        configuration.userContentController.addUserScript(script)
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.setValue(false, forKey: "drawsBackground")
+        return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.lastHTML != html else { return }
         webView.loadHTMLString(html, baseURL: nil)
+        context.coordinator.lastHTML = html
+    }
+
+    class Coordinator {
+        var lastHTML: String = ""
     }
 }
