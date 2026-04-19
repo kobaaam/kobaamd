@@ -66,6 +66,7 @@ struct FileTreeView: View {
             return
         }
         appViewModel.selectedFileURL = node.url
+        AppState.saveLastFile(node.url)
         Task {
             do {
                 let content = try FileService().readFile(at: node.url)

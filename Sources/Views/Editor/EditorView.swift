@@ -8,14 +8,43 @@ struct EditorView: View {
     @State private var scrollRatio: Double = 0
     @State private var showFindReplace: Bool = false
 
+    var editorHeader: String {
+        guard let url = appViewModel.selectedFileURL else { return "No file open" }
+        return url.lastPathComponent
+    }
+
     var body: some View {
         @Bindable var vm = appViewModel
         VStack(spacing: 0) {
+            // Header bar
+            HStack(spacing: 10) {
+                Text(editorHeader)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(appViewModel.selectedFileURL == nil
+                        ? Color.kobaMute : Color.kobaInk)
+                if appViewModel.isDirty {
+                    Circle()
+                        .fill(Color.kobaAccent)
+                        .frame(width: 6, height: 6)
+                }
+                Spacer()
+                Text("\(appViewModel.lineCount) lines")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Color.kobaMute2)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 32)
+            .background(Color.kobaSurface)
+            .overlay(
+                Rectangle().fill(Color.kobaLine).frame(height: 1),
+                alignment: .bottom
+            )
+
             NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if showFindReplace {
-                Divider()
+                Rectangle().fill(Color.kobaLine).frame(height: 1)
                 FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
             }
         }

@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+enum PreviewMode: String, CaseIterable {
+    case split = "Split"
+    case off = "Off"
+}
+
 @Observable
 final class AppViewModel {
     var selectedFileURL: URL? = nil
@@ -10,6 +15,12 @@ final class AppViewModel {
     var previewScrollRatio: Double = 0
     var errorMessage: String? = nil
     var showError: Bool = false
+    var previewMode: PreviewMode = .split
+
+    var lineCount: Int {
+        guard !editorText.isEmpty else { return 0 }
+        return editorText.components(separatedBy: "\n").count
+    }
 
     func markSaved() {
         savedText = editorText

@@ -7,7 +7,6 @@ struct kobaamdApp: App {
     var body: some Scene {
         WindowGroup {
             MainWindowView()
-                .frame(minWidth: 900, minHeight: 600)
                 .environment(appViewModel)
                 .alert("Error", isPresented: Bindable(appViewModel).showError) {
                     Button("OK") {}

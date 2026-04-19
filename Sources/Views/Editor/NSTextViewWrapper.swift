@@ -18,12 +18,15 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = NSTextView()
-        textView.isRichText = true
+        textView.isRichText = false
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        textView.textColor = .labelColor
+        textView.backgroundColor = .clear
+        textView.drawsBackground = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.allowsUndo = true
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.textContainerInset = NSSize(width: 16, height: 16)
         textView.delegate = context.coordinator
 
         let scrollView = NSScrollView()
@@ -49,12 +52,7 @@ struct NSTextViewWrapper: NSViewRepresentable {
         guard let textView = nsView.documentView as? NSTextView else { return }
         if textView.string != binding.wrappedValue {
             let selectedRange = textView.selectedRange()
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
-                .foregroundColor: NSColor.labelColor
-            ]
-            let attrStr = NSAttributedString(string: binding.wrappedValue, attributes: attrs)
-            textView.textStorage?.setAttributedString(attrStr)
+            textView.string = binding.wrappedValue
             let safeRange = NSRange(location: min(selectedRange.location, textView.string.count), length: 0)
             textView.setSelectedRange(safeRange)
             if let ts = textView.textStorage {
