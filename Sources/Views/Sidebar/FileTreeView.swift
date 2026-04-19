@@ -4,6 +4,12 @@ struct FileTreeView: View {
     var fileTreeViewModel: FileTreeViewModel
     @Environment(AppViewModel.self) private var appViewModel
 
+    @State private var renamingNode: FileNode? = nil
+    @State private var showRenameAlert: Bool = false
+    @State private var renameText: String = ""
+    @State private var deletingNode: FileNode? = nil
+    @State private var showDeleteConfirm: Bool = false
+
     var body: some View {
         Group {
             if fileTreeViewModel.nodes.isEmpty {
@@ -17,10 +23,38 @@ struct FileTreeView: View {
                             .lineLimit(1)
                             .contentShape(Rectangle())
                             .onTapGesture { select(node: node) }
+                            .contextMenu {
+                                Button {
+                                    renamingNode = node
+                                    renameText = node.name
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("名前を変更...", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    deletingNode = node
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Label("削除", systemImage: "trash")
+                                }
+                            }
                     }
                 }
                 .listStyle(.sidebar)
             }
+        }
+        .alert("名前を変更", isPresented: $showRenameAlert) {
+            TextField("新しい名前", text: $renameText)
+            Button("変更") { renameNode() }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text(renamingNode?.name ?? "")
+        }
+        .confirmationDialog("削除しますか？", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("ゴミ箱に移動", role: .destructive) { deleteNode() }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text(deletingNode?.name ?? "")
         }
     }
 
@@ -44,6 +78,27 @@ struct FileTreeView: View {
                     appViewModel.showAppError(.fileReadFailed(url: node.url, underlying: error))
                 }
             }
+        }
+    }
+
+    private func renameNode() {
+        guard let node = renamingNode, !renameText.isEmpty else { return }
+        let newURL = node.url.deletingLastPathComponent().appendingPathComponent(renameText)
+        do {
+            try FileManager.default.moveItem(at: node.url, to: newURL)
+            fileTreeViewModel.reload()
+        } catch {
+            appViewModel.showAppError(.fileRenameFailed(from: node.url, to: newURL, underlying: error))
+        }
+    }
+
+    private func deleteNode() {
+        guard let node = deletingNode else { return }
+        do {
+            try FileManager.default.trashItem(at: node.url, resultingItemURL: nil)
+            fileTreeViewModel.reload()
+        } catch {
+            appViewModel.showAppError(.fileDeleteFailed(url: node.url, underlying: error))
         }
     }
 }
