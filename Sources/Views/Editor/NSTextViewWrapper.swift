@@ -40,6 +40,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
             object: scrollView
         )
 
+        LineNumberRulerView.install(on: scrollView, textView: textView)
+
         return scrollView
     }
 
@@ -71,6 +73,7 @@ struct NSTextViewWrapper: NSViewRepresentable {
                   let textStorage = textView.textStorage else { return }
             binding.wrappedValue = textView.string
             highlightService.highlight(textStorage)
+            textView.enclosingScrollView?.verticalRulerView?.needsDisplay = true
         }
 
         @objc func scrolled(_ notification: Notification) {
