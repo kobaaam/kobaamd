@@ -29,13 +29,13 @@ final class HighlightService {
                    options: [.anchorsMatchLines, .dotMatchesLineSeparators],
                    attributes: [.foregroundColor: NSColor.systemGreen, .font: codeFont])
 
-        // Bold
+        // Bold — fixed colour (never labelColor which goes white in dark mode)
         applyRegex(#"(\*\*[^*\n]+\*\*|__[^_\n]+__)"#, to: textStorage,
-                   attributes: [.foregroundColor: NSColor.labelColor, .font: boldFont])
+                   attributes: [.foregroundColor: inkColor, .font: boldFont])
 
-        // Italic
+        // Italic — fixed colour
         applyRegex(#"(\*[^*\n]+\*|_[^_\n]+_)"#, to: textStorage,
-                   attributes: [.foregroundColor: NSColor.labelColor, .obliqueness: 0.2])
+                   attributes: [.foregroundColor: inkColor, .obliqueness: 0.2])
 
         // Inline code
         applyRegex(#"`[^`\n]+`"#, to: textStorage,

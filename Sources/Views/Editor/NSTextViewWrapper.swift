@@ -8,17 +8,12 @@ struct NSTextViewWrapper: NSViewRepresentable {
     let scrollRatio: Binding<Double>
 
     private static let paperColor = NSColor(srgbRed: 0.992, green: 0.988, blue: 0.973, alpha: 1)
+    // Fixed dark ink — never use NSColor.black (system-adaptive in macOS 26+)
     private static let inkColor   = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
     private static let editorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
 
-    // Default attributes applied to ALL text before syntax highlighting
-    private static let baseAttrs: [NSAttributedString.Key: Any] = [
-        .font:            editorFont,
-        .foregroundColor: inkColor,
-    ]
-
     init(binding: Binding<String>, scrollRatio: Binding<Double>) {
-        self.binding    = binding
+        self.binding     = binding
         self.scrollRatio = scrollRatio
     }
 
@@ -27,43 +22,48 @@ struct NSTextViewWrapper: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        // ── ScrollView ───────────────────────────────────────────
-        let scrollView = NSScrollView()
-        scrollView.borderType        = .noBorder
-        scrollView.hasVerticalScroller   = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers    = true
+        // NSTextView.scrollableTextView() is Apple's factory method that creates
+        // a properly configured NSTextView+NSScrollView pair.
+        // This handles all required setup: autoresizingMask, widthTracksTextView,
+        // isVerticallyResizable, maxSize, etc. — the manual approach always misses
+        // something and causes invisible text.
+        let scrollView = NSTextView.scrollableTextView()
+        guard let textView = scrollView.documentView as? NSTextView else {
+            fatalError("scrollableTextView() must return NSTextView as documentView")
+        }
+
+        // Appearance
         scrollView.backgroundColor    = Self.paperColor
         scrollView.drawsBackground    = true
-        // Force aqua appearance so system colors resolve in light mode context
-        scrollView.appearance = NSAppearance(named: .aqua)
 
-        // ── TextView — start with non-zero width so layout is valid ──
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 600))
-        // isRichText = true → NSTextView USES .foregroundColor from textStorage
-        // (with isRichText=false the textView IGNORES storage attributes and uses
-        //  the textColor property, which caused the invisible-text bug)
-        textView.isRichText  = true
-        textView.font        = Self.editorFont
-        textView.backgroundColor = Self.paperColor
+        // Force Aqua appearance so the text view is never in dark-mode context,
+        // regardless of the system setting.  Without this, macOS 26 beta can
+        // give the embedded NSTextView a dark effectiveAppearance even when
+        // the SwiftUI window is using a light background.
+        textView.appearance = NSAppearance(named: .aqua)
 
-        // Proper scroll/resize setup (required for NSTextView in NSScrollView)
-        textView.isVerticallyResizable   = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask        = [.width]
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
-                                  height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = true
-
-        textView.isEditable   = true
-        textView.isSelectable = true
-        textView.allowsUndo   = true
+        // isRichText=true: rendering uses NSTextStorage attributes directly.
+        // This is the ONLY reliable way to guarantee text colour on macOS 26+
+        // when HighlightService modifies textStorage attributes.
+        textView.isRichText           = true
+        textView.font                 = Self.editorFont
+        textView.textColor            = Self.inkColor
+        textView.backgroundColor      = Self.paperColor
+        textView.drawsBackground      = true
+        textView.insertionPointColor  = Self.inkColor
+        textView.isEditable           = true
+        textView.isSelectable         = true
+        textView.allowsUndo           = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled  = false
-        textView.textContainerInset = NSSize(width: 16, height: 16)
-        textView.delegate = context.coordinator
+        textView.textContainerInset   = NSSize(width: 16, height: 16)
 
-        scrollView.documentView = textView
+        textView.typingAttributes = [
+            .font:            Self.editorFont,
+            .foregroundColor: Self.inkColor,
+        ]
+
+        textView.delegate = context.coordinator
 
         NotificationCenter.default.addObserver(
             context.coordinator,
@@ -83,13 +83,17 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
         let selectedRange = textView.selectedRange()
 
-        // Explicitly set foreground color so text is ALWAYS visible.
-        // With isRichText=true, NSTextView uses .foregroundColor from textStorage.
-        // We set it here (inkColor = #1a1a1a) before HighlightService overlays
-        // syntax-specific colors.
-        let attrStr = NSAttributedString(string: binding.wrappedValue,
-                                         attributes: Self.baseAttrs)
+        // Use setAttributedString so the ink colour is baked into the storage
+        // from the very first frame — before HighlightService runs async.
+        // This avoids a one-frame flash of invisible text on macOS 26 beta.
+        let baseAttrs: [NSAttributedString.Key: Any] = [
+            .font:            Self.editorFont,
+            .foregroundColor: Self.inkColor,
+        ]
+        let attrStr = NSAttributedString(string: binding.wrappedValue, attributes: baseAttrs)
         textView.textStorage?.setAttributedString(attrStr)
+
+        textView.typingAttributes = baseAttrs
 
         let safeRange = NSRange(
             location: min(selectedRange.location, textView.string.count),
@@ -97,10 +101,10 @@ struct NSTextViewWrapper: NSViewRepresentable {
         )
         textView.setSelectedRange(safeRange)
 
-        // Apply syntax highlighting asynchronously to avoid layout conflicts
-        // during SwiftUI's update pass
+        // Syntax highlighting (async to avoid layout conflicts during SwiftUI update)
+        let tv = textView
         DispatchQueue.main.async {
-            guard let ts = textView.textStorage else { return }
+            guard let ts = tv.textStorage else { return }
             context.coordinator.highlightService.highlight(ts)
         }
     }
@@ -108,8 +112,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
     // MARK: - Coordinator
 
     final class Coordinator: NSObject, NSTextViewDelegate {
-        let binding: Binding<String>
-        let scrollRatio: Binding<Double>
+        let binding:      Binding<String>
+        let scrollRatio:  Binding<Double>
         let highlightService = HighlightService()
 
         init(binding: Binding<String>, scrollRatio: Binding<Double>) {
@@ -119,9 +123,9 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView,
-                  let textStorage = textView.textStorage else { return }
+                  let ts       = textView.textStorage else { return }
             binding.wrappedValue = textView.string
-            highlightService.highlight(textStorage)
+            highlightService.highlight(ts)
             textView.enclosingScrollView?.verticalRulerView?.needsDisplay = true
         }
 
