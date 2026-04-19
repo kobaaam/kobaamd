@@ -89,6 +89,13 @@ struct MainWindowView: View {
                     Image(systemName: "magnifyingglass")
                 }
                 .help("Find & Replace (⌘F)")
+
+                Button {
+                    NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
+                } label: {
+                    Image(systemName: "sparkles")
+                }
+                .help("AI アシスト (⌘E)")
             }
         }
     }

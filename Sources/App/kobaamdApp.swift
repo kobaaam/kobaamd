@@ -36,7 +36,17 @@ struct kobaamdApp: App {
                     NotificationCenter.default.post(name: .findRequested, object: nil)
                 }
                 .keyboardShortcut("f", modifiers: .command)
+                Divider()
+                Button("AI アシスト…") {
+                    NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: .command)
             }
+        }
+
+        // Settings window (⌘,)
+        Settings {
+            SettingsView()
         }
     }
 }
@@ -46,4 +56,5 @@ extension Notification.Name {
     static let newFileRequested    = Notification.Name("kobaamd.newFileRequested")
     static let findRequested       = Notification.Name("kobaamd.findRequested")
     static let openFolderRequested = Notification.Name("kobaamd.openFolderRequested")
+    static let aiAssistRequested   = Notification.Name("kobaamd.aiAssistRequested")
 }

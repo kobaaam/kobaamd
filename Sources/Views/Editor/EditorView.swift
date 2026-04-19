@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var showFindReplace: Bool = false
+    @State private var showAIPanel:    Bool = false
     @State private var scrollRatio: Double = 0
 
     var editorHeader: String {
@@ -65,6 +66,13 @@ struct EditorView: View {
                 FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if showAIPanel {
+                AIAssistPanel(isVisible: $showAIPanel, editorText: $vm.editorText)
+                    .frame(width: 400)
+                    .padding(16)
+            }
+        }
         .onChange(of: scrollRatio) { _, r in
             appViewModel.previewScrollRatio = r
         }
@@ -79,6 +87,9 @@ struct EditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .findRequested)) { _ in
             showFindReplace.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
+            showAIPanel.toggle()
         }
     }
 
