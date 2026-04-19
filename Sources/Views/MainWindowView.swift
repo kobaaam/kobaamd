@@ -132,6 +132,10 @@ struct StatusCommandBar: View {
                     Text("\(appViewModel.lineCount) lines")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Color.kobaMute2)
+                    kobaLineSep()
+                    Text("\(appViewModel.wordCount) words")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute2)
                 }
             }
             .padding(.leading, 14)

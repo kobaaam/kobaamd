@@ -22,6 +22,14 @@ final class AppViewModel {
         return editorText.components(separatedBy: "\n").count
     }
 
+    var wordCount: Int {
+        guard !editorText.isEmpty else { return 0 }
+        return editorText
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .count
+    }
+
     func markSaved() {
         savedText = editorText
         isDirty = false

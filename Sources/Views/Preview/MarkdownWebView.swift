@@ -27,7 +27,9 @@ struct MarkdownWebView: NSViewRepresentable {
 
     func updateNSView(_ webView: WKWebView, context: Context) {
         if context.coordinator.lastHTML != html {
-            webView.loadHTMLString(html, baseURL: nil)
+            // Use a base URL so the WKWebView treats this as a real origin,
+            // which allows loading CDN resources (Mermaid.js, etc.)
+            webView.loadHTMLString(html, baseURL: URL(string: "https://kobaamd-preview.local/"))
             context.coordinator.lastHTML = html
             // スクロール同期はページ読み込み後に適用するためnavigationDelegateで処理
             context.coordinator.pendingScrollRatio = scrollRatio
