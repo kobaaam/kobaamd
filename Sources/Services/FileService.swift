@@ -3,6 +3,16 @@ import Foundation
 final class FileService {
     private let fileManager = FileManager.default
 
+    static let supportedExtensions: Set<String> = [
+        "md", "markdown",
+        "txt", "text",
+        "json", "yaml", "yml", "toml",
+        "swift", "py", "rb", "js", "ts", "jsx", "tsx",
+        "html", "css", "scss", "xml",
+        "sh", "zsh", "bash",
+        "gitignore", "env", "conf", "ini", "log"
+    ]
+
     func loadNodes(at url: URL) -> [FileNode] {
         guard isDirectory(url) else { return [] }
         return children(of: url)
@@ -43,7 +53,7 @@ final class FileService {
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
                     nodes.append(FileNode(id: UUID(), name: item.lastPathComponent, url: item, isDirectory: true, children: children(of: item)))
-                } else if item.pathExtension.lowercased() == "md" {
+                } else if FileService.supportedExtensions.contains(item.pathExtension.lowercased()) {
                     nodes.append(FileNode(id: UUID(), name: item.lastPathComponent, url: item, isDirectory: false, children: nil))
                 }
             }

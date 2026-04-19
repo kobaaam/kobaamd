@@ -42,6 +42,13 @@ struct kobaamdApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
             }
+            CommandGroup(before: .sidebar) {
+                Button("サイドバーの表示/非表示") {
+                    NotificationCenter.default.post(name: .sidebarToggleRequested, object: nil)
+                }
+                .keyboardShortcut("b", modifiers: .command)
+                Divider()
+            }
         }
 
         // Settings window (⌘,)
@@ -52,9 +59,10 @@ struct kobaamdApp: App {
 }
 
 extension Notification.Name {
-    static let saveRequested       = Notification.Name("kobaamd.saveRequested")
-    static let newFileRequested    = Notification.Name("kobaamd.newFileRequested")
-    static let findRequested       = Notification.Name("kobaamd.findRequested")
-    static let openFolderRequested = Notification.Name("kobaamd.openFolderRequested")
-    static let aiAssistRequested   = Notification.Name("kobaamd.aiAssistRequested")
+    static let saveRequested         = Notification.Name("kobaamd.saveRequested")
+    static let newFileRequested      = Notification.Name("kobaamd.newFileRequested")
+    static let findRequested         = Notification.Name("kobaamd.findRequested")
+    static let openFolderRequested   = Notification.Name("kobaamd.openFolderRequested")
+    static let aiAssistRequested     = Notification.Name("kobaamd.aiAssistRequested")
+    static let sidebarToggleRequested = Notification.Name("kobaamd.sidebarToggleRequested")
 }
