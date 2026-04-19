@@ -15,7 +15,7 @@ final class LineNumberRulerView: NSRulerView {
         ruleThickness = 44
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+    required init(coder: NSCoder) { fatalError("init(coder:) not implemented") }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let textView,
