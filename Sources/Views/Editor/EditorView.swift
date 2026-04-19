@@ -8,6 +8,7 @@ struct EditorView: View {
     @State private var showFindReplace: Bool = false
     @State private var showAIPanel:    Bool = false
     @State private var scrollRatio: Double = 0
+    @State private var autoSaveTask: Task<Void, Never>? = nil
 
     var editorHeader: String {
         guard let url = appViewModel.selectedFileURL else { return "No file open" }
@@ -78,6 +79,7 @@ struct EditorView: View {
         }
         .onChange(of: vm.editorText) { _, _ in
             appViewModel.markEdited()
+            scheduleAutoSave()
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
             saveCurrentFile()
@@ -90,6 +92,16 @@ struct EditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
             showAIPanel.toggle()
+        }
+    }
+
+    private func scheduleAutoSave() {
+        guard appViewModel.selectedFileURL != nil else { return }
+        autoSaveTask?.cancel()
+        autoSaveTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { saveCurrentFile() }
         }
     }
 

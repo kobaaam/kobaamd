@@ -58,9 +58,18 @@ struct MainWindowView: View {
                             .background(Color.kobaSurface)
                     }
                 }
+
+                // Git panel (trailing, slides in from right)
+                if appViewModel.isGitPanelVisible {
+                    KobaDivider()
+                    GitPanel(gitVM: appViewModel.gitViewModel)
+                        .frame(width: 300)
+                        .transition(.move(edge: .trailing))
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
+            .animation(.easeInOut(duration: 0.2), value: appViewModel.isGitPanelVisible)
 
             // ── Status / command bar ───────────────────────────────
             StatusCommandBar(previewMode: $vm.previewMode)
@@ -71,6 +80,11 @@ struct MainWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
                 appViewModel.isSidebarVisible.toggle()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gitPanelRequested)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                appViewModel.isGitPanelVisible.toggle()
             }
         }
         .toolbar {
@@ -121,6 +135,17 @@ struct MainWindowView: View {
                     Image(systemName: "sparkles")
                 }
                 .help("AI アシスト (⌘E)")
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        appViewModel.isGitPanelVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: appViewModel.isGitPanelVisible
+                          ? "arrow.triangle.branch" : "arrow.triangle.branch")
+                        .symbolVariant(appViewModel.isGitPanelVisible ? .fill : .none)
+                }
+                .help("Git パネル (⌘G)")
             }
         }
     }
@@ -167,8 +192,19 @@ struct StatusCommandBar: View {
 
             Spacer()
 
-            // Right — version + preview toggle + keyboard hints
+            // Right — git branch + version + preview toggle + keyboard hints
             HStack(spacing: 14) {
+                if appViewModel.gitViewModel.isGitRepo && !appViewModel.gitViewModel.branch.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 9))
+                        Text(appViewModel.gitViewModel.branch)
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                    .foregroundStyle(Color.kobaMute)
+                    kobaLineSep()
+                }
+
                 Text(AppVersion.display)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(Color.kobaMute2)

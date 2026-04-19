@@ -47,6 +47,10 @@ struct kobaamdApp: App {
                     NotificationCenter.default.post(name: .sidebarToggleRequested, object: nil)
                 }
                 .keyboardShortcut("b", modifiers: .command)
+                Button("Git パネル") {
+                    NotificationCenter.default.post(name: .gitPanelRequested, object: nil)
+                }
+                .keyboardShortcut("g", modifiers: .command)
                 Divider()
             }
         }
@@ -65,4 +69,5 @@ extension Notification.Name {
     static let openFolderRequested   = Notification.Name("kobaamd.openFolderRequested")
     static let aiAssistRequested     = Notification.Name("kobaamd.aiAssistRequested")
     static let sidebarToggleRequested = Notification.Name("kobaamd.sidebarToggleRequested")
+    static let gitPanelRequested      = Notification.Name("kobaamd.gitPanelRequested")
 }
