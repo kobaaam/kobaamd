@@ -17,12 +17,13 @@ struct NSTextViewWrapper: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
+        let paperColor = NSColor(srgbRed: 0.992, green: 0.988, blue: 0.973, alpha: 1)
+
         let textView = NSTextView()
         textView.isRichText = false
         textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
-        textView.textColor = .labelColor
-        textView.backgroundColor = .clear
-        textView.drawsBackground = false
+        textView.textColor = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
+        textView.backgroundColor = paperColor
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.allowsUndo = true
@@ -34,6 +35,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
+        scrollView.backgroundColor = paperColor
+        scrollView.drawsBackground = true
         scrollView.documentView = textView
 
         NotificationCenter.default.addObserver(
