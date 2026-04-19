@@ -49,7 +49,12 @@ struct NSTextViewWrapper: NSViewRepresentable {
         guard let textView = nsView.documentView as? NSTextView else { return }
         if textView.string != binding.wrappedValue {
             let selectedRange = textView.selectedRange()
-            textView.string = binding.wrappedValue
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedSystemFont(ofSize: 14, weight: .regular),
+                .foregroundColor: NSColor.labelColor
+            ]
+            let attrStr = NSAttributedString(string: binding.wrappedValue, attributes: attrs)
+            textView.textStorage?.setAttributedString(attrStr)
             let safeRange = NSRange(location: min(selectedRange.location, textView.string.count), length: 0)
             textView.setSelectedRange(safeRange)
             if let ts = textView.textStorage {
