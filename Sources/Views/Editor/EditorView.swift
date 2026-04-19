@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var showFindReplace: Bool = false
-    @State private var scrollRatio: Double = 0   // reserved for future scroll-sync
+    @State private var scrollRatio: Double = 0
 
     var editorHeader: String {
         guard let url = appViewModel.selectedFileURL else { return "No file open" }
@@ -41,12 +41,16 @@ struct EditorView: View {
             )
 
             NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
+                .background(Color.kobaPaper)   // paper colour fed through drawsBackground=false
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if showFindReplace {
                 Rectangle().fill(Color.kobaLine).frame(height: 1)
                 FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
             }
+        }
+        .onChange(of: scrollRatio) { _, r in
+            appViewModel.previewScrollRatio = r
         }
         .onChange(of: vm.editorText) { _, _ in
             appViewModel.markEdited()
