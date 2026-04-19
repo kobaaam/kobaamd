@@ -18,18 +18,9 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let paperColor = NSColor(srgbRed: 0.992, green: 0.988, blue: 0.973, alpha: 1)
+        let inkColor   = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
 
-        let textView = NSTextView()
-        textView.isRichText = false
-        textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
-        textView.textColor = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
-        textView.backgroundColor = paperColor
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.allowsUndo = true
-        textView.textContainerInset = NSSize(width: 16, height: 16)
-        textView.delegate = context.coordinator
-
+        // ── ScrollView ───────────────────────────────────────────
         let scrollView = NSScrollView()
         scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true
@@ -37,9 +28,42 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.backgroundColor = paperColor
         scrollView.drawsBackground = true
-        scrollView.documentView = textView
-        // Force light appearance so NSColor.labelColor always resolves to dark ink
         scrollView.appearance = NSAppearance(named: .aqua)
+
+        // ── TextContainer: must track textView width ──────────────
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                  height: CGFloat.greatestFiniteMagnitude)
+        )
+        textContainer.widthTracksTextView = true   // ← wrap width follows textView
+
+        // ── LayoutManager + TextStorage ──────────────────────────
+        let layoutManager = NSLayoutManager()
+        layoutManager.addTextContainer(textContainer)
+
+        let textStorage = NSTextStorage()
+        textStorage.addLayoutManager(layoutManager)
+
+        // ── TextView ─────────────────────────────────────────────
+        let textView = NSTextView(frame: .zero, textContainer: textContainer)
+        textView.isRichText = false
+        textView.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        textView.textColor = inkColor
+        textView.backgroundColor = paperColor
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.isVerticallyResizable = true       // ← grow vertically with content
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]         // ← follow scrollView width
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                  height: CGFloat.greatestFiniteMagnitude)
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.textContainerInset = NSSize(width: 16, height: 16)
+        textView.delegate = context.coordinator
+
+        scrollView.documentView = textView
 
         NotificationCenter.default.addObserver(
             context.coordinator,
