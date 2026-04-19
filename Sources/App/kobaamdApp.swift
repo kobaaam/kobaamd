@@ -28,6 +28,12 @@ struct kobaamdApp: App {
                 }
                 .keyboardShortcut("s", modifiers: .command)
             }
+            CommandGroup(after: .textEditing) {
+                Button("Find & Replace") {
+                    NotificationCenter.default.post(name: .findRequested, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
+            }
         }
     }
 }
@@ -35,4 +41,5 @@ struct kobaamdApp: App {
 extension Notification.Name {
     static let saveRequested = Notification.Name("kobaamd.saveRequested")
     static let newFileRequested = Notification.Name("kobaamd.newFileRequested")
+    static let findRequested = Notification.Name("kobaamd.findRequested")
 }

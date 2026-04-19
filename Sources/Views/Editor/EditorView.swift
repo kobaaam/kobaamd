@@ -6,20 +6,31 @@ import UniformTypeIdentifiers
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var scrollRatio: Double = 0
+    @State private var showFindReplace: Bool = false
 
     var body: some View {
         @Bindable var vm = appViewModel
-        NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onChange(of: scrollRatio) { _, r in
-                appViewModel.previewScrollRatio = r
+        VStack(spacing: 0) {
+            NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if showFindReplace {
+                Divider()
+                FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
             }
-            .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
-                saveCurrentFile()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .newFileRequested)) { _ in
-                createNewFile()
-            }
+        }
+        .onChange(of: scrollRatio) { _, r in
+            appViewModel.previewScrollRatio = r
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
+            saveCurrentFile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newFileRequested)) { _ in
+            createNewFile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .findRequested)) { _ in
+            showFindReplace.toggle()
+        }
     }
 
     private func saveCurrentFile() {
@@ -56,5 +67,6 @@ struct EditorView: View {
         appViewModel.savedText = ""
         appViewModel.isDirty = false
         appViewModel.selectedFileURL = nil
+        showFindReplace = false
     }
 }
