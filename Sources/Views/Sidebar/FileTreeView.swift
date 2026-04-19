@@ -33,8 +33,17 @@ struct FileTreeView: View {
         }
         appViewModel.selectedFileURL = node.url
         Task {
-            let content = (try? FileService().readFile(at: node.url)) ?? ""
-            await MainActor.run { appViewModel.editorText = content }
+            do {
+                let content = try FileService().readFile(at: node.url)
+                await MainActor.run {
+                    appViewModel.editorText = content
+                    appViewModel.markSaved()
+                }
+            } catch {
+                await MainActor.run {
+                    appViewModel.showAppError(.fileReadFailed(url: node.url, underlying: error))
+                }
+            }
         }
     }
 }

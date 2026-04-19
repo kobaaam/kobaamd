@@ -27,8 +27,7 @@ struct EditorView: View {
             try FileService().saveFile(at: url, content: appViewModel.editorText)
             appViewModel.markSaved()
         } catch {
-            appViewModel.errorMessage = error.localizedDescription
-            appViewModel.showError = true
+            appViewModel.showAppError(.fileWriteFailed(url: url, underlying: error))
         }
     }
 
@@ -44,8 +43,7 @@ struct EditorView: View {
             appViewModel.selectedFileURL = url
             appViewModel.markSaved()
         } catch {
-            appViewModel.errorMessage = error.localizedDescription
-            appViewModel.showError = true
+            appViewModel.showAppError(.fileWriteFailed(url: url, underlying: error))
         }
     }
 

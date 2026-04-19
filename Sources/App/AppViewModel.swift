@@ -23,4 +23,9 @@ final class AppViewModel {
         editorText = text
         markEdited()
     }
+
+    func showAppError(_ error: AppError) {
+        errorMessage = error.localizedDescription
+        showError = true
+    }
 }
