@@ -6,8 +6,14 @@ struct kobaamdApp: App {
 
     var body: some Scene {
         WindowGroup("kobaamd") {
-            MainWindowView(appViewModel: appViewModel)
+            MainWindowView()
                 .frame(minWidth: 900, minHeight: 600)
+                .environment(appViewModel)
+        }
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                EmptyView()
+            }
         }
     }
 }

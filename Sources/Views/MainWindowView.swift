@@ -1,19 +1,24 @@
 import SwiftUI
 
 struct MainWindowView: View {
-    @Bindable var appViewModel: AppViewModel
-
-    init(appViewModel: AppViewModel) {
-        self._appViewModel = .init(appViewModel)
-    }
+    @Environment(AppViewModel.self) private var viewModel
 
     var body: some View {
         NavigationSplitView {
             SidebarView()
+                .frame(minWidth: 200, idealWidth: 220)
         } content: {
             EditorView()
+                .frame(minWidth: 350)
         } detail: {
             PreviewView()
+                .frame(minWidth: 300)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("kobaamd")
+            }
         }
     }
 }
