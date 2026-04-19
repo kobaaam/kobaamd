@@ -44,6 +44,7 @@ struct FindReplaceBar: View {
         .background(.bar)
         .onChange(of: findText) { _, _ in refreshCount() }
         .onChange(of: text) { _, _ in refreshCount() }
+        .onExitCommand { isVisible = false }
     }
 
     private func findRanges() -> [Range<String.Index>] {

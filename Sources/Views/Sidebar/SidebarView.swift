@@ -144,6 +144,19 @@ struct SidebarView: View {
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color.kobaMute2)
                     Spacer()
+                    // New file in current workspace
+                    Button {
+                        createNewFile()
+                    } label: {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.kobaMute)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(fileTreeViewModel.rootURL == nil)
+                    .help("New file in workspace")
+
+                    // Open / change folder
                     Button {
                         fileTreeViewModel.openFolder()
                     } label: {
@@ -152,12 +165,25 @@ struct SidebarView: View {
                             .foregroundStyle(Color.kobaMute)
                     }
                     .buttonStyle(.plain)
+                    .help("Open folder")
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
 
                 FileTreeView(fileTreeViewModel: fileTreeViewModel)
             }
+        }
+    }
+
+    private func createNewFile() {
+        do {
+            let url = try fileTreeViewModel.createNewFileInRoot()
+            appViewModel.selectedFileURL = url
+            appViewModel.editorText = ""
+            appViewModel.markSaved()
+            AppState.saveLastFile(url)
+        } catch {
+            appViewModel.showAppError(.fileWriteFailed(url: URL(fileURLWithPath: "Untitled.md"), underlying: error))
         }
     }
 
