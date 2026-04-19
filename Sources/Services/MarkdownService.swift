@@ -11,6 +11,22 @@ final class MarkdownService {
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1">
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+              // Convert <pre><code class="language-mermaid"> to <div class="mermaid">
+              document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
+                var div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = el.textContent;
+                el.parentNode.replaceWith(div);
+              });
+              if (typeof mermaid !== 'undefined') {
+                mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+                mermaid.run({ querySelector: '.mermaid' });
+              }
+            });
+            </script>
             <style>
             *{box-sizing:border-box}
             html{background:#fdfcf8}
