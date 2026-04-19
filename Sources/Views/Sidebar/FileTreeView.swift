@@ -19,8 +19,12 @@ struct FileTreeView: View {
             } else {
                 List {
                     OutlineGroup(fileTreeViewModel.nodes, id: \.id, children: \.children) { node in
+                        let isSelected = appViewModel.selectedFileURL == node.url
                         Label(node.name, systemImage: node.isDirectory ? "folder" : "doc.text")
                             .lineLimit(1)
+                            .font(.system(size: 12))
+                            .foregroundStyle(isSelected ? Color.kobaAccent : Color.kobaInk)
+                            .fontWeight(isSelected ? .semibold : .regular)
                             .contentShape(Rectangle())
                             .onTapGesture { select(node: node) }
                             .contextMenu {

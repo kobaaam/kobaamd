@@ -53,6 +53,10 @@ struct SidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
             fileTreeViewModel.openFolder()
         }
+        // Auto-refresh when app regains focus (picks up external file changes)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            fileTreeViewModel.reload()
+        }
         .onAppear {
             fileTreeViewModel.restoreLastFolder()
             if let lastURL = AppState.loadLastFile(),
