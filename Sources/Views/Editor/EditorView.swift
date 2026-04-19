@@ -5,8 +5,8 @@ import UniformTypeIdentifiers
 
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
-    @State private var scrollRatio: Double = 0
     @State private var showFindReplace: Bool = false
+    @State private var scrollRatio: Double = 0   // reserved for future scroll-sync
 
     var editorHeader: String {
         guard let url = appViewModel.selectedFileURL else { return "No file open" }
@@ -48,8 +48,8 @@ struct EditorView: View {
                 FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
             }
         }
-        .onChange(of: scrollRatio) { _, r in
-            appViewModel.previewScrollRatio = r
+        .onChange(of: vm.editorText) { _, _ in
+            appViewModel.markEdited()
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
             saveCurrentFile()

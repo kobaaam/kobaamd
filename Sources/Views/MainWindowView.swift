@@ -130,8 +130,13 @@ struct StatusCommandBar: View {
 
             Spacer()
 
-            // Right — preview toggle + keyboard hints
+            // Right — version + preview toggle + keyboard hints
             HStack(spacing: 14) {
+                Text(AppVersion.display)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.kobaMute2)
+
+                kobaLineSep()
                 // Preview toggle
                 HStack(spacing: 0) {
                     ForEach(PreviewMode.allCases, id: \.self) { mode in
