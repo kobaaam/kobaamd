@@ -1,7 +1,12 @@
 import SwiftUI
 
 struct MainWindowView: View {
-    @Environment(AppViewModel.self) private var viewModel
+    @Environment(AppViewModel.self) private var appViewModel
+
+    var windowTitle: String {
+        let name = appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd"
+        return appViewModel.isDirty ? "● \(name)" : name
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -17,7 +22,8 @@ struct MainWindowView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("kobaamd")
+                Text(windowTitle)
+                    .font(.headline)
             }
         }
     }

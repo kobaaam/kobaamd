@@ -18,6 +18,11 @@ final class MarkdownService {
             blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:0}
             img{max-width:100%}
             hr{border:none;border-top:1px solid #ddd;margin:24px 0}
+            table{border-collapse:collapse;width:100%;margin:16px 0}
+            th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+            th{background:#f5f5f5;font-weight:600}
+            del{color:#999}
+            li input[type=checkbox]{margin-right:6px}
             </style>
         </head>
         <body>
@@ -29,11 +34,11 @@ final class MarkdownService {
 
     private func render(_ markup: Markup) -> String {
         switch markup {
+        case is Markdown.Document:
+            return renderChildren(of: markup)
         case let heading as Heading:
             let level = min(max(heading.level, 1), 6)
             return "<h\(level)>\(renderChildren(of: heading))</h\(level)>"
-        case is Markdown.Document:
-            return renderChildren(of: markup)
         case let paragraph as Paragraph:
             return "<p>\(renderChildren(of: paragraph))</p>"
         case let text as Text:
@@ -46,6 +51,8 @@ final class MarkdownService {
             return "<strong>\(renderChildren(of: strong))</strong>"
         case let emphasis as Emphasis:
             return "<em>\(renderChildren(of: emphasis))</em>"
+        case let strikethrough as Strikethrough:
+            return "<del>\(renderChildren(of: strikethrough))</del>"
         case let code as InlineCode:
             return "<code>\(escapeHTML(code.code))</code>"
         case let codeBlock as CodeBlock:
@@ -62,12 +69,17 @@ final class MarkdownService {
             return "<ul>\(renderChildren(of: list))</ul>"
         case let list as OrderedList:
             return "<ol>\(renderChildren(of: list))</ol>"
+        case let item as ListItem where item.checkbox != nil:
+            let checked = item.checkbox == .checked ? "checked" : ""
+            return "<li><input type=\"checkbox\" \(checked) disabled> \(renderChildren(of: item))</li>"
         case let item as ListItem:
             return "<li>\(renderChildren(of: item))</li>"
         case let blockquote as BlockQuote:
             return "<blockquote>\(renderChildren(of: blockquote))</blockquote>"
         case is ThematicBreak:
             return "<hr>"
+        case let table as Table:
+            return renderTable(table)
         case let inlineHTML as InlineHTML:
             return inlineHTML.rawHTML
         case let htmlBlock as HTMLBlock:
@@ -75,6 +87,33 @@ final class MarkdownService {
         default:
             return renderChildren(of: markup)
         }
+    }
+
+    private func renderTable(_ table: Table) -> String {
+        var html = "<table>"
+        for child in table.children {
+            if let head = child as? Table.Head {
+                html += "<thead><tr>"
+                for row in head.children.compactMap({ $0 as? Table.Row }) {
+                    for cell in row.children.compactMap({ $0 as? Table.Cell }) {
+                        html += "<th>\(renderChildren(of: cell))</th>"
+                    }
+                }
+                html += "</tr></thead>"
+            } else if let body = child as? Table.Body {
+                html += "<tbody>"
+                for row in body.children.compactMap({ $0 as? Table.Row }) {
+                    html += "<tr>"
+                    for cell in row.children.compactMap({ $0 as? Table.Cell }) {
+                        html += "<td>\(renderChildren(of: cell))</td>"
+                    }
+                    html += "</tr>"
+                }
+                html += "</tbody>"
+            }
+        }
+        html += "</table>"
+        return html
     }
 
     private func renderChildren(of markup: Markup) -> String {
