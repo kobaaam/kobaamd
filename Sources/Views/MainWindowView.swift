@@ -33,23 +33,34 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             // ── Main pane ──────────────────────────────────────────
             HStack(spacing: 0) {
-                SidebarView()
-                    .frame(width: 240)
+                if appViewModel.isSidebarVisible {
+                    SidebarView()
+                        .frame(width: 240)
+                        .transition(.move(edge: .leading))
 
-                KobaDivider()
-
-                EditorView()
-                    .frame(minWidth: 320, maxWidth: .infinity)
-                    .background(Color.kobaPaper)
-
-                if appViewModel.previewMode == .split {
                     KobaDivider()
-                    PreviewView()
-                        .frame(minWidth: 260, idealWidth: 380)
-                        .background(Color.kobaSurface)
+                }
+
+                if appViewModel.previewMode == .wysiwyg {
+                    @Bindable var vm = appViewModel
+                    WYSIWYGEditorView(text: $vm.editorText)
+                        .frame(minWidth: 320, maxWidth: .infinity)
+                        .background(Color.kobaPaper)
+                } else {
+                    EditorView()
+                        .frame(minWidth: 320, maxWidth: .infinity)
+                        .background(Color.kobaPaper)
+
+                    if appViewModel.previewMode == .split {
+                        KobaDivider()
+                        PreviewView()
+                            .frame(minWidth: 260, idealWidth: 380)
+                            .background(Color.kobaSurface)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
 
             // ── Status / command bar ───────────────────────────────
             StatusCommandBar(previewMode: $vm.previewMode)
@@ -57,8 +68,22 @@ struct MainWindowView: View {
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 900, minHeight: 600)
+        .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                appViewModel.isSidebarVisible.toggle()
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        appViewModel.isSidebarVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .help("サイドバーの表示/非表示 (⌘B)")
+
                 Button {
                     NotificationCenter.default.post(name: .openFolderRequested, object: nil)
                 } label: {

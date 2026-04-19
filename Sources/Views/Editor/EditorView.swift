@@ -49,7 +49,7 @@ struct EditorView: View {
                     provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
                         guard let data = item as? Data,
                               let url = URL(dataRepresentation: data, relativeTo: nil),
-                              url.pathExtension == "md" else { return }
+                              FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
                         Task { @MainActor in
                             if let content = try? FileService().readFile(at: url) {
                                 appViewModel.selectedFileURL = url

@@ -20,7 +20,7 @@ struct FileTreeView: View {
                 List {
                     OutlineGroup(fileTreeViewModel.nodes, id: \.id, children: \.children) { node in
                         let isSelected = appViewModel.selectedFileURL == node.url
-                        Label(node.name, systemImage: node.isDirectory ? "folder" : "doc.text")
+                        Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
                             .lineLimit(1)
                             .font(.system(size: 12))
                             .foregroundStyle(isSelected ? Color.kobaAccent : Color.kobaInk)
@@ -59,6 +59,18 @@ struct FileTreeView: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text(deletingNode?.name ?? "")
+        }
+    }
+
+    private func iconName(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "md", "markdown": return "doc.text"
+        case "swift":          return "swift"
+        case "json", "yaml", "yml", "toml": return "curlybraces"
+        case "html", "css", "scss", "xml": return "globe"
+        case "sh", "zsh", "bash": return "terminal"
+        case "py":             return "doc.text.below.echelon"
+        default:               return "doc"
         }
     }
 
