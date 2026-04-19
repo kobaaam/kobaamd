@@ -14,17 +14,20 @@ class SearchViewModel {
     var query: String = ""
     var results: [SearchResult] = []
     var isSearching: Bool = false
+    private var searchTask: Task<Void, Never>? = nil
 
     func search(in rootURL: URL?) {
         guard let rootURL, !query.isEmpty else {
             results = []
             return
         }
+        searchTask?.cancel()
         isSearching = true
         results = []
         let q = query
-        Task {
+        searchTask = Task {
             let found = await performSearch(rootURL: rootURL, query: q)
+            guard !Task.isCancelled else { return }
             self.results = found
             self.isSearching = false
         }
