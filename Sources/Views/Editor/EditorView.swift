@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct EditorView: View {
+    @Environment(AppViewModel.self) private var appViewModel
+
     var body: some View {
-        Text("Editor")
+        @Bindable var vm = appViewModel
+        NSTextViewWrapper(binding: $vm.editorText)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
