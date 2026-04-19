@@ -86,6 +86,10 @@ struct FileTreeView: View {
         let newURL = node.url.deletingLastPathComponent().appendingPathComponent(renameText)
         do {
             try FileManager.default.moveItem(at: node.url, to: newURL)
+            // 現在開いているファイルだった場合はURLを更新
+            if appViewModel.selectedFileURL == node.url {
+                appViewModel.selectedFileURL = newURL
+            }
             fileTreeViewModel.reload()
         } catch {
             appViewModel.showAppError(.fileRenameFailed(from: node.url, to: newURL, underlying: error))
