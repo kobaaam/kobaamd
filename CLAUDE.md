@@ -50,7 +50,8 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 ## 現在のフェーズ
 
 **Phase 0（完了）**: PRD・アーキテクチャ設計
-**Phase 1（次）**: MVP実装
+**Phase 1（完了）**: MVP実装（Tasks 1〜7、2026-04-20）
+**Phase 2（次）**: 保存機能・エラーハンドリング・UX改善
 
 ---
 
