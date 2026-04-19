@@ -50,6 +50,9 @@ struct SidebarView: View {
             }
         }
         .background(Color.kobaSidebar)
+        .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
+            fileTreeViewModel.openFolder()
+        }
         .onAppear {
             fileTreeViewModel.restoreLastFolder()
             if let lastURL = AppState.loadLastFile(),

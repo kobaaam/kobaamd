@@ -56,6 +56,40 @@ struct MainWindowView: View {
         }
         .background(Color.kobaPaper)
         .frame(minWidth: 900, minHeight: 600)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                Button {
+                    NotificationCenter.default.post(name: .openFolderRequested, object: nil)
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .help("Open Folder (⌘O)")
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    NotificationCenter.default.post(name: .newFileRequested, object: nil)
+                } label: {
+                    Image(systemName: "doc.badge.plus")
+                }
+                .help("New File (⌘N)")
+
+                Button {
+                    NotificationCenter.default.post(name: .saveRequested, object: nil)
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .help("Save (⌘S)")
+
+                Divider()
+
+                Button {
+                    NotificationCenter.default.post(name: .findRequested, object: nil)
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .help("Find & Replace (⌘F)")
+            }
+        }
     }
 }
 

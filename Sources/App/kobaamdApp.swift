@@ -20,6 +20,10 @@ struct kobaamdApp: App {
                     NotificationCenter.default.post(name: .newFileRequested, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                Button("Open Folder…") {
+                    NotificationCenter.default.post(name: .openFolderRequested, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: .command)
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {
@@ -38,7 +42,8 @@ struct kobaamdApp: App {
 }
 
 extension Notification.Name {
-    static let saveRequested = Notification.Name("kobaamd.saveRequested")
-    static let newFileRequested = Notification.Name("kobaamd.newFileRequested")
-    static let findRequested = Notification.Name("kobaamd.findRequested")
+    static let saveRequested       = Notification.Name("kobaamd.saveRequested")
+    static let newFileRequested    = Notification.Name("kobaamd.newFileRequested")
+    static let findRequested       = Notification.Name("kobaamd.findRequested")
+    static let openFolderRequested = Notification.Name("kobaamd.openFolderRequested")
 }
