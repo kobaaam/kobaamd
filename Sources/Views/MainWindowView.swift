@@ -54,6 +54,7 @@ struct MainWindowView: View {
             // ── Status / command bar ───────────────────────────────
             StatusCommandBar(previewMode: $vm.previewMode)
         }
+        .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 900, minHeight: 600)
         .toolbar {

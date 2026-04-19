@@ -10,19 +10,74 @@ final class MarkdownService {
         <html>
         <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
             <style>
-            body{font-family:-apple-system,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6}
-            code{background:#f0f0f0;padding:2px 4px;border-radius:3px;font-family:monospace}
-            pre{background:#f0f0f0;padding:16px;border-radius:6px;overflow-x:auto}
-            pre code{background:none;padding:0}
-            blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:0}
-            img{max-width:100%}
-            hr{border:none;border-top:1px solid #ddd;margin:24px 0}
-            table{border-collapse:collapse;width:100%;margin:16px 0}
-            th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
-            th{background:#f5f5f5;font-weight:600}
+            *{box-sizing:border-box}
+            html{background:#fdfcf8}
+            body{
+              font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+              font-size:15px;
+              line-height:1.75;
+              color:#1a1a1a;
+              max-width:720px;
+              margin:0 auto;
+              padding:32px 28px 80px;
+              background:#fdfcf8;
+              -webkit-font-smoothing:antialiased;
+            }
+            h1,h2,h3,h4,h5,h6{
+              font-weight:700;
+              line-height:1.3;
+              margin:1.6em 0 0.5em;
+              color:#111;
+            }
+            h1{font-size:2em;margin-top:0.8em}
+            h2{font-size:1.4em;border-bottom:2px solid #e8e5df;padding-bottom:0.25em}
+            h3{font-size:1.15em}
+            p{margin:0.8em 0}
+            a{color:#0070f3;text-decoration:none}
+            a:hover{text-decoration:underline}
+            strong{font-weight:700}
+            em{font-style:italic}
             del{color:#999}
-            li input[type=checkbox]{margin-right:6px}
+            code{
+              font-family:"SF Mono",Menlo,Monaco,monospace;
+              font-size:0.88em;
+              background:#eeecea;
+              padding:2px 5px;
+              border-radius:4px;
+              color:#c0392b;
+            }
+            pre{
+              background:#f0ede8;
+              border:1px solid #e0ddd8;
+              border-radius:8px;
+              padding:16px 20px;
+              overflow-x:auto;
+              margin:1.2em 0;
+            }
+            pre code{
+              background:none;
+              padding:0;
+              color:#1a1a1a;
+              font-size:0.87em;
+            }
+            blockquote{
+              border-left:3px solid #FF5B1F;
+              margin:1em 0;
+              padding:4px 0 4px 18px;
+              color:#555;
+              font-style:italic;
+            }
+            img{max-width:100%;border-radius:6px}
+            hr{border:none;border-top:1px solid #e0ddd8;margin:2em 0}
+            table{border-collapse:collapse;width:100%;margin:1.2em 0;font-size:0.93em}
+            th,td{border:1px solid #e0ddd8;padding:8px 14px;text-align:left}
+            th{background:#f5f2ec;font-weight:600}
+            tr:nth-child(even) td{background:#faf8f4}
+            ul,ol{padding-left:1.6em;margin:0.8em 0}
+            li{margin:0.25em 0}
+            li input[type=checkbox]{margin-right:6px;accent-color:#FF5B1F}
             </style>
         </head>
         <body>

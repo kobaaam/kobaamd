@@ -4,7 +4,7 @@
 //   1.0 = Phase 3 complete, OSS release
 
 enum AppVersion {
-    static let semantic = "0.3.1"
-    static let build    = 4
+    static let semantic = "0.3.2"
+    static let build    = 5
     static var display: String { "v\(semantic) (b\(build))" }
 }

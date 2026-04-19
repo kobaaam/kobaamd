@@ -43,6 +43,22 @@ struct EditorView: View {
             NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
                 .background(Color.kobaPaper)   // paper colour fed through drawsBackground=false
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                    guard let provider = providers.first else { return false }
+                    provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                        guard let data = item as? Data,
+                              let url = URL(dataRepresentation: data, relativeTo: nil),
+                              url.pathExtension == "md" else { return }
+                        Task { @MainActor in
+                            if let content = try? FileService().readFile(at: url) {
+                                appViewModel.selectedFileURL = url
+                                appViewModel.editorText = content
+                                appViewModel.markSaved()
+                            }
+                        }
+                    }
+                    return true
+                }
 
             if showFindReplace {
                 Rectangle().fill(Color.kobaLine).frame(height: 1)
