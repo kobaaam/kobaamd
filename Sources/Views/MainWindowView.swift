@@ -1,28 +1,5 @@
 import SwiftUI
 
-// MARK: - Design tokens (Linear/Raycast vibe)
-extension Color {
-    static let kobaPaper    = Color(hex: "fdfcf8")
-    static let kobaSurface  = Color(hex: "ffffff")
-    static let kobaSidebar  = Color(hex: "fafaf7")
-    static let kobaAccent   = Color(hex: "FF5B1F")
-    static let kobaLine     = Color(hex: "e0ddd8")
-    static let kobaMute     = Color(hex: "888888")
-    static let kobaMute2    = Color(hex: "aaaaaa")
-    static let kobaInk      = Color(hex: "1a1a1a")
-
-    init(hex: String) {
-        let h = hex.trimmingCharacters(in: .alphanumerics.inverted)
-        var v: UInt64 = 0
-        Scanner(string: h).scanHexInt64(&v)
-        self.init(
-            red:   Double((v >> 16) & 0xFF) / 255,
-            green: Double((v >> 8)  & 0xFF) / 255,
-            blue:  Double( v        & 0xFF) / 255
-        )
-    }
-}
-
 // MARK: - Main window
 
 struct MainWindowView: View {
