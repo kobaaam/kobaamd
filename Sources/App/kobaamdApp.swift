@@ -40,6 +40,10 @@ struct kobaamdApp: App {
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { AppCommand.save.post() }
                     .keyboardShortcut("s", modifiers: .command)
+                Divider()
+                Button("Export as PDF…") { AppCommand.exportPDF.post() }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                Button("Export as HTML…") { AppCommand.exportHTML.post() }
             }
             CommandGroup(after: .textEditing) {
                 Button("Find & Replace") { AppCommand.find.post() }
@@ -75,6 +79,8 @@ extension Notification.Name {
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
     static let gitPanelRequested      = AppCommand.toggleGitPanel.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
+    static let exportPDFRequested     = AppCommand.exportPDF.notificationName
+    static let exportHTMLRequested    = AppCommand.exportHTML.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)

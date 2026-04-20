@@ -95,6 +95,30 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
             showAIPanel.toggle()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
+            exportDocument(asPDF: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .exportHTMLRequested)) { _ in
+            exportDocument(asPDF: false)
+        }
+    }
+
+    private func exportDocument(asPDF: Bool) {
+        guard !appViewModel.editorText.isEmpty else { return }
+        let html = MarkdownService().toHTML(appViewModel.editorText)
+        let base = appViewModel.selectedFileURL?.deletingPathExtension().lastPathComponent ?? "document"
+        Task {
+            do {
+                if asPDF {
+                    try await ExportService.exportPDF(html: html, suggestedName: base + ".pdf")
+                } else {
+                    try ExportService.exportHTML(html: html, suggestedName: base + ".html")
+                }
+            } catch {
+                if case ExportService.ExportError.userCancelled = error { return }
+                appViewModel.showAppError(.fileWriteFailed(url: URL(fileURLWithPath: base), underlying: error))
+            }
+        }
     }
 
     private func scheduleAutoSave() {
