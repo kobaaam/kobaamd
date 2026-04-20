@@ -21,8 +21,15 @@ final class GitViewModel {
     func configure(repoURL: URL) {
         let svc = GitService(repoURL: repoURL)
         self.service = svc
-        self.isGitRepo = svc.isGitRepo()
-        if isGitRepo { refresh() }
+        // Run isGitRepo check off the main thread to avoid blocking UI
+        Task.detached { [weak self] in
+            guard let self else { return }
+            let isRepo = svc.isGitRepo()
+            await MainActor.run { self.isGitRepo = isRepo }
+            if isRepo {
+                await MainActor.run { self.refresh() }
+            }
+        }
     }
 
     // MARK: - Refresh

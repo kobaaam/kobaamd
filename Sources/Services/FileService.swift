@@ -52,9 +52,9 @@ final class FileService {
             for item in contents {
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
-                    nodes.append(FileNode(id: UUID(), name: item.lastPathComponent, url: item, isDirectory: true, children: children(of: item)))
+                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: true, children: children(of: item)))
                 } else if FileService.supportedExtensions.contains(item.pathExtension.lowercased()) {
-                    nodes.append(FileNode(id: UUID(), name: item.lastPathComponent, url: item, isDirectory: false, children: nil))
+                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: false, children: nil))
                 }
             }
             nodes.sort { lhs, rhs in

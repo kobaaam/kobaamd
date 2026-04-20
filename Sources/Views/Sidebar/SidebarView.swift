@@ -4,6 +4,7 @@ struct SidebarView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var fileTreeViewModel = FileTreeViewModel()
     @State private var selectedTab: SidebarTab = .files
+    @State private var reloadDebounceTask: Task<Void, Never>? = nil
 
     enum SidebarTab: String, CaseIterable {
         case files = "Files"
@@ -56,9 +57,14 @@ struct SidebarView: View {
                 appViewModel.gitViewModel.configure(repoURL: root)
             }
         }
-        // Auto-refresh when app regains focus (picks up external file changes)
+        // Auto-refresh when app regains focus — debounced 1s to avoid rapid-fire reloads
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            fileTreeViewModel.reload()
+            reloadDebounceTask?.cancel()
+            reloadDebounceTask = Task {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                await MainActor.run { fileTreeViewModel.reload() }
+            }
         }
         .onAppear {
             fileTreeViewModel.restoreLastFolder()
