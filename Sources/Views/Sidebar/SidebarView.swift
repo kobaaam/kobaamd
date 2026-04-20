@@ -52,6 +52,9 @@ struct SidebarView: View {
         .background(Color.kobaSidebar)
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
             fileTreeViewModel.openFolder()
+            if let root = fileTreeViewModel.rootURL {
+                appViewModel.gitViewModel.configure(repoURL: root)
+            }
         }
         // Auto-refresh when app regains focus (picks up external file changes)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -59,6 +62,9 @@ struct SidebarView: View {
         }
         .onAppear {
             fileTreeViewModel.restoreLastFolder()
+            if let root = fileTreeViewModel.rootURL {
+                appViewModel.gitViewModel.configure(repoURL: root)
+            }
             if let lastURL = AppState.loadLastFile(),
                FileManager.default.fileExists(atPath: lastURL.path) {
                 appViewModel.selectedFileURL = lastURL

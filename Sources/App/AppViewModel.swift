@@ -18,6 +18,9 @@ final class AppViewModel {
     var showError: Bool = false
     var previewMode: PreviewMode = .split
     var isSidebarVisible: Bool = true
+    var isGitPanelVisible: Bool = false
+
+    let gitViewModel = GitViewModel()
 
     var lineCount: Int {
         guard !editorText.isEmpty else { return 0 }
