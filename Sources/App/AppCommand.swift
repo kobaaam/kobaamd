@@ -11,6 +11,8 @@ enum AppCommand: String {
     case aiAssist          = "kobaamd.aiAssistRequested"
     case toggleSidebar     = "kobaamd.sidebarToggleRequested"
     case toggleGitPanel    = "kobaamd.gitPanelRequested"
+    case exportPDF         = "kobaamd.exportPDFRequested"
+    case exportHTML        = "kobaamd.exportHTMLRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

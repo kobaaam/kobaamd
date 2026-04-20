@@ -19,6 +19,7 @@ final class AppViewModel {
     var previewMode: PreviewMode = .split
     var isSidebarVisible: Bool = true
     var isGitPanelVisible: Bool = false
+    var scrollToLineNumber: Int? = nil  // Outline → editor scroll request
 
     let gitViewModel = GitViewModel()
 
