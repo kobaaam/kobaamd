@@ -1,90 +1,63 @@
 # kobaamd
 
-**The Mac-native Markdown editor built for the AI era.**
-
-kobaamd is a lightweight, fast Markdown editor for macOS — designed around how engineers actually work with AI-generated content today. No Electron. No subscriptions. No bloat.
-
----
-
-## Why kobaamd?
-
-AI tools like Claude and ChatGPT generate a lot of Markdown — READMEs, specs, docs, notes. Existing editors all miss the mark for engineers:
-
-| Tool | Problem |
-|------|---------|
-| Typora | Electron-based, slow to launch |
-| Bear | Proprietary DB, no Git integration |
-| Obsidian | Feature overload, steep learning curve |
-| iA Writer | Too minimal, no AI integration |
-| VS Code | Not Markdown-native, too heavy |
-
-kobaamd fills the gap: **Mac-native speed × clean UI × folder-based workflow × Mermaid diagrams**.
+**A lightweight, Mac-native Markdown editor.**
+**軽量な、Mac ネイティブの Markdown エディタ。**
 
 ---
 
-## Features
+## Motivation / なぜ作ったか
 
-- **Instant preview** — Split view (editor + rendered Markdown side by side) or WYSIWYG mode
-- **Folder workspace** — Open a folder and browse all files in a sidebar tree
-- **Mermaid diagrams** — Flowcharts, sequence diagrams, Gantt charts rendered inline
-- **Tabbed editing** — Multiple files open simultaneously (⌘T for new tab)
-- **Syntax highlighting** — Markdown syntax highlighted in the editor
-- **Full-text search** — Search across all files in your workspace
-- **Git panel** — View branch and status at a glance
-- **AI assist** — Send selected text to OpenAI / Anthropic / Gemini (API key required)
-- **Autosave** — Changes saved automatically; manual save with ⌘S
-- **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized
-- **Offline-first** — Mermaid.js and EasyMDE bundled, no CDN required
+I wanted a simple, fast Markdown editor that felt at home on macOS — one that opens a folder, shows files, and gets out of the way. Nothing more, nothing less.
+
+シンプルで軽快な Markdown エディタが欲しかった。フォルダを開いて、ファイルを一覧して、あとは邪魔しない。それだけのツールを、Mac らしい質感で作りたかった。
 
 ---
 
-## Screenshots
+## Features / 機能
 
-> _Split view: editor on the left, live Markdown preview on the right_
-
-```
-┌─────────────────┬──────────────────────────────┐
-│  EXPLORER       │ ## Hello kobaamd              │
-│                 │                               │
-│  README.md   ●  │ A lightweight Markdown editor │
-│  CHANGELOG.md   │ for the AI era.               │
-│  docs/          │                               │
-│    spec.md      │ ┌─────────────────────────┐   │
-│    notes.md     │ │  flowchart TD           │   │
-│                 │ │    A --> B --> C         │   │
-│                 │ └── [Mermaid diagram] ─────┘   │
-└─────────────────┴──────────────────────────────┘
-```
+- **Instant preview / リアルタイムプレビュー** — Split view or WYSIWYG mode / スプリットビューまたは WYSIWYG モード
+- **Folder workspace / フォルダワークスペース** — Open a folder and browse all files in a sidebar / フォルダを開いてサイドバーでファイルを管理
+- **Mermaid diagrams / Mermaid ダイアグラム** — Flowcharts, sequence diagrams, Gantt charts rendered inline / フローチャート・シーケンス図・ガントチャートをインラインで描画
+- **Tabbed editing / タブ編集** — Multiple files open simultaneously (⌘T) / 複数ファイルを同時に開く（⌘T）
+- **Syntax highlighting / シンタックスハイライト** — Markdown syntax highlighted in the editor / エディタ内の Markdown 構文をハイライト
+- **Full-text search / 全文検索** — Search across all files in your workspace / ワークスペース全ファイルを横断検索
+- **Git panel / Git パネル** — View branch and status at a glance / ブランチ・差分をひと目で確認
+- **AI assist / AI アシスト** — Send selected text to OpenAI / Anthropic / Gemini / 選択テキストを AI API に送信
+- **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
+- **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
+- **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
 
 ---
 
-## Requirements
+## Requirements / 動作環境
 
-- macOS 14 (Sonoma) or later
-- Apple Silicon (arm64) — Intel untested
+- macOS 14 (Sonoma) or later / macOS 14（Sonoma）以降
+- Apple Silicon (arm64) — Intel untested / Apple Silicon 推奨（Intel 未検証）
 
 ---
 
-## Build
+## Build / ビルド
 
 kobaamd uses Swift Package Manager. No Xcode project required.
+Swift Package Manager を使用します。Xcode プロジェクト不要。
 
 ```bash
-# Clone
+# Clone / クローン
 git clone https://github.com/kobaaam/kobaamd.git
 cd kobaamd
 
-# Build
+# Build / ビルド
 swift build
 
 # Bundle into .app (copies binary + resources + app icon)
+# .app バンドルを作成（バイナリ・リソース・アイコンをコピー）
 ./scripts/post-build.sh
 
-# Launch
+# Launch / 起動
 open .build/kobaamd.app
 ```
 
-### Release build
+### Release build / リリースビルド
 
 ```bash
 swift build -c release
@@ -92,18 +65,21 @@ swift build -c release
 open .build/kobaamd.app
 ```
 
-### Set as default Markdown editor
+### Set as default Markdown editor / デフォルトの Markdown エディタに設定
 
 After launching once, open any `.md` file in Finder → **Get Info (⌘I)** → "Open With" → select **kobaamd** → **"Change All…"**
 
+一度起動後、Finder で `.md` ファイルを右クリック → **「情報を見る（⌘I）」** → 「このアプリケーションで開く」→ **kobaamd** を選択 → **「すべてを変更...」**
+
 ---
 
-## Architecture
+## Architecture / アーキテクチャ
 
 ```
 kobaamd/
 ├── Sources/
 │   ├── App/                    # Entry point, AppViewModel, commands
+│   │                           # エントリポイント・グローバル状態・コマンド
 │   ├── Models/                 # FileNode, EditorTab
 │   ├── Views/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
@@ -125,40 +101,40 @@ kobaamd/
 
 ---
 
-## Keyboard Shortcuts
+## Keyboard Shortcuts / キーボードショートカット
 
-| Shortcut | Action |
-|----------|--------|
-| ⌘O | Open folder |
-| ⌘N | New file |
-| ⌘T | New tab |
-| ⌘W | Close tab |
-| ⌘S | Save |
-| ⌘F | Find & Replace |
-| ⌘B | Toggle sidebar |
-| ⌘G | Toggle Git panel |
-| ⌘E | AI assist |
-| ⌘, | Settings |
-
----
-
-## Roadmap
-
-- [ ] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax
-- [ ] **TreeSitter syntax highlighting** — Full language support in code blocks
-- [ ] **Export** — PDF, HTML export
-- [ ] **Outline panel** — Navigate headings
-- [ ] **Custom themes** — Light/dark/custom color schemes
-- [ ] **Apple Silicon notarization** — App Store / direct download
+| Shortcut | Action / アクション |
+|----------|---------------------|
+| ⌘O | Open folder / フォルダを開く |
+| ⌘N | New file / 新規ファイル |
+| ⌘T | New tab / 新しいタブ |
+| ⌘W | Close tab / タブを閉じる |
+| ⌘S | Save / 保存 |
+| ⌘F | Find & Replace / 検索・置換 |
+| ⌘B | Toggle sidebar / サイドバー表示切替 |
+| ⌘G | Toggle Git panel / Git パネル表示切替 |
+| ⌘E | AI assist / AI アシスト |
+| ⌘, | Settings / 設定 |
 
 ---
 
-## Contributing
+## Roadmap / ロードマップ
+
+- [ ] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
+- [ ] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
+- [ ] **Export** — PDF, HTML export / PDF・HTML エクスポート
+- [ ] **Outline panel** — Navigate headings / 見出しナビゲーション
+- [ ] **Custom themes** — Light/dark/custom color schemes / カスタムカラーテーマ
+
+---
+
+## Contributing / コントリビュート
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+貢献を歓迎します。[CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
 
 ---
 
-## License
+## License / ライセンス
 
 MIT — see [LICENSE](LICENSE).
