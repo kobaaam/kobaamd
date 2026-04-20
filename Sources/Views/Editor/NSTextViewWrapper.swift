@@ -62,6 +62,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
         scrollView.documentView = textView
+        // Attach line number ruler (already implemented in LineNumberRulerView).
+        LineNumberRulerView.install(on: scrollView, textView: textView)
         return scrollView
     }
 
@@ -126,6 +128,8 @@ struct NSTextViewWrapper: NSViewRepresentable {
             // Push text to SwiftUI binding before highlighting.
             parent.text = textView.string
             applyHighlight(to: textView)
+            // Refresh line number ruler.
+            textView.enclosingScrollView?.verticalRulerView?.needsDisplay = true
         }
     }
 }
