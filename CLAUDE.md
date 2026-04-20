@@ -82,14 +82,73 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 
 ---
 
-## 作業ルール（automode用）
+## ⚠️ 厳守ルール：役割分担（最重要）
 
-- **コード実装はCodexに依頼する**。Claudeはアーキテクチャ判断・レビュー・コアロジックを担当
-- **調査・ドキュメントはGeminiに依頼する**
-- タスクは上記リストを上から順に進める
-- 各タスク完了後、次のタスクを自動で開始する
-- APIキー・秘密情報は絶対に出力しない
-- コードはリポジトリ内（`/Users/h.kobayashi02/atelier/kobaamd/`）に書く
+> **このルールを守らないことは、プロジェクトの開発体制を壊すことと同義です。**
+> Claudeが直接コードを書くことは原則禁止です。
+
+### Claude が単独でやること（これだけ）
+- アーキテクチャの判断・設計
+- コードレビュー・方針のすり合わせ
+- バグの根本原因の特定
+- Codex / Gemini へのプロンプト作成と結果の取り込み
+
+### Codex に必ず依頼すること
+以下に該当する作業は **必ずCodexを呼び出してから実装すること**。自分でコードを書いてはいけない。
+
+| 作業カテゴリ | 例 |
+|---|---|
+| SwiftUI View の追加・変更 | TabBarView, SplitDivider, ツールチップ追加など |
+| ViewModel / Service の追加・変更 | openInTab(), タブ管理メソッドなど |
+| バグ修正（コード変更を伴うもの） | Mermaid修正, 段ずれ修正など |
+| リファクタリング | height統一, header削除など |
+| AppDelegate / App エントリポイントの変更 | WindowGroup→Window切り替えなど |
+
+**判断基準**: `.swift` ファイルを新規作成・編集するなら → **Codexに依頼**
+
+### Gemini に必ず依頼すること
+- 技術調査・選定比較
+- ドキュメント生成（README, CONTRIBUTING など）
+- デザイン方針の相談
+
+---
+
+### Codex 呼び出し手順（実装依頼のテンプレート）
+
+```bash
+source ~/.zshrc
+PROMPT="以下のSwift/SwiftUIコードを実装してください。\n\n【目的】\n...\n\n【対象ファイル】\n...\n\n【変更内容】\n..."
+curl -s https://api.openai.com/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d "$(jq -n --arg p "$PROMPT" '{model:"gpt-5.1-codex-mini", input:$p}')" \
+  | jq -r '(.output[] | select(.type=="message") | .content[0].text)'
+```
+
+### Gemini 呼び出し手順
+
+```bash
+source ~/.zshrc
+cat > /tmp/req.json << 'EOF'
+{"contents": [{"parts": [{"text": "プロンプト"}]}]}
+EOF
+curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @/tmp/req.json \
+  | jq -r '.candidates[0].content.parts[0].text'
+```
+> **注意**: Geminiへのプロンプトは日本語特殊文字が含まれる場合、必ずファイル経由で渡すこと
+
+---
+
+## 作業フロー（automode用）
+
+1. ユーザーの要求を受ける
+2. **Gemini** に調査・設計相談（必要な場合）
+3. Claude がアーキテクチャを決定・Codexへのプロンプトを設計
+4. **Codex** に実装を依頼し、出力をレビューしてファイルに反映
+5. ビルド確認（`swift build && ./scripts/post-build.sh && open .build/kobaamd.app`）
+6. APIキー・秘密情報は絶対に出力しない
 
 ---
 

@@ -7,7 +7,7 @@ struct kobaamdApp: App {
     @State private var appViewModel = AppViewModel()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("kobaamd") {
             MainWindowView()
                 .environment(appViewModel)
                 .alert("Error", isPresented: Bindable(appViewModel).showError) {
@@ -16,6 +16,7 @@ struct kobaamdApp: App {
                     Text(appViewModel.errorMessage ?? "")
                 }
         }
+        .handlesExternalEvents(matching: ["*"])
         .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -79,6 +80,7 @@ extension Notification.Name {
     static let gitPanelRequested      = AppCommand.toggleGitPanel.notificationName
     static let newTabRequested        = AppCommand.newTab.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
+    static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
 }
 
 // MARK: - App Delegate (window frame save/restore)
@@ -87,6 +89,25 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowFrameKey = "windowFrame"
     private var moveObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
+
+    /// Finder ダブルクリック（URL配列版・現代的 API）
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first,
+              FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+        AppState.shared.pendingOpenFileURL = url
+        NSApp.activate(ignoringOtherApps: true)
+        application.windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Finder ダブルクリック（レガシー単一ファイル API）。true を返して新規ウィンドウ生成を抑制。
+    func application(_ application: NSApplication, openFile filename: String) -> Bool {
+        let url = URL(fileURLWithPath: filename)
+        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return false }
+        AppState.shared.pendingOpenFileURL = url
+        NSApp.activate(ignoringOtherApps: true)
+        application.windows.first?.makeKeyAndOrderFront(nil)
+        return true
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // ツールチップを 0.5秒で表示（デフォルト ~1秒）

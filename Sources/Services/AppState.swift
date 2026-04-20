@@ -1,6 +1,11 @@
 import Foundation
+import Observation
 
-final class AppState {
+@Observable final class AppState {
+    /// Finder ダブルクリック / ドロップで開くべきファイル URL。
+    /// AppDelegate がセットし、MainWindowView の onChange で検知してタブを開く。
+    var pendingOpenFileURL: URL? = nil
+
     // Inject UserDefaults for testability; defaults to .standard in production.
     let defaults: UserDefaults
 
