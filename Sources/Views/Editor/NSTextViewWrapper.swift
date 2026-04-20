@@ -14,15 +14,17 @@ struct NSTextViewWrapper: NSViewRepresentable {
     @Binding var text: String
     @Binding var scrollRatio: Double   // drives editor↔preview sync
     var fileURL: URL?                  // used by image-paste to resolve ./assets/
+    var scrollToLine: Int?             // Outline view scroll request
 
     // Fixed sRGB values, matching HighlightService (labelColor goes white on macOS 26 dark).
     fileprivate static let inkColor   = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
     fileprivate static let editorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
 
-    init(binding: Binding<String>, scrollRatio: Binding<Double>, fileURL: URL? = nil) {
+    init(binding: Binding<String>, scrollRatio: Binding<Double>, fileURL: URL? = nil, scrollToLine: Int? = nil) {
         self._text        = binding
         self._scrollRatio = scrollRatio
         self.fileURL      = fileURL
+        self.scrollToLine = scrollToLine
     }
 
     func makeCoordinator() -> Coordinator {
@@ -79,6 +81,13 @@ struct NSTextViewWrapper: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        // Handle Outline → scroll-to-line request.
+        if let line = scrollToLine, line != context.coordinator.lastScrolledLine {
+            context.coordinator.lastScrolledLine = line
+            scrollTextView(textView, toLine: line)
+        }
+
         guard textView.string != text else { return }
 
         // External text update (file open) — re-highlight after replacing.
@@ -98,9 +107,20 @@ struct NSTextViewWrapper: NSViewRepresentable {
 
     // MARK: - Coordinator
 
+    // Scroll NSTextView to a 1-based line number.
+    private func scrollTextView(_ textView: NSTextView, toLine lineNumber: Int) {
+        let lines = textView.string.components(separatedBy: "\n")
+        guard lineNumber >= 1, lineNumber <= lines.count else { return }
+        let charOffset = lines.prefix(lineNumber - 1).reduce(0) { $0 + $1.count + 1 }
+        let range = NSRange(location: min(charOffset, textView.string.count), length: 0)
+        textView.scrollRangeToVisible(range)
+        textView.setSelectedRange(range)
+    }
+
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NSTextViewWrapper
         var isUpdating = false
+        var lastScrolledLine: Int? = nil
         private let highlighter = HighlightService()
 
         init(parent: NSTextViewWrapper) {

@@ -7,8 +7,9 @@ struct SidebarView: View {
     @State private var reloadDebounceTask: Task<Void, Never>? = nil
 
     enum SidebarTab: String, CaseIterable {
-        case files = "Files"
-        case search = "Search"
+        case files   = "Files"
+        case outline = "Outline"
+        case search  = "Search"
     }
 
     var body: some View {
@@ -46,6 +47,13 @@ struct SidebarView: View {
             switch selectedTab {
             case .files:
                 filePanel
+            case .outline:
+                OutlineView(text: Binding(
+                    get: { appViewModel.editorText },
+                    set: { _ in }  // read-only from outline's perspective
+                )) { lineNumber in
+                    appViewModel.scrollToLineNumber = lineNumber
+                }
             case .search:
                 SearchView(fileTreeViewModel: fileTreeViewModel)
             }

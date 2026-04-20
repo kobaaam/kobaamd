@@ -42,7 +42,9 @@ struct EditorView: View {
                 alignment: .bottom
             )
 
-            NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio, fileURL: appViewModel.selectedFileURL)
+            NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio,
+                              fileURL: appViewModel.selectedFileURL,
+                              scrollToLine: appViewModel.scrollToLineNumber)
                 .background(Color.kobaPaper)   // paper colour fed through drawsBackground=false
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onDrop(of: [.fileURL], isTargeted: nil) { providers in
