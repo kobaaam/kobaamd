@@ -12,15 +12,17 @@ import AppKit
 //
 struct NSTextViewWrapper: NSViewRepresentable {
     @Binding var text: String
-    @Binding var scrollRatio: Double   // reserved — not yet exported
+    @Binding var scrollRatio: Double   // drives editor↔preview sync
+    var fileURL: URL?                  // used by image-paste to resolve ./assets/
 
     // Fixed sRGB values, matching HighlightService (labelColor goes white on macOS 26 dark).
     fileprivate static let inkColor   = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1)
     fileprivate static let editorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
 
-    init(binding: Binding<String>, scrollRatio: Binding<Double>) {
+    init(binding: Binding<String>, scrollRatio: Binding<Double>, fileURL: URL? = nil) {
         self._text        = binding
         self._scrollRatio = scrollRatio
+        self.fileURL      = fileURL
     }
 
     func makeCoordinator() -> Coordinator {
@@ -135,6 +137,41 @@ struct NSTextViewWrapper: NSViewRepresentable {
             let pos = scrollView.contentView.bounds.minY
             let total = textView.bounds.height - scrollView.contentSize.height
             parent.scrollRatio = total > 0 ? max(0, min(1, pos / total)) : 0
+        }
+
+        // MARK: Image paste
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == NSSelectorFromString("paste:") {
+                return handleImagePaste(in: textView)
+            }
+            return false
+        }
+
+        /// Intercepts paste when the clipboard contains an image.
+        /// Saves it to ./assets/ beside the open file, then inserts a Markdown image link.
+        private func handleImagePaste(in textView: NSTextView) -> Bool {
+            let pb = NSPasteboard.general
+            guard let image = NSImage(pasteboard: pb) else { return false }
+
+            // Resolve ./assets/ directory relative to the currently open file.
+            guard let fileURL = parent.fileURL,
+                  let tiffData = image.tiffRepresentation,
+                  let bitmapRep = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else { return false }
+
+            let assetsDir = fileURL.deletingLastPathComponent().appendingPathComponent("assets", isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: assetsDir, withIntermediateDirectories: true)
+                let fileName = "image-\(Int(Date().timeIntervalSince1970)).png"
+                let destURL = assetsDir.appendingPathComponent(fileName)
+                try pngData.write(to: destURL)
+                let mdLink = "![](./assets/\(fileName))"
+                textView.insertText(mdLink, replacementRange: textView.selectedRange)
+                return true
+            } catch {
+                return false
+            }
         }
 
         // MARK: NSTextViewDelegate
