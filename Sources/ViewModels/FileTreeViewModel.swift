@@ -37,6 +37,22 @@ final class FileTreeViewModel {
         nodes = FileService().loadNodes(at: rootURL)
     }
 
+    /// Creates a new .md file in the given directory with a unique name and returns its URL.
+    func createNewFile(in directory: URL) throws -> URL {
+        let service = FileService()
+        var name = "Untitled.md"
+        var counter = 1
+        var target = directory.appendingPathComponent(name)
+        while FileManager.default.fileExists(atPath: target.path) {
+            name = "Untitled-\(counter).md"
+            target = directory.appendingPathComponent(name)
+            counter += 1
+        }
+        try service.saveFile(at: target, content: "")
+        reload()
+        return target
+    }
+
     /// Creates a new .md file in rootURL with a unique name and returns its URL.
     func createNewFileInRoot() throws -> URL {
         guard let rootURL else {

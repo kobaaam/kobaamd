@@ -30,6 +30,28 @@ struct FileTreeView: View {
                             .fontWeight(isSelected ? .semibold : .regular)
                             .tag(node)
                             .contextMenu {
+                                if node.isDirectory {
+                                    Button {
+                                        do {
+                                            let newURL = try fileTreeViewModel.createNewFile(in: node.url)
+                                            appViewModel.selectedFileURL = newURL
+                                            appViewModel.editorText = ""
+                                            appViewModel.markSaved()
+                                            AppState.saveLastFile(newURL)
+                                            let newFileNode = FileNode(name: newURL.lastPathComponent,
+                                                                       url: newURL,
+                                                                       isDirectory: false,
+                                                                       children: nil)
+                                            renamingNode = newFileNode
+                                            renameText = newURL.lastPathComponent
+                                            showRenameAlert = true
+                                        } catch {
+                                            appViewModel.showAppError(.fileWriteFailed(url: node.url, underlying: error))
+                                        }
+                                    } label: {
+                                        Label("新規ファイル...", systemImage: "doc.badge.plus")
+                                    }
+                                }
                                 Button {
                                     renamingNode = node
                                     renameText = node.name
