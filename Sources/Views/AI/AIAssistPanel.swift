@@ -13,6 +13,14 @@ struct AIAssistPanel: View {
 
     private let service = AIService()
 
+    private static let templates: [(label: String, prompt: String)] = [
+        ("要約",    "この文章を3行で要約してください。"),
+        ("整形",    "技術文書として読みやすく整形してください。Markdown形式で出力してください。"),
+        ("箇条書き", "箇条書き（- ）形式に変換してください。"),
+        ("英訳",    "英語に翻訳してください。"),
+        ("レビュー", "このコードをレビューして、改善点と問題点を指摘してください。"),
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -40,6 +48,25 @@ struct AIAssistPanel: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color.kobaSurface)
+            .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
+
+            // Prompt templates
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Self.templates, id: \.label) { t in
+                        Button(t.label) { prompt = t.prompt }
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.kobaMute)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 10)
+                            .background(Color.kobaSurface)
+                            .clipShape(Capsule())
+                            .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
             .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
 
             // Prompt input
