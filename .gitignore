@@ -17,6 +17,9 @@ DerivedData/
 # Swift Package Manager
 .swiftpm/
 
+# Claude Code local settings
+.claude/
+
 # Internal docs (not for public)
 PRD.md
 ARCHITECTURE.md
