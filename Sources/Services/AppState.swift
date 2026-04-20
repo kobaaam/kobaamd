@@ -1,41 +1,61 @@
 import Foundation
 
 final class AppState {
-    private static let defaults = UserDefaults.standard
-    private static let lastFolderKey = "lastFolderURL"
-    private static let lastFileKey = "lastFileURL"
+    // Inject UserDefaults for testability; defaults to .standard in production.
+    let defaults: UserDefaults
+
+    static let shared = AppState()
+
+    private static let lastFolderKey  = "lastFolderURL"
+    private static let lastFileKey    = "lastFileURL"
     private static let recentFilesKey = "recentFiles"
     private static let maxRecentFiles = 10
 
-    static func saveLastFolder(_ url: URL) {
-        defaults.set(url.path, forKey: lastFolderKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
     }
 
-    static func loadLastFolder() -> URL? {
-        guard let path = defaults.string(forKey: lastFolderKey) else { return nil }
+    // MARK: - Instance API (preferred for testing)
+
+    func saveLastFolder(_ url: URL) {
+        defaults.set(url.path, forKey: Self.lastFolderKey)
+    }
+
+    func loadLastFolder() -> URL? {
+        guard let path = defaults.string(forKey: Self.lastFolderKey) else { return nil }
         return URL(filePath: path)
     }
 
-    static func saveLastFile(_ url: URL) {
-        defaults.set(url.path, forKey: lastFileKey)
-        var recent = defaults.stringArray(forKey: recentFilesKey) ?? []
+    func saveLastFile(_ url: URL) {
+        defaults.set(url.path, forKey: Self.lastFileKey)
+        var recent = defaults.stringArray(forKey: Self.recentFilesKey) ?? []
         recent.removeAll { $0 == url.path }
         recent.insert(url.path, at: 0)
-        defaults.set(Array(recent.prefix(maxRecentFiles)), forKey: recentFilesKey)
+        defaults.set(Array(recent.prefix(Self.maxRecentFiles)), forKey: Self.recentFilesKey)
     }
 
-    static func loadLastFile() -> URL? {
-        guard let path = defaults.string(forKey: lastFileKey) else { return nil }
+    func loadLastFile() -> URL? {
+        guard let path = defaults.string(forKey: Self.lastFileKey) else { return nil }
         return URL(filePath: path)
     }
 
-    static func loadRecentFiles() -> [URL] {
-        (defaults.stringArray(forKey: recentFilesKey) ?? [])
+    func loadRecentFiles() -> [URL] {
+        (defaults.stringArray(forKey: Self.recentFilesKey) ?? [])
             .compactMap { URL(filePath: $0) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    static func clearRecentFiles() {
-        defaults.removeObject(forKey: recentFilesKey)
+    func clearRecentFiles() {
+        defaults.removeObject(forKey: Self.recentFilesKey)
     }
+
+    // MARK: - Static shims (backward compatibility)
+    // Call sites can migrate to AppState.shared.xxx() over time.
+
+    static func saveLastFolder(_ url: URL) { shared.saveLastFolder(url) }
+    static func loadLastFolder() -> URL?   { shared.loadLastFolder() }
+    static func saveLastFile(_ url: URL)   { shared.saveLastFile(url) }
+    static func loadLastFile() -> URL?     { shared.loadLastFile() }
+    static func loadRecentFiles() -> [URL] { shared.loadRecentFiles() }
+    static func clearRecentFiles()         { shared.clearRecentFiles() }
 }
