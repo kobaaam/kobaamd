@@ -21,7 +21,19 @@ let package = Package(
             dependencies: [
                 .product(name: "Markdown", package: "swift-markdown")
             ],
-            path: "Sources"
+            path: "Sources",
+            swiftSettings: [
+                // Allow @testable import kobaamd in test targets
+                .unsafeFlags(["-enable-testing"])
+            ]
+        ),
+        .testTarget(
+            name: "kobaamdTests",
+            dependencies: [
+                "kobaamd",
+                .product(name: "Markdown", package: "swift-markdown")
+            ],
+            path: "Tests"
         )
     ]
 )
