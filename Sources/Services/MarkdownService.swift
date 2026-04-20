@@ -2,6 +2,14 @@ import Foundation
 import Markdown
 
 final class MarkdownService {
+
+    /// ボディのコンテンツだけ返す（WKWebView の差分更新用）。
+    func toBodyHTML(_ text: String) -> String {
+        let document = Markdown.Document(parsing: text)
+        return renderChildren(of: document)
+    }
+
+    /// 初回ロード用のフル HTML（シェル＋スタイル＋mermaid.js 込み）。
     func toHTML(_ text: String) -> String {
         let document = Markdown.Document(parsing: text)
         let bodyContent = renderChildren(of: document)

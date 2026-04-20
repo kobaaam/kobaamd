@@ -41,7 +41,8 @@ final class FileService {
         return folderURL
     }
 
-    private func children(of directory: URL) -> [FileNode] {
+    private func children(of directory: URL, depth: Int = 0, maxDepth: Int = 5) -> [FileNode] {
+        guard depth < maxDepth else { return [] }
         do {
             let contents = try fileManager.contentsOfDirectory(
                 at: directory,
@@ -52,7 +53,8 @@ final class FileService {
             for item in contents {
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
-                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: true, children: children(of: item)))
+                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: true,
+                                         children: children(of: item, depth: depth + 1, maxDepth: maxDepth)))
                 } else if FileService.supportedExtensions.contains(item.pathExtension.lowercased()) {
                     nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: false, children: nil))
                 }

@@ -16,9 +16,12 @@ struct kobaamdApp: App {
                     Text(appViewModel.errorMessage ?? "")
                 }
         }
+        .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {
                 let recentFiles = AppState.loadRecentFiles()
+                Button("New Tab") { AppCommand.newTab.post() }
+                    .keyboardShortcut("t", modifiers: .command)
                 Button("New File") { AppCommand.newFile.post() }
                     .keyboardShortcut("n", modifiers: .command)
                 Button("Open Folder…") { AppCommand.openFolder.post() }
@@ -74,6 +77,7 @@ extension Notification.Name {
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
     static let gitPanelRequested      = AppCommand.toggleGitPanel.notificationName
+    static let newTabRequested        = AppCommand.newTab.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
 }
 
@@ -85,6 +89,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var resizeObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // ツールチップを 0.5秒で表示（デフォルト ~1秒）
+        UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
         subscribeToWindowNotifications()
         DispatchQueue.main.async { [weak self] in
             self?.restoreWindowFrame()

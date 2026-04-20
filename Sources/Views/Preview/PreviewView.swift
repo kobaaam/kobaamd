@@ -7,11 +7,27 @@ struct PreviewView: View {
     @State private var isReady = false
 
     var body: some View {
-        Group {
+        ZStack {
             if isReady {
-                MarkdownWebView(html: previewViewModel.html, scrollRatio: appViewModel.previewScrollRatio)
+                MarkdownWebView(
+                    shellHTML: previewViewModel.shellHTML,
+                    bodyHTML: previewViewModel.bodyHTML,
+                    scrollRatio: appViewModel.previewScrollRatio
+                )
             } else {
-                Color.kobaSurface  // lightweight placeholder
+                Color.kobaSurface
+            }
+            if previewViewModel.isRendering {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.7)
+                            .padding(10)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

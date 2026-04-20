@@ -4,14 +4,19 @@ import SwiftUI
 // Single source of truth for the app's color palette.
 // Add new colors here; never hardcode hex values elsewhere.
 extension Color {
-    static let kobaPaper   = Color(hex: "fdfcf8")  // Editor background (warm white)
-    static let kobaSurface = Color(hex: "ffffff")  // Panel surfaces
-    static let kobaSidebar = Color(hex: "fafaf7")  // Sidebar background
-    static let kobaAccent  = Color(hex: "FF5B1F")  // Brand orange
-    static let kobaLine    = Color(hex: "e0ddd8")  // Dividers / borders
-    static let kobaMute    = Color(hex: "888888")  // Secondary text
-    static let kobaMute2   = Color(hex: "aaaaaa")  // Tertiary text / labels
-    static let kobaInk     = Color(hex: "1a1a1a")  // Primary text
+    // Handoff tokens (tokens.css 準拠)
+    static let kobaInk        = Color(hex: "0E0E0E")  // --koba-ink
+    static let kobaPaper      = Color(hex: "FDFBF5")  // --koba-paper
+    static let kobaAccent     = Color(hex: "FF5B1F")  // --koba-accent
+    static let kobaAccentInk  = Color(hex: "B8380B")  // --koba-accent-ink
+    static let kobaAccentSoft = Color(hex: "FFE7D8")  // --koba-accent-soft
+    static let kobaMute       = Color(hex: "6A6A6A")  // --koba-mute
+    static let kobaMute2      = Color(hex: "9A9A9A")  // --koba-mute-2
+    static let kobaLine       = Color(hex: "D8D6CF")  // --koba-faint (dividers)
+
+    // Derived surfaces (handoff で明示なし → paper/ink から導出)
+    static let kobaSurface = Color(hex: "F5F3ED")  // panel background
+    static let kobaSidebar = Color(hex: "F0EEE8")  // sidebar background
 
     init(hex: String) {
         let h = hex.trimmingCharacters(in: .alphanumerics.inverted)

@@ -26,6 +26,7 @@ struct SidebarView: View {
                             .padding(.vertical, 7)
                     }
                     .buttonStyle(.plain)
+                    .help(tab == .files ? "ファイルツリーを表示" : "ワークスペース内を全文検索")
                     .background(
                         selectedTab == tab
                             ? Color.kobaSurface
@@ -39,7 +40,7 @@ struct SidebarView: View {
                     )
                 }
             }
-            .frame(height: 32)
+            .frame(height: 34)
             .background(Color.kobaSidebar)
             .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
 
@@ -78,12 +79,10 @@ struct SidebarView: View {
             }
             if let lastURL = AppState.loadLastFile(),
                FileManager.default.fileExists(atPath: lastURL.path) {
-                appViewModel.selectedFileURL = lastURL
-                Task {
+                Task.detached {
                     if let content = try? FileService().readFile(at: lastURL) {
                         await MainActor.run {
-                            appViewModel.editorText = content
-                            appViewModel.markSaved()
+                            appViewModel.openInTab(url: lastURL, content: content)
                         }
                     }
                 }
@@ -214,7 +213,7 @@ struct SidebarView: View {
             fileTreeViewModel.openFolder(url: folder)
         }
         appViewModel.selectedFileURL = url
-        Task {
+        Task.detached {
             if let content = try? FileService().readFile(at: url) {
                 await MainActor.run {
                     appViewModel.editorText = content

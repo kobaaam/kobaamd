@@ -1,1 +1,27 @@
+# Build artifacts
 .build/
+*.o
+*.d
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode (if ever used)
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Swift Package Manager
+.swiftpm/
+
+# Test / scratch files
+test-*.md
+Untitled*.md
+
+# Editor configs
+.vscode/
+*.swp
+*~

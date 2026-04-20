@@ -7,6 +7,7 @@ final class FileTreeViewModel {
     var rootURL: URL? = nil
     var nodes: [FileNode] = []
     var selectedNode: FileNode? = nil
+    var isLoading: Bool = false
 
     func openFolder() {
         let openPanel = NSOpenPanel()
@@ -34,7 +35,15 @@ final class FileTreeViewModel {
 
     func reload() {
         guard let rootURL else { return }
-        nodes = FileService().loadNodes(at: rootURL)
+        let url = rootURL
+        isLoading = true
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let newNodes = FileService().loadNodes(at: url)
+            await MainActor.run {
+                self?.nodes = newNodes
+                self?.isLoading = false
+            }
+        }
     }
 
     /// Creates a new .md file in the given directory with a unique name and returns its URL.

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @State private var splitFraction: CGFloat = 0.55
 
     var body: some View {
         @Bindable var vm = appViewModel
@@ -18,23 +19,34 @@ struct MainWindowView: View {
                     KobaDivider()
                 }
 
-                if appViewModel.previewMode == .wysiwyg {
-                    @Bindable var vm = appViewModel
-                    WYSIWYGEditorView(text: $vm.editorText)
-                        .frame(minWidth: 320, maxWidth: .infinity)
-                        .background(Color.kobaPaper)
-                } else {
-                    EditorView()
-                        .frame(minWidth: 320, maxWidth: .infinity)
-                        .background(Color.kobaPaper)
+                VStack(spacing: 0) {
+                    TabBarView()
 
-                    if appViewModel.previewMode == .split {
-                        KobaDivider()
-                        PreviewView()
-                            .frame(minWidth: 260, idealWidth: 380)
-                            .background(Color.kobaSurface)
+                    if appViewModel.previewMode == .wysiwyg {
+                        @Bindable var vm = appViewModel
+                        WYSIWYGEditorView(text: $vm.editorText)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.kobaPaper)
+                    } else if appViewModel.previewMode == .split {
+                        GeometryReader { geo in
+                            HStack(spacing: 0) {
+                                EditorView()
+                                    .frame(width: max(280, geo.size.width * splitFraction))
+                                    .background(Color.kobaPaper)
+                                SplitDivider(fraction: $splitFraction, availableWidth: geo.size.width)
+                                PreviewView()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.kobaSurface)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        EditorView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.kobaPaper)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Git panel (trailing, slides in from right)
                 if appViewModel.isGitPanelVisible {
@@ -53,7 +65,10 @@ struct MainWindowView: View {
         }
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
-        .frame(minWidth: 900, minHeight: 600)
+        .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
+        .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
+            appViewModel.newTab()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
                 appViewModel.isSidebarVisible.toggle()
@@ -218,6 +233,7 @@ struct StatusCommandBar: View {
                                 .background(previewMode == mode ? Color.kobaInk : Color.clear)
                         }
                         .buttonStyle(.plain)
+                        .help(helpText(for: mode))
                     }
                 }
                 .background(Color.kobaLine.opacity(0.4))
@@ -244,6 +260,14 @@ struct StatusCommandBar: View {
             .fill(Color.kobaLine)
             .frame(width: 1, height: 12)
     }
+
+    func helpText(for mode: PreviewMode) -> String {
+        switch mode {
+        case .off:     return "エディタのみ表示"
+        case .split:   return "エディタ + プレビューを並べて表示"
+        case .wysiwyg: return "リアルタイムプレビュー（WYSIWYG）"
+        }
+    }
 }
 
 // MARK: - Small shared components
@@ -254,6 +278,39 @@ struct KobaDivider: View {
             .fill(Color.kobaLine)
             .frame(width: 1)
             .frame(maxHeight: .infinity)
+    }
+}
+
+// MARK: - Draggable split divider
+
+struct SplitDivider: View {
+    @Binding var fraction: CGFloat
+    let availableWidth: CGFloat
+    @State private var baseF: CGFloat = 0
+    @State private var isDragging: Bool = false
+
+    var body: some View {
+        Color.kobaLine
+            .frame(width: 1)
+            .frame(maxHeight: .infinity)
+            .padding(.horizontal, 3)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { v in
+                        if !isDragging {
+                            isDragging = true
+                            baseF = fraction
+                        }
+                        let newF = baseF + v.translation.width / availableWidth
+                        fraction = min(0.8, max(0.2, newF))
+                    }
+                    .onEnded { _ in isDragging = false }
+            )
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() }
+                else { NSCursor.pop() }
+            }
     }
 }
 

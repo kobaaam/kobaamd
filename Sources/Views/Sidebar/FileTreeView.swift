@@ -20,8 +20,6 @@ struct FileTreeView: View {
             } else {
                 List(selection: $listSelection) {
                     OutlineGroup(fileTreeViewModel.nodes, id: \.id, children: \.children) { node in
-                        // Use listSelection (local state) instead of appViewModel.selectedFileURL
-                        // to avoid every row re-rendering on file selection change
                         let isSelected = listSelection?.url == node.url
                         Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
                             .lineLimit(1)
@@ -29,6 +27,11 @@ struct FileTreeView: View {
                             .foregroundStyle(isSelected ? Color.kobaAccent : Color.kobaInk)
                             .fontWeight(isSelected ? .semibold : .regular)
                             .tag(node)
+                            .onTapGesture {
+                                guard !node.isDirectory else { return }
+                                listSelection = node
+                                select(node: node)
+                            }
                             .contextMenu {
                                 if node.isDirectory {
                                     Button {
@@ -69,10 +72,6 @@ struct FileTreeView: View {
                     }
                 }
                 .listStyle(.sidebar)
-                .onChange(of: listSelection) { _, node in
-                    guard let node else { return }
-                    select(node: node)
-                }
             }
         }
         .alert("名前を変更", isPresented: $showRenameAlert) {
@@ -105,17 +104,18 @@ struct FileTreeView: View {
     private func select(node: FileNode) {
         guard !node.isDirectory else { return }
         fileTreeViewModel.selectedNode = node
-        appViewModel.selectedFileURL = node.url
+        appViewModel.isFileLoading = true
         AppState.saveLastFile(node.url)
-        Task {
+        Task.detached {
             do {
                 let content = try FileService().readFile(at: node.url)
                 await MainActor.run {
-                    appViewModel.editorText = content
-                    appViewModel.markSaved()
+                    appViewModel.openInTab(url: node.url, content: content)
+                    appViewModel.isFileLoading = false
                 }
             } catch {
                 await MainActor.run {
+                    appViewModel.isFileLoading = false
                     appViewModel.showAppError(.fileReadFailed(url: node.url, underlying: error))
                 }
             }
