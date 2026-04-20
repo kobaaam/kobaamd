@@ -152,4 +152,130 @@ private final class KobaTextView: NSTextView {
             self?.onFirstAppear?()
         }
     }
+
+    // MARK: - Markdown auto-completion
+
+    private static let bracketPairs: [Character: Character] = [
+        "(": ")", "[": "]", "{": "}", "\"": "\"", "`": "`"
+    ]
+
+    override func keyDown(with event: NSEvent) {
+        if handleMarkdownKey(event) { return }
+        super.keyDown(with: event)
+    }
+
+    private func handleMarkdownKey(_ event: NSEvent) -> Bool {
+        guard let chars = event.characters, let first = chars.first else { return false }
+        switch first {
+        case "\t":
+            insertText("    ", replacementRange: selectedRange)
+            return true
+        case "\u{7f}", "\u{08}":
+            return handleSmartBackspace()
+        case "\r", "\n":
+            return handleNewline()
+        default:
+            guard Self.bracketPairs.keys.contains(first) else { return false }
+            handleBracketCompletion(for: first)
+            return true
+        }
+    }
+
+    private func handleBracketCompletion(for opening: Character) {
+        guard let closing = Self.bracketPairs[opening] else { return }
+        let range = selectedRange
+        if range.length > 0 {
+            let selection = (string as NSString).substring(with: range)
+            insertText("\(opening)\(selection)\(closing)", replacementRange: range)
+            selectedRange = NSRange(location: range.location + 1, length: range.length)
+        } else {
+            insertText("\(opening)\(closing)", replacementRange: range)
+            selectedRange = NSRange(location: range.location + 1, length: 0)
+        }
+    }
+
+    private func handleSmartBackspace() -> Bool {
+        let location = selectedRange.location
+        guard selectedRange.length == 0, location > 0 else { return false }
+        let ns = string as NSString
+        guard location < ns.length else { return false }
+        let prev = Character(ns.substring(with: NSRange(location: location - 1, length: 1)))
+        let next = Character(ns.substring(with: NSRange(location: location, length: 1)))
+        guard let expected = Self.bracketPairs[prev], expected == next else { return false }
+        insertText("", replacementRange: NSRange(location: location - 1, length: 2))
+        return true
+    }
+
+    private func handleNewline() -> Bool {
+        let ns = string as NSString
+        let location = selectedRange.location
+        let lineRange = ns.lineRange(for: NSRange(location: max(0, location - 1), length: 0))
+        let prefixLen = location - lineRange.location
+        guard prefixLen >= 0 else { return false }
+        let lineText = prefixLen > 0 ? ns.substring(with: NSRange(location: lineRange.location, length: prefixLen)) : ""
+        if handleFenceInsertion(lineText: lineText, cursorLocation: location) { return true }
+        if handleListContinuation(lineText: lineText, lineRange: lineRange, prefixLen: prefixLen) { return true }
+        return false
+    }
+
+    private func handleFenceInsertion(lineText: String, cursorLocation: Int) -> Bool {
+        let trimmed = lineText.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("```"), trimmed.count >= 3 else { return false }
+        let indent = String(lineText.prefix { $0.isWhitespace })
+        let newline = "\n" + indent
+        let closing = "\n" + indent + "```"
+        insertText(newline + closing, replacementRange: NSRange(location: cursorLocation, length: 0))
+        selectedRange = NSRange(location: cursorLocation + newline.utf16.count, length: 0)
+        return true
+    }
+
+    private func handleListContinuation(lineText: String, lineRange: NSRange, prefixLen: Int) -> Bool {
+        guard let (indent, marker, content) = parseListMarker(in: lineText) else { return false }
+        let ns = string as NSString
+        let lineEnd = lineRange.location + lineRange.length
+        let tail = lineEnd > selectedRange.location
+            ? ns.substring(with: NSRange(location: selectedRange.location, length: lineEnd - selectedRange.location))
+            : ""
+        guard tail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+
+        // Empty item → exit list mode.
+        if content.trimmingCharacters(in: .whitespaces).isEmpty {
+            let removalRange = NSRange(location: lineRange.location, length: prefixLen)
+            insertText("", replacementRange: removalRange)
+            insertText("\n", replacementRange: NSRange(location: lineRange.location, length: 0))
+            selectedRange = NSRange(location: lineRange.location + 1, length: 0)
+        } else {
+            // Increment ordered list numbers.
+            let nextMarker = nextListMarker(from: marker)
+            insertText("\n" + indent + nextMarker + " ",
+                       replacementRange: NSRange(location: selectedRange.location, length: 0))
+        }
+        return true
+    }
+
+    private func parseListMarker(in line: String) -> (indent: String, marker: String, content: String)? {
+        let indentEnd = line.firstIndex(where: { !$0.isWhitespace }) ?? line.endIndex
+        let indent = String(line[..<indentEnd])
+        let rest = String(line[indentEnd...])
+        for bullet in ["-", "*", "+"] {
+            if rest.hasPrefix(bullet + " ") {
+                return (indent, bullet, String(rest.dropFirst(bullet.count + 1)))
+            }
+        }
+        // Ordered list: "123. "
+        let digits = rest.prefix(while: { $0.isNumber })
+        if !digits.isEmpty {
+            let afterDigits = rest.dropFirst(digits.count)
+            if afterDigits.hasPrefix(". ") {
+                return (indent, String(digits) + ".", String(afterDigits.dropFirst(2)))
+            }
+        }
+        return nil
+    }
+
+    private func nextListMarker(from marker: String) -> String {
+        guard marker.hasSuffix("."),
+              let n = Int(marker.dropLast()) else { return marker }
+        return "\(n + 1)."
+    }
 }
