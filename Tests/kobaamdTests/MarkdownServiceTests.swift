@@ -96,20 +96,18 @@ struct MarkdownServiceTests {
     // MarkdownService deliberately forwards HTMLBlock/InlineHTML as-is.
     // Escaping is applied to TEXT nodes (headings, paragraphs, etc.).
 
-    @Test("< and > in paragraph text are escaped")
+    @Test("< and > in plain text are escaped")
     func anglebracketsInTextAreEscaped() {
-        // Markdown text that is NOT raw HTML — rendered as a paragraph
-        let html = body(of: svc.toHTML("use `1 < 2 > 0` comparison"))
-        // The inline code content is escaped
-        #expect(html.contains("&lt;") || html.contains("<code>"))
+        // Plain paragraph text (not raw HTML) — escapeHTML() must apply
+        let html = body(of: svc.toHTML("Use <tag> and > literally"))
+        #expect(html.contains("&lt;tag&gt;"))
+        #expect(html.contains("&gt;"))
     }
 
-    @Test("Heading text containing < is escaped")
+    @Test("Heading text with special characters is escaped")
     func headingTextIsEscaped() {
-        let html = body(of: svc.toHTML("# A &amp; B"))
-        // &amp; in source should appear as &amp;amp; (double escaped) or the literal &
-        // The key requirement: text-level escaping via escapeHTML() is applied
-        #expect(html.contains("<h1>"))
+        let html = body(of: svc.toHTML("# A < B & C"))
+        #expect(html.contains("<h1>A &lt; B &amp; C</h1>"))
     }
 
     @Test("Ampersands in text are escaped")
@@ -135,5 +133,25 @@ struct MarkdownServiceTests {
     @Test("Mermaid script tag is always included")
     func mermaidScriptPresent() {
         #expect(svc.toHTML("test").contains("mermaid"))
+    }
+
+    // MARK: - Table
+
+    @Test("Table renders to table elements")
+    func tableRendering() {
+        let md = "| Name | Value |\n| --- | --- |\n| A | 1 |"
+        let html = body(of: svc.toHTML(md))
+        #expect(html.contains("<table>"))
+        #expect(html.contains("<td>A</td>"))
+        #expect(html.contains("<th>Name</th>") || html.contains("<th>"))
+    }
+
+    // MARK: - Mermaid code block
+
+    @Test("Mermaid code block gets language-mermaid class")
+    func mermaidBlockHasLanguageClass() {
+        let md = "```mermaid\ngraph TD;\nA-->B;\n```"
+        let html = svc.toHTML(md)
+        #expect(html.contains("language-mermaid"))
     }
 }

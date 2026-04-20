@@ -17,6 +17,22 @@ struct SearchViewModelTests {
         try content.write(to: tmpDir.appendingPathComponent(name), atomically: true, encoding: .utf8)
     }
 
+    // Polls until results appear or timeout (~1s). Avoids fragile fixed Task.sleep.
+    private func waitForResults(_ vm: SearchViewModel, attempts: Int = 20) async throws {
+        for _ in 0..<attempts {
+            if !vm.results.isEmpty { return }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    // Polls until isSearching becomes false.
+    private func waitForCompletion(_ vm: SearchViewModel, attempts: Int = 20) async throws {
+        for _ in 0..<attempts {
+            if !vm.isSearching { return }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
     // MARK: - Edge cases
 
     @Test("Empty query produces no results")
@@ -43,7 +59,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "Hello World"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(!vm.results.isEmpty)
         #expect(vm.results.contains { $0.matchLine.contains("Hello World") })
     }
@@ -54,7 +70,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "uppercase"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(!vm.results.isEmpty)
     }
 
@@ -64,7 +80,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "line three"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(vm.results.first?.lineNumber == 3)
     }
 
@@ -74,7 +90,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "match"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(vm.results.first?.fileName == "myfile.md")
     }
 
@@ -87,7 +103,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "hello"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForCompletion(vm)
         #expect(vm.results.isEmpty)
     }
 
@@ -97,7 +113,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "findMe"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(!vm.results.isEmpty)
     }
 
@@ -107,7 +123,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "findMe"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(!vm.results.isEmpty)
     }
 
@@ -120,7 +136,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "match target"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForResults(vm)
         #expect(vm.results.count <= 100)
     }
 
@@ -132,7 +148,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "xyznotfound"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForCompletion(vm)
         #expect(vm.results.isEmpty)
     }
 
@@ -144,7 +160,7 @@ struct SearchViewModelTests {
         let vm = SearchViewModel()
         vm.query = "sample"
         vm.search(in: tmpDir)
-        try await Task.sleep(for: .milliseconds(500))
+        try await waitForCompletion(vm)
         #expect(!vm.isSearching)
     }
 }

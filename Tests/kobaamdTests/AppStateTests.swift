@@ -102,4 +102,25 @@ struct AppStateTests {
         let paths = defaults.stringArray(forKey: "recentFiles") ?? []
         #expect(paths.isEmpty)
     }
+
+    // MARK: - loadRecentFiles filtering
+
+    @Test("loadRecentFiles skips missing files")
+    func loadRecentFilesSkipsMissingFiles() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let existing = dir.appendingPathComponent("note.md")
+        try "# live".write(to: existing, atomically: true, encoding: .utf8)
+        let missing = dir.appendingPathComponent("gone.md")   // file never created
+
+        state.saveLastFile(existing)
+        state.saveLastFile(missing)
+
+        let results = state.loadRecentFiles()
+        #expect(results.contains(existing))
+        #expect(!results.contains(missing))
+    }
 }
