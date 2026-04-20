@@ -22,6 +22,9 @@ let package = Package(
                 .product(name: "Markdown", package: "swift-markdown")
             ],
             path: "Sources",
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 // Allow @testable import kobaamd in test targets
                 .unsafeFlags(["-enable-testing"])

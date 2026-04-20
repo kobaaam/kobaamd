@@ -79,12 +79,27 @@ struct WYSIWYGEditorView: NSViewRepresentable {
 
     // MARK: - Static HTML template (no initial value injection — pushed after load)
 
-    static let htmlTemplate = """
+    // Inlines bundled JS/CSS for offline support. Falls back to CDN if resources are missing.
+    static let htmlTemplate: String = _makeEasyMDETemplate()
+}
+
+// MARK: - HTML template builder (free function avoids Swift parser issues with static let closures)
+
+private func _makeEasyMDETemplate() -> String {
+    let css = BundledJS.easymdeCss.isEmpty
+        ? #"<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">"#
+        : "<style>" + BundledJS.easymdeCss + "</style>"
+    let js = BundledJS.easymdeJS.isEmpty
+        ? #"<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>"#
+        : "<script>" + BundledJS.easymdeJS + "</script>"
+
+    let head = """
     <!DOCTYPE html>
     <html lang="ja">
     <head>
     <meta charset="utf-8">
-    <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+    """
+    let styles = """
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       html, body { height: 100%; background: #fdfcf8; }
@@ -120,7 +135,8 @@ struct WYSIWYGEditorView: NSViewRepresentable {
     </head>
     <body>
     <textarea id="editor"></textarea>
-    <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+    """
+    let script = """
     <script>
       var easyMDE = new EasyMDE({
         element: document.getElementById('editor'),
@@ -151,4 +167,6 @@ struct WYSIWYGEditorView: NSViewRepresentable {
     </body>
     </html>
     """
+
+    return head + "\n" + css + "\n" + styles + "\n" + js + "\n" + script
 }

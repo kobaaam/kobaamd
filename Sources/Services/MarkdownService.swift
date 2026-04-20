@@ -5,13 +5,18 @@ final class MarkdownService {
     func toHTML(_ text: String) -> String {
         let document = Markdown.Document(parsing: text)
         let bodyContent = renderChildren(of: document)
+        // Inline the bundled mermaid.min.js so preview works offline.
+        // BundledJS.mermaid is empty only if the resource is missing (build error).
+        let mermaidScript = BundledJS.mermaid.isEmpty
+            ? "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
+            : "<script>\(BundledJS.mermaid)</script>"
         return """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1">
-            <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+            \(mermaidScript)
             <script>
             document.addEventListener('DOMContentLoaded', function() {
               // Convert <pre><code class="language-mermaid"> to <div class="mermaid">
