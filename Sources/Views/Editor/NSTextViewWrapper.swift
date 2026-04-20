@@ -227,6 +227,35 @@ private final class KobaTextView: NSTextView {
         }
     }
 
+    // MARK: - Current line highlight
+
+    private static let lineHighlightColor = NSColor(srgbRed: 1.0, green: 0.937, blue: 0.820, alpha: 0.6)
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        highlightCurrentLine(in: rect)
+    }
+
+    private func highlightCurrentLine(in rect: NSRect) {
+        guard let layoutManager,
+              let textContainer else { return }
+        let selectedRange = self.selectedRange()
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+        var lineRect = layoutManager.boundingRect(forGlyphRange: NSRange(location: glyphRange.location, length: 0),
+                                                   in: textContainer)
+        lineRect.origin.x = 0
+        lineRect.size.width = bounds.width
+        lineRect.origin.y += textContainerInset.height
+        guard lineRect.intersects(rect) else { return }
+        Self.lineHighlightColor.setFill()
+        lineRect.fill()
+    }
+
+    override func setSelectedRange(_ charRange: NSRange, affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
+        super.setSelectedRange(charRange, affinity: affinity, stillSelecting: stillSelectingFlag)
+        needsDisplay = true
+    }
+
     // MARK: - Markdown auto-completion
 
     private static let bracketPairs: [Character: Character] = [
