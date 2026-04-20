@@ -10,7 +10,7 @@ struct SearchResult: Identifiable {
 
 @Observable
 @MainActor
-class SearchViewModel {
+final class SearchViewModel {
     var query: String = ""
     var results: [SearchResult] = []
     var isSearching: Bool = false
