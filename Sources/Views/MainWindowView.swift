@@ -66,6 +66,17 @@ struct MainWindowView: View {
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
+        .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
+            guard let url = fileURL else { return }
+            AppState.shared.pendingOpenFileURL = nil
+            Task.detached(priority: .userInitiated) {
+                if let content = try? FileService().readFile(at: url) {
+                    await MainActor.run {
+                        appViewModel.openInTab(url: url, content: content)
+                    }
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
             appViewModel.newTab()
         }

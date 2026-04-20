@@ -77,6 +77,8 @@ struct SidebarView: View {
             if let root = fileTreeViewModel.rootURL {
                 appViewModel.gitViewModel.configure(repoURL: root)
             }
+
+            // 前回開いていたファイルを復元（Finder 経由のオープンは MainWindowView.onChange が担当）
             if let lastURL = AppState.loadLastFile(),
                FileManager.default.fileExists(atPath: lastURL.path) {
                 Task.detached {
