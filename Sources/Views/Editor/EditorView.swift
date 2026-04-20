@@ -10,52 +10,32 @@ struct EditorView: View {
     @State private var scrollRatio: Double = 0
     @State private var autoSaveTask: Task<Void, Never>? = nil
 
-    var editorHeader: String {
-        guard let url = appViewModel.selectedFileURL else { return "No file open" }
-        return url.lastPathComponent
-    }
-
     var body: some View {
         @Bindable var vm = appViewModel
         VStack(spacing: 0) {
-            // Header bar
-            HStack(spacing: 10) {
-                Text(editorHeader)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(appViewModel.selectedFileURL == nil
-                        ? Color.kobaMute : Color.kobaInk)
-                if appViewModel.isDirty {
-                    Circle()
-                        .fill(Color.kobaAccent)
-                        .frame(width: 6, height: 6)
+            ZStack {
+                NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
+                    .background(Color.kobaPaper)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if appViewModel.isFileLoading {
+                    Color.kobaPaper.opacity(0.6)
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.8)
                 }
-                Spacer()
-                Text("\(appViewModel.lineCount) lines")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Color.kobaMute2)
             }
-            .padding(.horizontal, 14)
-            .frame(height: 32)
-            .background(Color.kobaSurface)
-            .overlay(
-                Rectangle().fill(Color.kobaLine).frame(height: 1),
-                alignment: .bottom
-            )
-
-            NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
-                .background(Color.kobaPaper)   // paper colour fed through drawsBackground=false
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
                     guard let provider = providers.first else { return false }
                     provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
                         guard let data = item as? Data,
                               let url = URL(dataRepresentation: data, relativeTo: nil),
                               FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
-                        Task { @MainActor in
+                        Task.detached {
                             if let content = try? FileService().readFile(at: url) {
-                                appViewModel.selectedFileURL = url
-                                appViewModel.editorText = content
-                                appViewModel.markSaved()
+                                await MainActor.run {
+                                    appViewModel.openInTab(url: url, content: content)
+                                }
                             }
                         }
                     }
