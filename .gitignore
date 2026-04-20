@@ -17,6 +17,11 @@ DerivedData/
 # Swift Package Manager
 .swiftpm/
 
+# Internal docs (not for public)
+PRD.md
+ARCHITECTURE.md
+CLAUDE.md
+
 # Test / scratch files
 test-*.md
 Untitled*.md
