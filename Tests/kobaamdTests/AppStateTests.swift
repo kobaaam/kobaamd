@@ -3,9 +3,9 @@ import Testing
 import Foundation
 
 // NOTE: AppState uses UserDefaults.standard directly.
-// Tests clear the relevant keys in setUp/tearDown.
+// .serialized prevents parallel execution that would cause UserDefaults race conditions.
 // Planned refactor: inject UserDefaults for proper test isolation.
-@Suite("AppState")
+@Suite("AppState", .serialized)
 struct AppStateTests {
     let defaults = UserDefaults.standard
     let folderKey = "lastFolderURL"
