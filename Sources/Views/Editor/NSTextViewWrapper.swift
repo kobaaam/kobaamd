@@ -64,6 +64,13 @@ struct NSTextViewWrapper: NSViewRepresentable {
         scrollView.documentView = textView
         // Attach line number ruler (already implemented in LineNumberRulerView).
         LineNumberRulerView.install(on: scrollView, textView: textView)
+        // Observe scroll events to drive editor↔preview sync via scrollRatio binding.
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.scrollViewDidScroll(_:)),
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
         return scrollView
     }
 
@@ -118,6 +125,16 @@ struct NSTextViewWrapper: NSViewRepresentable {
             isUpdating = true
             highlighter.highlight(storage)
             isUpdating = prev
+        }
+
+        // MARK: Scroll sync
+
+        @objc func scrollViewDidScroll(_ notification: Notification) {
+            guard let scrollView = notification.object as? NSScrollView,
+                  let textView = scrollView.documentView as? NSTextView else { return }
+            let pos = scrollView.contentView.bounds.minY
+            let total = textView.bounds.height - scrollView.contentSize.height
+            parent.scrollRatio = total > 0 ? max(0, min(1, pos / total)) : 0
         }
 
         // MARK: NSTextViewDelegate
