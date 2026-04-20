@@ -12,6 +12,7 @@ final class AppViewModel {
     var selectedFileURL: URL? = nil
     var editorText: String = ""
     var isDirty: Bool = false
+    /// 最後に保存した時点の editorText。未保存の変更検知に使用。
     var savedText: String = ""
     var previewScrollRatio: Double = 0
     var errorMessage: String? = nil
@@ -27,6 +28,11 @@ final class AppViewModel {
     var tabs: [EditorTab] = []
     var activeTabID: UUID? = nil
 
+    /// 現在アクティブなタブ。
+    var activeTab: EditorTab? {
+        tabs.first(where: { $0.id == activeTabID })
+    }
+
     /// ファイルをタブで開く。既に開いていれば切り替えるだけ。
     func openInTab(url: URL, content: String) {
         if let existing = tabs.first(where: { $0.url == url }) {
@@ -36,11 +42,7 @@ final class AppViewModel {
         flushActiveTab()
         let tab = EditorTab(url: url, content: content)
         tabs.append(tab)
-        activeTabID = tab.id
-        editorText = content
-        selectedFileURL = url
-        savedText = content
-        isDirty = false
+        activate(tab: tab)
     }
 
     /// 新しい空タブを追加する。
@@ -48,23 +50,15 @@ final class AppViewModel {
         flushActiveTab()
         let tab = EditorTab()
         tabs.append(tab)
-        activeTabID = tab.id
-        editorText = ""
-        selectedFileURL = nil
-        isDirty = false
-        savedText = ""
+        activate(tab: tab)
     }
 
     /// タブを切り替える。
     func switchToTab(id: UUID) {
-        guard id != activeTabID else { return }
+        guard id != activeTabID,
+              let tab = tabs.first(where: { $0.id == id }) else { return }
         flushActiveTab()
-        activeTabID = id
-        guard let tab = tabs.first(where: { $0.id == id }) else { return }
-        editorText = tab.content
-        selectedFileURL = tab.url
-        isDirty = tab.isDirty
-        savedText = tab.isDirty ? "" : tab.content
+        activate(tab: tab)
     }
 
     /// タブを閉じる。
@@ -73,19 +67,7 @@ final class AppViewModel {
         let wasActive = activeTabID == id
         tabs.remove(at: idx)
         if wasActive {
-            if tabs.isEmpty {
-                activeTabID = nil
-                editorText = ""
-                selectedFileURL = nil
-                isDirty = false
-            } else {
-                let t = tabs[min(idx, tabs.count - 1)]
-                activeTabID = t.id
-                editorText = t.content
-                selectedFileURL = t.url
-                isDirty = t.isDirty
-                savedText = t.isDirty ? "" : t.content
-            }
+            activate(tab: tabs.isEmpty ? nil : tabs[min(idx, tabs.count - 1)])
         }
     }
 
@@ -96,6 +78,25 @@ final class AppViewModel {
         tabs[idx].content = editorText
         tabs[idx].isDirty = isDirty
         tabs[idx].url = selectedFileURL
+    }
+
+    // MARK: - Private Helpers
+
+    /// エディタ状態をタブに同期する。nil を渡すとエディタをクリアする。
+    private func activate(tab: EditorTab?) {
+        guard let tab else {
+            activeTabID = nil
+            editorText = ""
+            selectedFileURL = nil
+            isDirty = false
+            savedText = ""
+            return
+        }
+        activeTabID = tab.id
+        editorText = tab.content
+        selectedFileURL = tab.url
+        isDirty = tab.isDirty
+        savedText = tab.isDirty ? "" : tab.content
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新
