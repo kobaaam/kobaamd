@@ -4,6 +4,7 @@ struct FileTreeView: View {
     var fileTreeViewModel: FileTreeViewModel
     @Environment(AppViewModel.self) private var appViewModel
 
+    @State private var listSelection: FileNode? = nil
     @State private var renamingNode: FileNode? = nil
     @State private var showRenameAlert: Bool = false
     @State private var renameText: String = ""
@@ -17,17 +18,40 @@ struct FileTreeView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
+                List(selection: $listSelection) {
                     OutlineGroup(fileTreeViewModel.nodes, id: \.id, children: \.children) { node in
-                        let isSelected = appViewModel.selectedFileURL == node.url
+                        // Use listSelection (local state) instead of appViewModel.selectedFileURL
+                        // to avoid every row re-rendering on file selection change
+                        let isSelected = listSelection?.url == node.url
                         Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
                             .lineLimit(1)
                             .font(.system(size: 12))
                             .foregroundStyle(isSelected ? Color.kobaAccent : Color.kobaInk)
                             .fontWeight(isSelected ? .semibold : .regular)
-                            .contentShape(Rectangle())
-                            .onTapGesture { select(node: node) }
+                            .tag(node)
                             .contextMenu {
+                                if node.isDirectory {
+                                    Button {
+                                        do {
+                                            let newURL = try fileTreeViewModel.createNewFile(in: node.url)
+                                            appViewModel.selectedFileURL = newURL
+                                            appViewModel.editorText = ""
+                                            appViewModel.markSaved()
+                                            AppState.saveLastFile(newURL)
+                                            let newFileNode = FileNode(name: newURL.lastPathComponent,
+                                                                       url: newURL,
+                                                                       isDirectory: false,
+                                                                       children: nil)
+                                            renamingNode = newFileNode
+                                            renameText = newURL.lastPathComponent
+                                            showRenameAlert = true
+                                        } catch {
+                                            appViewModel.showAppError(.fileWriteFailed(url: node.url, underlying: error))
+                                        }
+                                    } label: {
+                                        Label("新規ファイル...", systemImage: "doc.badge.plus")
+                                    }
+                                }
                                 Button {
                                     renamingNode = node
                                     renameText = node.name
@@ -45,6 +69,10 @@ struct FileTreeView: View {
                     }
                 }
                 .listStyle(.sidebar)
+                .onChange(of: listSelection) { _, node in
+                    guard let node else { return }
+                    select(node: node)
+                }
             }
         }
         .alert("名前を変更", isPresented: $showRenameAlert) {
@@ -75,12 +103,8 @@ struct FileTreeView: View {
     }
 
     private func select(node: FileNode) {
+        guard !node.isDirectory else { return }
         fileTreeViewModel.selectedNode = node
-        guard !node.isDirectory else {
-            appViewModel.editorText = ""
-            appViewModel.selectedFileURL = nil
-            return
-        }
         appViewModel.selectedFileURL = node.url
         AppState.saveLastFile(node.url)
         Task {
@@ -103,7 +127,6 @@ struct FileTreeView: View {
         let newURL = node.url.deletingLastPathComponent().appendingPathComponent(renameText)
         do {
             try FileManager.default.moveItem(at: node.url, to: newURL)
-            // 現在開いているファイルだった場合はURLを更新
             if appViewModel.selectedFileURL == node.url {
                 appViewModel.selectedFileURL = newURL
             }

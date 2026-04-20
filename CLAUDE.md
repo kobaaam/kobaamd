@@ -98,3 +98,19 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flas
 - プレビューモード: 2ペイン vs シームレス（デフォルト）
 - AI APIキー管理: Keychain経由（方針確定、実装はPhase 2）
 - TreeSitter Swift バインディングの選定（v2以降）
+
+---
+
+## 行動原則（Karpathy Guidelines）
+
+### 1. Think Before Coding
+コードを書く前に問題を理解する。何を解決しようとしているのか、なぜそのアプローチが正しいのかを明確にしてから実装する。
+
+### 2. Simplicity First
+最もシンプルな解決策を選ぶ。複雑な抽象化や過剰な設計は避ける。今必要なものだけを実装する。
+
+### 3. Surgical Changes
+変更は最小限・ピンポイントに。関係のないコードは触らない。diff が小さいほど良い。
+
+### 4. Goal-Driven Execution
+ゴールから逆算して行動する。タスクの完了基準を明確にし、それに向けて最短経路を取る。途中の作業が目的化しない。

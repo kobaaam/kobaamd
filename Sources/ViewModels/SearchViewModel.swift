@@ -36,6 +36,7 @@ class SearchViewModel {
     private func performSearch(rootURL: URL, query: String) async -> [SearchResult] {
         await Task.detached(priority: .userInitiated) {
             let lowercased = query.lowercased()
+            let maxResults = 100
             var matches: [SearchResult] = []
             let fm = FileManager.default
             guard let enumerator = fm.enumerator(
@@ -43,8 +44,9 @@ class SearchViewModel {
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
             ) else { return [] }
-            for case let fileURL as URL in enumerator {
-                guard fileURL.pathExtension.lowercased() == "md",
+            let allURLs = enumerator.compactMap { $0 as? URL }
+            outer: for fileURL in allURLs {
+                guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()),
                       let content = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
                 let lines = content.components(separatedBy: .newlines)
                 for (index, line) in lines.enumerated() {
@@ -56,6 +58,7 @@ class SearchViewModel {
                             matchLine: line.trimmingCharacters(in: .whitespaces),
                             lineNumber: index + 1
                         ))
+                        if matches.count >= maxResults { break outer }
                     }
                 }
             }

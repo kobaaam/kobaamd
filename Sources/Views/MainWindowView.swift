@@ -1,28 +1,5 @@
 import SwiftUI
 
-// MARK: - Design tokens (Linear/Raycast vibe)
-extension Color {
-    static let kobaPaper    = Color(hex: "fdfcf8")
-    static let kobaSurface  = Color(hex: "ffffff")
-    static let kobaSidebar  = Color(hex: "fafaf7")
-    static let kobaAccent   = Color(hex: "FF5B1F")
-    static let kobaLine     = Color(hex: "e0ddd8")
-    static let kobaMute     = Color(hex: "888888")
-    static let kobaMute2    = Color(hex: "aaaaaa")
-    static let kobaInk      = Color(hex: "1a1a1a")
-
-    init(hex: String) {
-        let h = hex.trimmingCharacters(in: .alphanumerics.inverted)
-        var v: UInt64 = 0
-        Scanner(string: h).scanHexInt64(&v)
-        self.init(
-            red:   Double((v >> 16) & 0xFF) / 255,
-            green: Double((v >> 8)  & 0xFF) / 255,
-            blue:  Double( v        & 0xFF) / 255
-        )
-    }
-}
-
 // MARK: - Main window
 
 struct MainWindowView: View {
@@ -91,7 +68,7 @@ struct MainWindowView: View {
             ToolbarItemGroup(placement: .navigation) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        appViewModel.isSidebarVisible.toggle()
+                        vm.isSidebarVisible.toggle()
                     }
                 } label: {
                     Image(systemName: "sidebar.left")
@@ -105,6 +82,22 @@ struct MainWindowView: View {
                 }
                 .help("Open Folder (⌘O)")
             }
+
+            // Center: preview mode selector (only when a file is open)
+            ToolbarItem(placement: .principal) {
+                if vm.selectedFileURL != nil {
+                    Picker("", selection: $vm.previewMode) {
+                        Image(systemName: "pencil").tag(PreviewMode.off)
+                        Image(systemName: "rectangle.split.2x1").tag(PreviewMode.split)
+                        Image(systemName: "eye").tag(PreviewMode.wysiwyg)
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.small)
+                    .labelsHidden()
+                    .help("プレビューモード切り替え")
+                }
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     NotificationCenter.default.post(name: .newFileRequested, object: nil)
@@ -113,10 +106,12 @@ struct MainWindowView: View {
                 }
                 .help("New File (⌘N)")
 
+                // Save button doubles as autosave indicator
                 Button {
                     NotificationCenter.default.post(name: .saveRequested, object: nil)
                 } label: {
-                    Image(systemName: "square.and.arrow.down")
+                    Image(systemName: vm.isDirty ? "circle.fill" : "checkmark.circle")
+                        .foregroundStyle(vm.isDirty ? Color.kobaAccent : .secondary)
                 }
                 .help("Save (⌘S)")
 
@@ -138,12 +133,11 @@ struct MainWindowView: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        appViewModel.isGitPanelVisible.toggle()
+                        vm.isGitPanelVisible.toggle()
                     }
                 } label: {
-                    Image(systemName: appViewModel.isGitPanelVisible
-                          ? "arrow.triangle.branch" : "arrow.triangle.branch")
-                        .symbolVariant(appViewModel.isGitPanelVisible ? .fill : .none)
+                    Image(systemName: "sourcecontrol.changes")
+                        .symbolVariant(vm.isGitPanelVisible ? .fill : .none)
                 }
                 .help("Git パネル (⌘G)")
             }

@@ -134,3 +134,71 @@ EditorView (選択テキスト)
 - [ ] AI APIキー管理: Keychain経由で保存する方針で固める
 - [ ] WKWebViewをプレビューに使う場合のパフォーマンス検証
 - [ ] TreeSitter Swift バインディングの選定（`tree-sitter-swift` / SwiftTreeSitter）
+
+---
+
+## Phase 3 設計: TextKit 2 + SwiftTreeSitter (Gemini調査 2026-04-20)
+
+### 技術選定（確定）
+
+| 領域 | 採用 | 根拠 |
+|------|------|------|
+| シンタックスハイライト | SwiftTreeSitter + TreeSitterMarkdown | ChimeHQ 製・SPM 対応・インクリメンタルパース |
+| テキスト基盤 | NSTextStorage サブクラス (TextKit 1) | TextKit 2 への移行は Phase 4 以降 |
+| パース戦略 | インクリメンタルパース (InputEdit API) | 10,000行でも < 1ms |
+
+### SPM 依存関係
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/ChimeHQ/SwiftTreeSitter",
+             .upToNextMajor(from: "0.20.0")),
+    .package(url: "https://github.com/ChimeHQ/SwiftTreeSitterGrammars",
+             .upToNextMajor(from: "0.20.0")),
+],
+// targets に追加:
+// .product(name: "SwiftTreeSitter", package: "SwiftTreeSitter"),
+// .product(name: "TreeSitterMarkdown", package: "SwiftTreeSitterGrammars"),
+```
+
+### 実装アーキテクチャ
+
+```
+NSTextView (編集・表示)
+  └── SyntaxHighlightingTextStorage: NSTextStorage
+        ├── processEditing() でパース・ハイライトをトリガー
+        ├── Parser (SwiftTreeSitter) — インクリメンタルパース
+        │     InputEdit = editedRange + changeInLength + 編集前文字列
+        └── Query (atx_heading / fenced_code_block / strong / inline_code 等)
+              → Task.detached で非同期処理
+              → MainActor.run で NSTextStorage 属性を適用
+```
+
+### TreeSitter クエリ (Markdown)
+
+```scheme
+(atx_heading (atx_heading_content) @heading)
+(fenced_code_block (code_fence_content) @code_block)
+(strong (text) @bold)
+(inline_code) @inline_code
+(list_marker) @list_marker
+(link_text) @link_text
+(link_destination) @link_destination
+```
+
+### パフォーマンス特性
+
+- **全体再パース**: 数百ms〜数秒（10,000行では不可）
+- **インクリメンタルパース**: < 1ms（1文字編集の場合）
+- **推奨**: `parser.apply(edit:)` → `parser.parse(string:oldTree:)` の組み合わせ
+
+### 推定工数（solo developer）
+
+| 作業 | 工数 |
+|------|------|
+| SwiftTreeSitter SPM 統合 + 文法ロード | 8〜16h |
+| SyntaxHighlightingTextStorage 実装 | 24〜40h |
+| NSTextView を NSViewRepresentable でラップ | 16〜24h |
+| インクリメンタルパース最適化 | 8〜16h |
+| テスト整備 | 8〜16h |
+| **合計** | **64〜112h** |

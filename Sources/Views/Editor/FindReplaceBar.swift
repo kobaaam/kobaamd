@@ -8,15 +8,31 @@ struct FindReplaceBar: View {
     @State private var replaceText: String = ""
     @State private var matchCount: Int = 0
     @State private var currentMatch: Int = 0
+    @State private var caseSensitive: Bool = false
+    @FocusState private var isFindFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            TextField("Find...", text: $findText)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
+            HStack(spacing: 4) {
+                TextField("Find...", text: $findText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+                    .focused($isFindFieldFocused)
+                    .onKeyPress(.return) {
+                        nextMatch()
+                        return .handled
+                    }
+
+                Button(action: { caseSensitive.toggle() }) {
+                    Image(systemName: "textformat.abc")
+                        .foregroundStyle(caseSensitive ? Color.accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(caseSensitive ? "大文字小文字を区別する" : "大文字小文字を区別しない")
+            }
 
             Text("\(currentMatch)/\(matchCount)")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(matchCount == 0 && !findText.isEmpty ? .red : .secondary)
                 .font(.caption)
                 .frame(width: 50)
 
@@ -44,15 +60,21 @@ struct FindReplaceBar: View {
         .background(.bar)
         .onChange(of: findText) { _, _ in refreshCount() }
         .onChange(of: text) { _, _ in refreshCount() }
+        .onChange(of: caseSensitive) { _, _ in refreshCount() }
+        .onChange(of: isVisible) { _, visible in
+            if visible { isFindFieldFocused = true }
+        }
         .onExitCommand { isVisible = false }
+        .onAppear { isFindFieldFocused = true }
     }
 
     private func findRanges() -> [Range<String.Index>] {
         guard !findText.isEmpty else { return [] }
+        let options: String.CompareOptions = caseSensitive ? .literal : .caseInsensitive
         var ranges: [Range<String.Index>] = []
         var start = text.startIndex
         while start < text.endIndex,
-              let range = text.range(of: findText, options: .caseInsensitive, range: start..<text.endIndex) {
+              let range = text.range(of: findText, options: options, range: start..<text.endIndex) {
             ranges.append(range)
             start = range.upperBound
         }
@@ -81,11 +103,13 @@ struct FindReplaceBar: View {
         let idx = min(max(currentMatch - 1, 0), ranges.count - 1)
         text.replaceSubrange(ranges[idx], with: replaceText)
         refreshCount()
+        nextMatch()
     }
 
     private func replaceAll() {
         guard !findText.isEmpty else { return }
-        text = text.replacingOccurrences(of: findText, with: replaceText, options: .caseInsensitive)
+        let options: String.CompareOptions = caseSensitive ? .literal : .caseInsensitive
+        text = text.replacingOccurrences(of: findText, with: replaceText, options: options)
         matchCount = 0
         currentMatch = 0
     }
