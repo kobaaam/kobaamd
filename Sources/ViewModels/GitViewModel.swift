@@ -72,42 +72,15 @@ final class GitViewModel {
     // MARK: - Staging
 
     func stage(_ file: GitFileStatus) {
-        guard let service else { return }
-        Task.detached { [weak self] in
-            guard let self else { return }
-            do {
-                try service.stage(file.path)
-                await MainActor.run { self.refresh() }
-            } catch {
-                await MainActor.run { self.showAppError(error) }
-            }
-        }
+        performGitOp { try self.service?.stage(file.path) }
     }
 
     func unstage(_ file: GitFileStatus) {
-        guard let service else { return }
-        Task.detached { [weak self] in
-            guard let self else { return }
-            do {
-                try service.unstage(file.path)
-                await MainActor.run { self.refresh() }
-            } catch {
-                await MainActor.run { self.showAppError(error) }
-            }
-        }
+        performGitOp { try self.service?.unstage(file.path) }
     }
 
     func stageAll() {
-        guard let service else { return }
-        Task.detached { [weak self] in
-            guard let self else { return }
-            do {
-                try service.stageAll()
-                await MainActor.run { self.refresh() }
-            } catch {
-                await MainActor.run { self.showAppError(error) }
-            }
-        }
+        performGitOp { try self.service?.stageAll() }
     }
 
     // MARK: - Commit
@@ -132,6 +105,19 @@ final class GitViewModel {
     }
 
     // MARK: - Private
+
+    private func performGitOp(_ op: @escaping () throws -> Void) {
+        guard service != nil else { return }
+        Task.detached { [weak self] in
+            guard let self else { return }
+            do {
+                try op()
+                await MainActor.run { self.refresh() }
+            } catch {
+                await MainActor.run { self.showAppError(error) }
+            }
+        }
+    }
 
     private func showAppError(_ error: Error) {
         errorMessage = error.localizedDescription

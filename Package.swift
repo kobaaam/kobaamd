@@ -36,7 +36,22 @@ let package = Package(
                 "kobaamd",
                 .product(name: "Markdown", package: "swift-markdown")
             ],
-            path: "Tests"
+            path: "Tests",
+            swiftSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
+                ])
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-framework", "Testing",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "/Library/Developer/CommandLineTools/Library/Developer/usr/lib"
+                ])
+            ]
         )
     ]
 )
