@@ -57,6 +57,11 @@ struct SidebarView: View {
                 appViewModel.gitViewModel.configure(repoURL: root)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openRecentNotification)) { notification in
+            if let url = notification.object as? URL {
+                openRecent(url)
+            }
+        }
         // Auto-refresh when app regains focus — debounced 1s to avoid rapid-fire reloads
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             reloadDebounceTask?.cancel()
