@@ -49,6 +49,8 @@ struct MarkdownWebView: NSViewRepresentable {
             .replacingOccurrences(of: "$", with: "\\$")
         let js = """
         (function() {
+          var oldScrollY = window.scrollY;
+          var oldHeight = document.body.scrollHeight;
           document.body.innerHTML = `\(escaped)`;
           // mermaid ダイアグラムを再変換・再描画
           document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
@@ -60,7 +62,9 @@ struct MarkdownWebView: NSViewRepresentable {
           if (typeof mermaid !== 'undefined') {
             mermaid.run({ querySelector: '.mermaid' });
           }
-          window.scrollTo(0, \(scrollRatio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));
+          if (oldHeight > 0) {
+            window.scrollTo(0, oldScrollY * document.body.scrollHeight / oldHeight);
+          }
         })();
         """
         webView.evaluateJavaScript(js, completionHandler: nil)

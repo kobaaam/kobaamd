@@ -155,7 +155,13 @@ final class MarkdownService {
             return "<ol>\(renderChildren(of: list))</ol>"
         case let item as ListItem where item.checkbox != nil:
             let checked = item.checkbox == .checked ? "checked" : ""
-            return "<li><input type=\"checkbox\" \(checked) disabled> \(renderChildren(of: item))</li>"
+            let inlineContent = item.children.compactMap { child -> String? in
+                if let para = child as? Paragraph {
+                    return renderChildren(of: para)
+                }
+                return render(child)
+            }.joined()
+            return "<li><input type=\"checkbox\" \(checked) disabled> \(inlineContent)</li>"
         case let item as ListItem:
             return "<li>\(renderChildren(of: item))</li>"
         case let blockquote as BlockQuote:
