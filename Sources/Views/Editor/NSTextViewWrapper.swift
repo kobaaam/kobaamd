@@ -39,16 +39,18 @@ struct NSTextViewWrapper: View {
 
 // MARK: - Scroll position observer
 
-/// TextEditor の親 NSScrollView を検出してスクロール比率を binding に流す。
-/// サイズゼロの透明 NSView を background に置くだけで、描画への影響はない。
+/// TextEditor の NSScrollView を検出してスクロール比率を binding に流す。
+///
+/// TextEditor の NSScrollView は background NSView の「兄弟」であり祖先ではないため、
+/// 親を辿りながら各レベルで再帰的に下方向へ探索する。
 private struct ScrollRatioReader: NSViewRepresentable {
     @Binding var ratio: Double
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         view.frame = .zero
-        // ビュー階層が構築されてから NSScrollView を探す
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // 0.2s 待ってビュー階層が構築されてから探索
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             context.coordinator.attach(to: view, ratio: $ratio)
         }
         return view
@@ -63,26 +65,47 @@ private struct ScrollRatioReader: NSViewRepresentable {
 
         func attach(to view: NSView, ratio: Binding<Double>) {
             guard observer == nil else { return }
-            // 親ビュー階層を辿って NSScrollView を見つける
-            var current: NSView? = view.superview
-            while let v = current {
-                if let sv = v as? NSScrollView {
-                    sv.contentView.postsBoundsChangedNotifications = true
-                    observer = NotificationCenter.default.addObserver(
-                        forName: NSView.boundsDidChangeNotification,
-                        object: sv.contentView,
-                        queue: .main
-                    ) { [weak sv] _ in
-                        guard let sv else { return }
-                        let docHeight = sv.documentView?.frame.height ?? 1
-                        let visHeight = sv.contentView.bounds.height
-                        let maxScroll = max(docHeight - visHeight, 1)
-                        let r = sv.contentView.bounds.origin.y / maxScroll
-                        ratio.wrappedValue = max(0, min(1, r))
-                    }
+
+            // 親を辿りながら各レベルの兄弟サブツリーを再帰探索
+            var current: NSView? = view
+            for _ in 0..<25 {
+                guard let parent = current?.superview else { break }
+                if let sv = findTextScrollView(in: parent, excluding: current) {
+                    subscribe(to: sv, ratio: ratio)
                     return
                 }
-                current = v.superview
+                current = parent
+            }
+        }
+
+        /// root 配下を再帰探索して NSTextView を documentView に持つ NSScrollView を返す。
+        /// excluding で指定した NSView のブランチはスキップ（無限ループ防止）。
+        private func findTextScrollView(in root: NSView, excluding: NSView?) -> NSScrollView? {
+            for subview in root.subviews {
+                if let excl = excluding, subview === excl { continue }
+                if let sv = subview as? NSScrollView, sv.documentView is NSTextView {
+                    return sv
+                }
+                if let found = findTextScrollView(in: subview, excluding: nil) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        private func subscribe(to sv: NSScrollView, ratio: Binding<Double>) {
+            sv.contentView.postsBoundsChangedNotifications = true
+            observer = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: sv.contentView,
+                queue: .main
+            ) { [weak sv] _ in
+                guard let sv else { return }
+                let docHeight = sv.documentView?.frame.height ?? 1
+                let visHeight = sv.contentView.bounds.height
+                let maxScroll = max(docHeight - visHeight, 1)
+                let r = sv.contentView.bounds.origin.y / maxScroll
+                ratio.wrappedValue = max(0, min(1, r))
             }
         }
 
