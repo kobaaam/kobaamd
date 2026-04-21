@@ -241,16 +241,16 @@ private struct EditorObserver: NSViewRepresentable {
             lm.addTemporaryAttribute(.backgroundColor, value: Self.highlightColor, forCharacterRange: lineRange)
             lastHighlightedRange = lineRange
 
-            // プレビュー側にカーソルの行番号（1-based）を通知
-            // UTF-16 オフセット insertion までの改行数を数えて行番号を求める
-            var lineNum = 1
-            for i in 0 ..< insertion {
-                if nsString.character(at: i) == 10 { lineNum += 1 }
-            }
+            // プレビュー側にカーソルのブロックインデックスを通知
+            let beforeCursor = String(tv.string.prefix(insertion))
+            let blockIndex = beforeCursor
+                .components(separatedBy: "\n\n")
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .count
             NotificationCenter.default.post(
                 name: .cursorBlockChanged,
                 object: nil,
-                userInfo: ["sourceLine": lineNum]
+                userInfo: ["blockIndex": max(0, blockIndex - 1)]
             )
         }
 
