@@ -10,6 +10,7 @@ struct D2WebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        webView.allowsMagnification = true
         loadSVGIfNeeded(into: webView, context: context)
         return webView
     }
@@ -29,13 +30,62 @@ struct D2WebView: NSViewRepresentable {
 
     private func htmlShell(for svg: String) -> String {
         """
-        <!DOCTYPE html><html><head><meta charset="utf-8">
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
         <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #fdfcf8; width: 100%; height: 100%; }
-        body { display: flex; justify-content: center; align-items: flex-start; padding: 24px; }
-        svg { max-width: 100%; height: auto; }
-        </style></head><body>\(svg)</body></html>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #fdfcf8;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        </style>
+        <script>\(BundledJS.svgPanZoom)</script>
+        </head>
+        <body>
+        \(svg)
+        <script>
+        window.addEventListener('load', function () {
+            const svg = document.querySelector('svg');
+            if (!svg) { return; }
+
+            if (!svg.hasAttribute('viewBox')) {
+                const widthAttr = svg.getAttribute('width');
+                const heightAttr = svg.getAttribute('height');
+                const width = widthAttr ? parseFloat(widthAttr) : NaN;
+                const height = heightAttr ? parseFloat(heightAttr) : NaN;
+
+                if (!Number.isNaN(width) && !Number.isNaN(height) && width > 0 && height > 0) {
+                    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                }
+            }
+
+            svg.removeAttribute('width');
+            svg.removeAttribute('height');
+
+            svgPanZoom(svg, {
+                zoomEnabled: true,
+                controlIconsEnabled: true,
+                fit: true,
+                center: true,
+                minZoom: 0.05,
+                maxZoom: 20,
+                mouseWheelZoomEnabled: true
+            });
+        });
+        </script>
+        </body>
+        </html>
         """
     }
 
