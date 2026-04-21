@@ -6,6 +6,11 @@ struct MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var splitFraction: CGFloat = 0.55
 
+    private var isMDFile: Bool {
+        let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
+        return ext == "md" || ext == "markdown" || ext.isEmpty
+    }
+
     var body: some View {
         @Bindable var vm = appViewModel
         VStack(spacing: 0) {
@@ -61,11 +66,18 @@ struct MainWindowView: View {
             .animation(.easeInOut(duration: 0.2), value: appViewModel.isGitPanelVisible)
 
             // ── Status / command bar ───────────────────────────────
-            StatusCommandBar(previewMode: $vm.previewMode)
+            StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
         }
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
+        .onChange(of: appViewModel.selectedFileURL) { _, url in
+            let ext = url?.pathExtension.lowercased() ?? ""
+            let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
+            if !isMD && appViewModel.previewMode == .wysiwyg {
+                appViewModel.previewMode = .split
+            }
+        }
         .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
             guard let url = fileURL else { return }
             AppState.shared.pendingOpenFileURL = nil
@@ -115,7 +127,9 @@ struct MainWindowView: View {
                     Picker("", selection: $vm.previewMode) {
                         Image(systemName: "pencil").tag(PreviewMode.off)
                         Image(systemName: "rectangle.split.2x1").tag(PreviewMode.split)
-                        Image(systemName: "eye").tag(PreviewMode.wysiwyg)
+                        if isMDFile {
+                            Image(systemName: "eye").tag(PreviewMode.wysiwyg)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .controlSize(.small)
@@ -176,6 +190,7 @@ struct MainWindowView: View {
 struct StatusCommandBar: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Binding var previewMode: PreviewMode
+    var isMDFile: Bool = true
 
     var filePath: String {
         guard let url = appViewModel.selectedFileURL else { return "" }
@@ -232,7 +247,7 @@ struct StatusCommandBar: View {
                 kobaLineSep()
                 // Preview toggle
                 HStack(spacing: 0) {
-                    ForEach(PreviewMode.allCases, id: \.self) { mode in
+                    ForEach(PreviewMode.allCases.filter { isMDFile || $0 != .wysiwyg }, id: \.self) { mode in
                         Button {
                             previewMode = mode
                         } label: {
