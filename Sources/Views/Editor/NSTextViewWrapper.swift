@@ -11,7 +11,7 @@ import AppKit
 
 struct NSTextViewWrapper: View {
     @Binding var text: String
-    @Binding var scrollRatio: Double   // reserved — not yet exported
+    @Binding var scrollRatio: Double
 
     private static let paperColor = Color(NSColor(srgbRed: 0.992, green: 0.988, blue: 0.973, alpha: 1))
     private static let inkColor   = Color(NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1))

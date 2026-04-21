@@ -106,7 +106,8 @@ final class MarkdownService {
             tr:nth-child(even) td{background:#faf8f4}
             ul,ol{padding-left:1.6em;margin:0.8em 0}
             li{margin:0.25em 0}
-            li input[type=checkbox]{margin-right:6px;accent-color:#FF5B1F}
+            li:has(input[type=checkbox]){list-style:none;margin-left:-1.6em}
+            li input[type=checkbox]{margin-right:6px;accent-color:#FF5B1F;vertical-align:middle}
             </style>
         </head>
         <body>
