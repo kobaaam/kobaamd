@@ -12,7 +12,8 @@ enum BundledJS {
     }
 
     // Lazily loaded — parsed once per app session
-    static let mermaid: String   = content(named: "mermaid.min.js")
-    static let easymdeJS: String = content(named: "easymde.min.js")
+    static let mermaid: String    = content(named: "mermaid.min.js")
+    static let easymdeJS: String  = content(named: "easymde.min.js")
     static let easymdeCss: String = content(named: "easymde.min.css")
+    static let svgPanZoom: String = content(named: "svg-pan-zoom.min.js")
 }

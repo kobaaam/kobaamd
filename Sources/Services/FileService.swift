@@ -4,6 +4,7 @@ final class FileService {
     private let fileManager = FileManager.default
 
     static let supportedExtensions: Set<String> = [
+        "d2",
         "md", "markdown",
         "txt", "text",
         "json", "yaml", "yml", "toml",

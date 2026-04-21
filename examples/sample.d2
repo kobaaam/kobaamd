@@ -1,0 +1,42 @@
+# kobaamd アーキテクチャ概要
+
+direction: right
+
+App: kobaamdApp {
+  shape: rectangle
+  style.fill: "#FF5B1F"
+  style.font-color: white
+}
+
+AppViewModel: AppViewModel {
+  shape: rectangle
+  style.fill: "#f5f2ec"
+}
+
+Views: Views {
+  shape: rectangle
+  style.fill: "#e8e5df"
+
+  MainWindow: MainWindowView
+  Editor: EditorView
+  Preview: PreviewView
+  Sidebar: SidebarView
+}
+
+Services: Services {
+  shape: rectangle
+  style.fill: "#e8e5df"
+
+  FileService: FileService
+  MarkdownService: MarkdownService
+  D2Service: D2Service
+  GitService: GitService
+  AIService: AIService
+}
+
+App -> AppViewModel: "@Environment"
+AppViewModel -> Views: "observe"
+Views.Editor -> Services.FileService: "read/write"
+Views.Preview -> Services.MarkdownService: "render HTML"
+Views.Preview -> Services.D2Service: "render SVG"
+Views.Sidebar -> Services.GitService: "git status"
