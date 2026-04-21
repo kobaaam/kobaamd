@@ -5,6 +5,7 @@ import SwiftUI
 struct MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var splitFraction: CGFloat = 0.55
+    @State private var isDiffSheetPresented: Bool = false
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -102,6 +103,9 @@ struct MainWindowView: View {
                 appViewModel.isGitPanelVisible.toggle()
             }
         }
+        .sheet(isPresented: $isDiffSheetPresented) {
+            DiffSheetView()
+        }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button {
@@ -170,6 +174,13 @@ struct MainWindowView: View {
                     Image(systemName: "sparkles")
                 }
                 .help("AI アシスト (⌘E)")
+
+                Button {
+                    isDiffSheetPresented = true
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                }
+                .help("Diff ビュー (⌘D)")
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
