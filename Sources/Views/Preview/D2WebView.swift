@@ -10,7 +10,7 @@ struct D2WebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let webView = WKWebView()
-        webView.allowsMagnification = true
+        webView.allowsMagnification = false
         loadSVGIfNeeded(into: webView, context: context)
         return webView
     }
@@ -73,7 +73,7 @@ struct D2WebView: NSViewRepresentable {
             svg.removeAttribute('width');
             svg.removeAttribute('height');
 
-            svgPanZoom(svg, {
+            const panZoom = svgPanZoom(svg, {
                 zoomEnabled: true,
                 controlIconsEnabled: true,
                 fit: true,
@@ -81,6 +81,21 @@ struct D2WebView: NSViewRepresentable {
                 minZoom: 0.05,
                 maxZoom: 20,
                 mouseWheelZoomEnabled: true
+            });
+
+            let lastScale = 1;
+            document.addEventListener('gesturestart', function(e) {
+                e.preventDefault();
+                lastScale = 1;
+            });
+            document.addEventListener('gesturechange', function(e) {
+                e.preventDefault();
+                const relativeScale = e.scale / lastScale;
+                lastScale = e.scale;
+                panZoom.zoomAtPointBy(relativeScale, { x: e.clientX, y: e.clientY });
+            });
+            document.addEventListener('gestureend', function(e) {
+                e.preventDefault();
             });
         });
         </script>
