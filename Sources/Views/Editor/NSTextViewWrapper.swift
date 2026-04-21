@@ -30,28 +30,26 @@ struct NSTextViewWrapper: View {
             .background(
                 ZStack {
                     Self.paperColor
-                    ScrollRatioReader(ratio: $scrollRatio)
+                    EditorObserver(scrollRatio: $scrollRatio)
                 }
             )
             .padding(.horizontal, 4)
     }
 }
 
-// MARK: - Scroll position observer
+// MARK: - Editor observer (scroll ratio + current line highlight)
 
-/// TextEditor の NSScrollView を検出してスクロール比率を binding に流す。
-///
-/// TextEditor の NSScrollView は background NSView の「兄弟」であり祖先ではないため、
-/// 親を辿りながら各レベルで再帰的に下方向へ探索する。
-private struct ScrollRatioReader: NSViewRepresentable {
-    @Binding var ratio: Double
+/// TextEditor 配下の NSScrollView / NSTextView を検出して
+/// ① スクロール比率を binding に流す
+/// ② カーソル行を temporaryAttribute でハイライト（ドキュメント非破壊）
+private struct EditorObserver: NSViewRepresentable {
+    @Binding var scrollRatio: Double
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         view.frame = .zero
-        // 0.2s 待ってビュー階層が構築されてから探索
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            context.coordinator.attach(to: view, ratio: $ratio)
+            context.coordinator.attach(to: view, scrollRatio: $scrollRatio)
         }
         return view
     }
@@ -61,41 +59,45 @@ private struct ScrollRatioReader: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class Coordinator: NSObject {
-        private var observer: Any?
+        private var scrollObserver: Any?
+        private var selectionObserver: Any?
+        private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
 
-        func attach(to view: NSView, ratio: Binding<Double>) {
-            guard observer == nil else { return }
+        /// 淡いウォームグレー — kobaPaper(#FDFBF5) より少し暗い
+        private static let highlightColor = NSColor(srgbRed: 0.918, green: 0.910, blue: 0.890, alpha: 1)
 
-            // 親を辿りながら各レベルの兄弟サブツリーを再帰探索
+        func attach(to view: NSView, scrollRatio: Binding<Double>) {
             var current: NSView? = view
+            var foundScrollView = false
+            var foundTextView = false
+
             for _ in 0..<25 {
                 guard let parent = current?.superview else { break }
-                if let sv = findTextScrollView(in: parent, excluding: current) {
-                    subscribe(to: sv, ratio: ratio)
-                    return
+
+                // NSScrollView を探してスクロール比率を購読
+                if !foundScrollView,
+                   let sv = findView(NSScrollView.self, in: parent, excluding: current, where: { $0.documentView is NSTextView }) {
+                    subscribeScroll(sv, ratio: scrollRatio)
+                    foundScrollView = true
                 }
+
+                // NSTextView を探してライン ハイライトを設定
+                if !foundTextView,
+                   let tv = findView(NSTextView.self, in: parent, excluding: current) {
+                    subscribeSelection(tv)
+                    foundTextView = true
+                }
+
+                if foundScrollView && foundTextView { break }
                 current = parent
             }
         }
 
-        /// root 配下を再帰探索して NSTextView を documentView に持つ NSScrollView を返す。
-        /// excluding で指定した NSView のブランチはスキップ（無限ループ防止）。
-        private func findTextScrollView(in root: NSView, excluding: NSView?) -> NSScrollView? {
-            for subview in root.subviews {
-                if let excl = excluding, subview === excl { continue }
-                if let sv = subview as? NSScrollView, sv.documentView is NSTextView {
-                    return sv
-                }
-                if let found = findTextScrollView(in: subview, excluding: nil) {
-                    return found
-                }
-            }
-            return nil
-        }
+        // MARK: - Scroll
 
-        private func subscribe(to sv: NSScrollView, ratio: Binding<Double>) {
+        private func subscribeScroll(_ sv: NSScrollView, ratio: Binding<Double>) {
             sv.contentView.postsBoundsChangedNotifications = true
-            observer = NotificationCenter.default.addObserver(
+            scrollObserver = NotificationCenter.default.addObserver(
                 forName: NSView.boundsDidChangeNotification,
                 object: sv.contentView,
                 queue: .main
@@ -109,9 +111,59 @@ private struct ScrollRatioReader: NSViewRepresentable {
             }
         }
 
+        // MARK: - Line highlight
+
+        private func subscribeSelection(_ tv: NSTextView) {
+            selectionObserver = NotificationCenter.default.addObserver(
+                forName: NSTextView.didChangeSelectionNotification,
+                object: tv,
+                queue: .main
+            ) { [weak self, weak tv] _ in
+                guard let self, let tv else { return }
+                self.highlightCurrentLine(in: tv)
+            }
+            highlightCurrentLine(in: tv)
+        }
+
+        private func highlightCurrentLine(in tv: NSTextView) {
+            guard let lm = tv.layoutManager else { return }
+            let nsString = tv.string as NSString
+            let fullLength = nsString.length
+            guard fullLength > 0 else { return }
+
+            let insertion = min(tv.selectedRange().location, fullLength)
+            let lineRange = nsString.lineRange(for: NSRange(location: insertion, length: 0))
+
+            // 前回行のハイライトだけ消す（全体リセットは高コストのため避ける）
+            if lastHighlightedRange.location != NSNotFound {
+                lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lastHighlightedRange)
+            }
+
+            lm.addTemporaryAttribute(.backgroundColor, value: Self.highlightColor, forCharacterRange: lineRange)
+            lastHighlightedRange = lineRange
+        }
+
+        // MARK: - Generic view search
+
+        /// root のサブツリーを再帰探索して条件を満たす T を返す。
+        /// excluding ブランチはスキップ（ループ防止）。
+        private func findView<T: NSView>(
+            _ type: T.Type,
+            in root: NSView,
+            excluding: NSView?,
+            where predicate: ((T) -> Bool)? = nil
+        ) -> T? {
+            for sub in root.subviews {
+                if let excl = excluding, sub === excl { continue }
+                if let typed = sub as? T, predicate?(typed) ?? true { return typed }
+                if let found = findView(type, in: sub, excluding: nil, where: predicate) { return found }
+            }
+            return nil
+        }
+
         deinit {
-            if let observer {
-                NotificationCenter.default.removeObserver(observer)
+            [scrollObserver, selectionObserver].compactMap { $0 }.forEach {
+                NotificationCenter.default.removeObserver($0)
             }
         }
     }
