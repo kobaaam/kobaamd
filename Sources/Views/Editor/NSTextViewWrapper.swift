@@ -141,6 +141,18 @@ private struct EditorObserver: NSViewRepresentable {
 
             lm.addTemporaryAttribute(.backgroundColor, value: Self.highlightColor, forCharacterRange: lineRange)
             lastHighlightedRange = lineRange
+
+            // プレビュー側にカーソルのブロックインデックスを通知
+            let beforeCursor = String(tv.string.prefix(insertion))
+            let blockIndex = beforeCursor
+                .components(separatedBy: "\n\n")
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .count
+            NotificationCenter.default.post(
+                name: .cursorBlockChanged,
+                object: nil,
+                userInfo: ["blockIndex": max(0, blockIndex - 1)]
+            )
         }
 
         // MARK: - Generic view search

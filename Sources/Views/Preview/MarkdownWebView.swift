@@ -16,6 +16,7 @@ struct MarkdownWebView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        context.coordinator.webView = webView
         return webView
     }
 
@@ -79,11 +80,53 @@ struct MarkdownWebView: NSViewRepresentable {
         var isLoaded = false
         var lastBodyHTML: String = ""
         var pendingScrollRatio: Double = 0
+        weak var webView: WKWebView?
+        private var blockObserver: Any?
+
+        override init() {
+            super.init()
+            blockObserver = NotificationCenter.default.addObserver(
+                forName: .cursorBlockChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let idx = note.userInfo?["blockIndex"] as? Int,
+                      let wv = self.webView else { return }
+                self.highlightBlock(idx, in: wv)
+            }
+        }
+
+        deinit {
+            if let blockObserver { NotificationCenter.default.removeObserver(blockObserver) }
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             PerfLogger.end("WebViewLoad")
             let js = "window.scrollTo(0, \(pendingScrollRatio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));"
             webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+
+        private func highlightBlock(_ idx: Int, in wv: WKWebView) {
+            let js = """
+            (function(idx) {
+              document.querySelectorAll('[data-koba-active]').forEach(function(el) {
+                el.removeAttribute('data-koba-active');
+                el.style.removeProperty('background-color');
+                el.style.removeProperty('border-radius');
+              });
+              var blocks = document.querySelectorAll(
+                'body > p, body > h1, body > h2, body > h3, body > h4, body > h5, body > h6, body > ul, body > ol, body > pre, body > blockquote, body > table'
+              );
+              if (idx >= 0 && idx < blocks.length) {
+                var el = blocks[idx];
+                el.setAttribute('data-koba-active', '');
+                el.style.backgroundColor = 'rgba(255,91,31,0.08)';
+                el.style.borderRadius = '4px';
+              }
+            })(\(idx));
+            """
+            wv.evaluateJavaScript(js, completionHandler: nil)
         }
     }
 }
