@@ -23,6 +23,7 @@ final class AppViewModel {
     var isFileLoading: Bool = false
 
     let gitViewModel = GitViewModel()
+    let outlineViewModel = OutlineViewModel()
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -90,6 +91,7 @@ final class AppViewModel {
             selectedFileURL = nil
             isDirty = false
             savedText = ""
+            outlineViewModel.update(text: "")
             return
         }
         activeTabID = tab.id
@@ -97,6 +99,7 @@ final class AppViewModel {
         selectedFileURL = tab.url
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
+        outlineViewModel.update(text: tab.content)
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新
@@ -136,6 +139,7 @@ final class AppViewModel {
 
     func updateEditorText(_ text: String) {
         editorText = text
+        outlineViewModel.update(text: text)
         markEdited()
     }
 
