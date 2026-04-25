@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import AppKit
+import UniformTypeIdentifiers
 
 enum PreviewMode: String, CaseIterable {
     case split   = "Split"
@@ -8,8 +10,16 @@ enum PreviewMode: String, CaseIterable {
 }
 
 @Observable
+@MainActor
 final class AppViewModel {
-    var selectedFileURL: URL? = nil
+    var selectedFileURL: URL? = nil {
+        didSet {
+            // アクティブタブの URL をすぐに反映してタブ名を更新する
+            guard let id = activeTabID,
+                  let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
+            tabs[idx].url = selectedFileURL
+        }
+    }
     var editorText: String = ""
     var isDirty: Bool = false
     /// 最後に保存した時点の editorText。未保存の変更検知に使用。
@@ -19,10 +29,10 @@ final class AppViewModel {
     var showError: Bool = false
     var previewMode: PreviewMode = .split
     var isSidebarVisible: Bool = true
-    var isGitPanelVisible: Bool = false
     var isFileLoading: Bool = false
+    var isDiffMode: Bool = false
 
-    let gitViewModel = GitViewModel()
+    let fileTreeViewModel = FileTreeViewModel()
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -35,6 +45,7 @@ final class AppViewModel {
 
     /// ファイルをタブで開く。既に開いていれば切り替えるだけ。
     func openInTab(url: URL, content: String) {
+        isDiffMode = false
         if let existing = tabs.first(where: { $0.url == url }) {
             switchToTab(id: existing.id)
             return
@@ -47,6 +58,7 @@ final class AppViewModel {
 
     /// 新しい空タブを追加する。
     func newTab() {
+        isDiffMode = false
         flushActiveTab()
         let tab = EditorTab()
         tabs.append(tab)
@@ -55,6 +67,7 @@ final class AppViewModel {
 
     /// タブを切り替える。
     func switchToTab(id: UUID) {
+        isDiffMode = false
         guard id != activeTabID,
               let tab = tabs.first(where: { $0.id == id }) else { return }
         flushActiveTab()
@@ -104,6 +117,39 @@ final class AppViewModel {
     var wordCount: Int = 0
     private var statsTask: Task<Void, Never>? = nil
 
+    // MARK: - Save
+
+    /// URL が確定済みならその場で保存。未保存なら saveAs シートを出す。
+    /// View に依存しないよう AppViewModel に集約。
+    func saveCurrentFile() {
+        guard let url = selectedFileURL else {
+            saveAs()
+            return
+        }
+        do {
+            try FileService().saveFile(at: url, content: editorText)
+            markSaved()
+        } catch {
+            showAppError(.fileWriteFailed(url: url, underlying: error))
+        }
+    }
+
+    func saveAs() {
+        let panel = NSSavePanel()
+        if let mdType = UTType(filenameExtension: "md") {
+            panel.allowedContentTypes = [mdType]
+        }
+        panel.nameFieldStringValue = "Untitled.md"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try FileService().saveFile(at: url, content: editorText)
+            selectedFileURL = url
+            markSaved()
+        } catch {
+            showAppError(.fileWriteFailed(url: url, underlying: error))
+        }
+    }
+
     func markSaved() {
         savedText = editorText
         isDirty = false
@@ -142,5 +188,63 @@ final class AppViewModel {
     func showAppError(_ error: AppError) {
         errorMessage = error.localizedDescription
         showError = true
+    }
+
+    // MARK: - AI Inline Completion
+
+    private static let aiPlaceholder = "<!-- kobaamd-ai-generating -->"
+
+    /// `{{プロンプト}}` を含む行をプレースホルダーに差し替えて AI を呼び出す。
+    /// すべて @MainActor の editorText 操作で完結するため textView への直接アクセス不要。
+    func startAIInlineCompletion(lineContent: String) {
+        let trimmed = lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("{{"), trimmed.hasSuffix("}}"), trimmed.count > 4 else { return }
+        let prompt = String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespaces)
+        guard !prompt.isEmpty else { return }
+
+        // プロバイダー選択
+        let provider: APIKeyStore.Provider
+        if let k = APIKeyStore.load(for: .openai), !k.isEmpty      { provider = .openai }
+        else if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { provider = .anthropic }
+        else {
+            // キー未設定: {{...}} 行の後ろにエラーを挿入
+            editorText = editorText.replacingOccurrences(
+                of: lineContent,
+                with: lineContent + "\n> **AI エラー:** API キーが設定されていません（設定 ⌘, から登録）\n",
+                range: editorText.range(of: lineContent)
+            )
+            markEdited()
+            return
+        }
+
+        // コンテキスト（{{...}} 行より前の最大2000文字）
+        let context: String
+        if let range = editorText.range(of: lineContent) {
+            context = String(editorText[..<range.lowerBound].suffix(2000))
+        } else {
+            context = ""
+        }
+
+        // {{...}} 行 → プレースホルダーへ差し替え
+        let ph = Self.aiPlaceholder
+        guard let lineRange = editorText.range(of: lineContent) else { return }
+        editorText.replaceSubrange(lineRange, with: "\(ph)\n")
+        markEdited()
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await AIService().complete(prompt: prompt, context: context, provider: provider)
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.replaceSubrange(r, with: result)
+                    self.markEdited()
+                }
+            } catch {
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.replaceSubrange(r, with: "> **AI エラー:** \(error.localizedDescription)")
+                    self.markEdited()
+                }
+            }
+        }
     }
 }

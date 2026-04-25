@@ -36,12 +36,12 @@ final class AIService {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         let userContent = context.isEmpty ? prompt : "\(prompt)\n\n---\n\(context)"
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": "gpt-5.4",
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user",   "content": userContent],
             ],
-            "max_tokens": 4096,
+            "max_completion_tokens": 4096,
         ]
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -75,7 +75,7 @@ final class AIService {
         let userContent = context.isEmpty ? prompt : "\(prompt)\n\n---\n\(context)"
         let body: [String: Any] = [
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 4096,
+            "max_completion_tokens": 4096,
             "system": systemPrompt,
             "messages": [["role": "user", "content": userContent]],
         ]

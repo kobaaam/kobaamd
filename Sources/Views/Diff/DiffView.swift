@@ -1,34 +1,57 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct DiffSheetView: View {
+    let preloadText: String
+    let preloadFileName: String
+    var isInline: Bool = false
+
     @State private var vm = DiffViewModel()
     @Environment(\.dismiss) private var dismiss
 
+    @State private var isTargetedA = false
+    @State private var isTargetedB = false
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Diff")
-                    .font(.headline)
-                Spacer()
-                Button("閉じる") { dismiss() }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.kobaMute)
+            // Header（シートモードのみ表示）
+            if !isInline {
+                HStack {
+                    Text("Diff")
+                        .font(.headline)
+                    Spacer()
+                    Button("閉じる") { dismiss() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(Color.kobaSurface)
+                .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
             }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            .background(Color.kobaSurface)
-            .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
 
             // 上段: 左右テキスト入力
             HStack(spacing: 0) {
+                // MARK: A エリア
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("A")
+                        Text(vm.fileNameA.isEmpty ? "A" : vm.fileNameA)
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color.kobaMute)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         Spacer()
+                        if !vm.textA.isEmpty {
+                            Button {
+                                vm.textA = ""; vm.fileNameA = ""; vm.scheduleUpdate()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(Color.kobaMute)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                        }
                         Button("ファイル…") { pickFile(target: .a) }
                             .font(.system(size: 11))
                             .buttonStyle(.plain)
@@ -47,15 +70,41 @@ struct DiffSheetView: View {
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onDrop(of: [.fileURL], isTargeted: $isTargetedA) { providers in
+                    loadDrop(providers: providers, target: .a)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(
+                            style: StrokeStyle(lineWidth: 2, dash: [6])
+                        )
+                        .foregroundStyle(isTargetedA ? Color.kobaAccent : Color.clear)
+                        .background(isTargetedA ? Color.kobaAccent.opacity(0.06) : Color.clear)
+                        .padding(4)
+                        .allowsHitTesting(false)
+                )
 
                 Rectangle().fill(Color.kobaLine).frame(width: 1)
 
+                // MARK: B エリア
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("B")
+                        Text(vm.fileNameB.isEmpty ? "B" : vm.fileNameB)
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color.kobaMute)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         Spacer()
+                        if !vm.textB.isEmpty {
+                            Button {
+                                vm.textB = ""; vm.fileNameB = ""; vm.scheduleUpdate()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(Color.kobaMute)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                        }
                         Button("ファイル…") { pickFile(target: .b) }
                             .font(.system(size: 11))
                             .buttonStyle(.plain)
@@ -74,6 +123,18 @@ struct DiffSheetView: View {
                     )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onDrop(of: [.fileURL], isTargeted: $isTargetedB) { providers in
+                    loadDrop(providers: providers, target: .b)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(
+                            style: StrokeStyle(lineWidth: 2, dash: [6])
+                        )
+                        .foregroundStyle(isTargetedB ? Color.kobaAccent : Color.clear)
+                        .background(isTargetedB ? Color.kobaAccent.opacity(0.06) : Color.clear)
+                        .padding(4)
+                )
             }
             .padding(.top, 8)
             .frame(maxWidth: .infinity)
@@ -102,11 +163,39 @@ struct DiffSheetView: View {
         }
         .frame(minWidth: 700, minHeight: 520)
         .background(Color.kobaPaper)
+        .onAppear {
+            if !preloadText.isEmpty {
+                vm.textA = preloadText
+                vm.fileNameA = preloadFileName
+                vm.scheduleUpdate()
+            }
+        }
     }
 
     enum FileTarget {
         case a
         case b
+    }
+
+    @discardableResult
+    private func loadDrop(providers: [NSItemProvider], target: FileTarget) -> Bool {
+        guard let provider = providers.first else { return false }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let data = item as? Data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil),
+                  let content = try? String(contentsOf: url, encoding: .utf8) else { return }
+            DispatchQueue.main.async {
+                if target == .a {
+                    vm.textA = content
+                    vm.fileNameA = url.lastPathComponent
+                } else {
+                    vm.textB = content
+                    vm.fileNameB = url.lastPathComponent
+                }
+                vm.scheduleUpdate()
+            }
+        }
+        return true
     }
 
     private func pickFile(target: FileTarget) {
@@ -119,11 +208,24 @@ struct DiffSheetView: View {
            let content = try? String(contentsOf: url, encoding: .utf8) {
             if target == .a {
                 vm.textA = content
+                vm.fileNameA = url.lastPathComponent
             } else {
                 vm.textB = content
+                vm.fileNameB = url.lastPathComponent
             }
             vm.scheduleUpdate()
         }
+    }
+}
+
+// MARK: - Inline (tab-embedded) version — no sheet chrome
+
+struct DiffInlineView: View {
+    let preloadText: String
+    let preloadFileName: String
+
+    var body: some View {
+        DiffSheetView(preloadText: preloadText, preloadFileName: preloadFileName, isInline: true)
     }
 }
 

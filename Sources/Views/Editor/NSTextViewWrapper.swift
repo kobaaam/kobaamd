@@ -61,6 +61,8 @@ private struct EditorObserver: NSViewRepresentable {
     final class Coordinator: NSObject {
         private var scrollObserver: Any?
         private var selectionObserver: Any?
+        private var eventMonitor: Any?
+        private weak var textViewRef: NSTextView?
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
 
         /// 淡いウォームグレー — kobaPaper(#FDFBF5) より少し暗い
@@ -114,6 +116,7 @@ private struct EditorObserver: NSViewRepresentable {
         // MARK: - Line highlight
 
         private func subscribeSelection(_ tv: NSTextView) {
+            textViewRef = tv
             selectionObserver = NotificationCenter.default.addObserver(
                 forName: NSTextView.didChangeSelectionNotification,
                 object: tv,
@@ -123,6 +126,102 @@ private struct EditorObserver: NSViewRepresentable {
                 self.highlightCurrentLine(in: tv)
             }
             highlightCurrentLine(in: tv)
+
+            // Return キーで箇条書き自動継続 / ⌘Return で AI インライン補完
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self,
+                      let tv = self.textViewRef,
+                      event.keyCode == 36, // Return
+                      tv.window?.firstResponder === tv,
+                      !tv.hasMarkedText() // IME 変換中は無視
+                else { return event }
+
+                let mods = event.modifierFlags.intersection([.shift, .option, .command, .control])
+
+                // ⌘Return → AI インライン補完（カーソル行を通知で送るだけ）
+                if mods == .command {
+                    let nsStr = tv.string as NSString
+                    let loc = min(tv.selectedRange().location, nsStr.length)
+                    let lineRange = nsStr.lineRange(for: NSRange(location: loc, length: 0))
+                    let lineContent = nsStr.substring(with: lineRange)
+                    let trimmed = lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.hasPrefix("{{"), trimmed.hasSuffix("}}"), trimmed.count > 4 {
+                        NotificationCenter.default.post(
+                            name: .aiInlineRequested,
+                            object: nil,
+                            userInfo: ["lineContent": lineContent]
+                        )
+                        return nil
+                    }
+                    return event
+                }
+
+                // 修飾キーなし → 箇条書き自動継続
+                if mods.isEmpty {
+                    return self.handleAutoListReturn(in: tv) ? nil : event
+                }
+
+                return event
+            }
+        }
+
+        // MARK: - Auto list continuation
+
+        /// 現在行のリストプレフィックスを検出して自動継続。
+        /// 処理した場合は true を返す（イベントを消費）。
+        @discardableResult
+        private func handleAutoListReturn(in tv: NSTextView) -> Bool {
+            let nsString = tv.string as NSString
+            let insertion = min(tv.selectedRange().location, nsString.length)
+            let lineRange = nsString.lineRange(for: NSRange(location: insertion, length: 0))
+            let currentLine = nsString.substring(with: lineRange)
+
+            // タスクリスト（チェック済みも未チェックも → 未チェックで継続）
+            let taskPrefixes = ["- [ ] ", "- [x] ", "- [X] "]
+            for prefix in taskPrefixes {
+                if currentLine.hasPrefix(prefix) {
+                    let content = currentLine.dropFirst(prefix.count).trimmingCharacters(in: .newlines)
+                    if content.isEmpty {
+                        tv.insertText("", replacementRange: lineRange) // 空行なら記号を消す
+                    } else {
+                        tv.insertText("\n- [ ] ", replacementRange: tv.selectedRange())
+                    }
+                    return true
+                }
+            }
+
+            // 順序なしリスト
+            let unorderedPrefixes = ["- ", "* ", "+ "]
+            for prefix in unorderedPrefixes {
+                if currentLine.hasPrefix(prefix) {
+                    let content = currentLine.dropFirst(prefix.count).trimmingCharacters(in: .newlines)
+                    if content.isEmpty {
+                        tv.insertText("", replacementRange: lineRange)
+                    } else {
+                        tv.insertText("\n" + prefix, replacementRange: tv.selectedRange())
+                    }
+                    return true
+                }
+            }
+
+            // 順序付きリスト（例: "1. ", "2. "）
+            let orderedRegex = try? NSRegularExpression(pattern: "^(\\d+)\\. ")
+            if let match = orderedRegex?.firstMatch(in: currentLine,
+                                                    range: NSRange(currentLine.startIndex..., in: currentLine)) {
+                let numStr = (currentLine as NSString).substring(with: match.range(at: 1))
+                if let num = Int(numStr) {
+                    let prefixLen = numStr.count + 2 // "N. "
+                    let content = currentLine.dropFirst(prefixLen).trimmingCharacters(in: .newlines)
+                    if content.isEmpty {
+                        tv.insertText("", replacementRange: lineRange)
+                    } else {
+                        tv.insertText("\n\(num + 1). ", replacementRange: tv.selectedRange())
+                    }
+                    return true
+                }
+            }
+
+            return false
         }
 
         private func highlightCurrentLine(in tv: NSTextView) {
@@ -142,16 +241,16 @@ private struct EditorObserver: NSViewRepresentable {
             lm.addTemporaryAttribute(.backgroundColor, value: Self.highlightColor, forCharacterRange: lineRange)
             lastHighlightedRange = lineRange
 
-            // プレビュー側にカーソルのブロックインデックスを通知
-            let beforeCursor = String(tv.string.prefix(insertion))
-            let blockIndex = beforeCursor
-                .components(separatedBy: "\n\n")
-                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                .count
+            // プレビュー側にカーソルの行番号（1-based）を通知
+            // UTF-16 オフセット insertion までの改行数を数えて行番号を求める
+            var lineNum = 1
+            for i in 0 ..< insertion {
+                if nsString.character(at: i) == 10 { lineNum += 1 }
+            }
             NotificationCenter.default.post(
                 name: .cursorBlockChanged,
                 object: nil,
-                userInfo: ["blockIndex": max(0, blockIndex - 1)]
+                userInfo: ["sourceLine": lineNum]
             )
         }
 
@@ -177,6 +276,7 @@ private struct EditorObserver: NSViewRepresentable {
             [scrollObserver, selectionObserver].compactMap { $0 }.forEach {
                 NotificationCenter.default.removeObserver($0)
             }
+            if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         }
     }
 }

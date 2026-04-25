@@ -121,9 +121,13 @@ kobaamd/
 ## Roadmap / ロードマップ
 
 - [ ] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
+
 - [ ] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
+
 - [ ] **Export** — PDF, HTML export / PDF・HTML エクスポート
+
 - [ ] **Outline panel** — Navigate headings / 見出しナビゲーション
+
 - [ ] **Custom themes** — Light/dark/custom color schemes / カスタムカラーテーマ
 
 ---
