@@ -80,6 +80,7 @@ extension Notification.Name {
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
+    static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
 }
 
 // MARK: - App Delegate (window frame save/restore)
