@@ -102,6 +102,14 @@ struct MainWindowView: View {
                 appViewModel.isSidebarVisible.toggle()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
+            appViewModel.exportPDF()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
+            if let result = note.object as? Result<Void, Error> {
+                appViewModel.handlePDFExportResult(result)
+            }
+        }
         .sheet(isPresented: $isDiffSheetPresented) {
             DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
         }
@@ -228,6 +236,21 @@ struct StatusCommandBar: View {
             .padding(.leading, 14)
 
             Spacer()
+
+            // PDF書き出しステータス
+            if let msg = appViewModel.pdfStatusMessage {
+                HStack(spacing: 4) {
+                    if appViewModel.isPDFExporting {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.6)
+                    }
+                    Text(msg)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 8)
+            }
 
             // Right — version + preview toggle + keyboard hints
             HStack(spacing: 14) {
