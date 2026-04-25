@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var saved: Bool = false
 
     var body: some View {
+        @Bindable var appState = AppState.shared
+
         Form {
             Section("AI プロバイダー") {
                 LabeledContent("OpenAI API Key") {
@@ -18,6 +20,10 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 320)
                 }
+            }
+
+            Section("Formatting") {
+                Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
 
             Section {
@@ -44,7 +50,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 260)
+        .frame(width: 520, height: 320)
         .navigationTitle("設定")
     }
 }

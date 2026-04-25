@@ -16,56 +16,67 @@ struct MainWindowView: View {
 
     var body: some View {
         @Bindable var vm = appViewModel
-        VStack(spacing: 0) {
-            // ── Main pane ──────────────────────────────────────────
-            HStack(spacing: 0) {
-                if appViewModel.isSidebarVisible {
-                    SidebarView()
-                        .frame(width: 240)
-                        .transition(.move(edge: .leading))
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                // ── Main pane ──────────────────────────────────────────
+                HStack(spacing: 0) {
+                    if appViewModel.isSidebarVisible {
+                        SidebarView()
+                            .frame(width: 240)
+                            .transition(.move(edge: .leading))
 
-                    KobaDivider()
-                }
-
-                VStack(spacing: 0) {
-                    TabBarView()
-
-                    if appViewModel.isDiffMode {
-                        DiffInlineView(preloadText: appViewModel.activeTab?.content ?? "",
-                                       preloadFileName: appViewModel.activeTab?.title ?? "")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if appViewModel.previewMode == .wysiwyg {
-                        @Bindable var vm = appViewModel
-                        WYSIWYGEditorView(text: $vm.editorText)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color.kobaPaper)
-                    } else if appViewModel.previewMode == .split {
-                        GeometryReader { geo in
-                            HStack(spacing: 0) {
-                                EditorView()
-                                    .frame(width: max(280, geo.size.width * splitFraction))
-                                    .background(Color.kobaPaper)
-                                SplitDivider(fraction: $splitFraction, availableWidth: geo.size.width)
-                                PreviewView()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.kobaSurface)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        EditorView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(Color.kobaPaper)
+                        KobaDivider()
                     }
+
+                    VStack(spacing: 0) {
+                        TabBarView()
+
+                        if appViewModel.isDiffMode {
+                            DiffInlineView(preloadText: appViewModel.activeTab?.content ?? "",
+                                           preloadFileName: appViewModel.activeTab?.title ?? "")
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if appViewModel.previewMode == .wysiwyg {
+                            @Bindable var vm = appViewModel
+                            WYSIWYGEditorView(text: $vm.editorText)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.kobaPaper)
+                        } else if appViewModel.previewMode == .split {
+                            GeometryReader { geo in
+                                HStack(spacing: 0) {
+                                    EditorView()
+                                        .frame(width: max(280, geo.size.width * splitFraction))
+                                        .background(Color.kobaPaper)
+                                    SplitDivider(fraction: $splitFraction, availableWidth: geo.size.width)
+                                    PreviewView()
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.kobaSurface)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            EditorView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.kobaPaper)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
 
+                // ── Status / command bar ───────────────────────────────
+                StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
 
-            // ── Status / command bar ───────────────────────────────
-            StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
+            if appViewModel.showFormatToast {
+                Text("\(appViewModel.formatChangeCount) changes applied")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.bottom, 42)
+            }
         }
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
@@ -89,7 +100,13 @@ struct MainWindowView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
+            if AppState.shared.autoFormatOnSave {
+                appViewModel.formatCurrentDocument()
+            }
             appViewModel.saveCurrentFile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .formatDocumentRequested)) { _ in
+            appViewModel.formatCurrentDocument()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
             appViewModel.fileTreeViewModel.addFolder()
