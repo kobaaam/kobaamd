@@ -81,6 +81,7 @@ extension Notification.Name {
     static let newTabRequested        = AppCommand.newTab.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
+    static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
 }
 
 // MARK: - App Delegate (window frame save/restore)

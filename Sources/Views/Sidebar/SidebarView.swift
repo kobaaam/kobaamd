@@ -9,6 +9,7 @@ struct SidebarView: View {
     enum SidebarTab: String, CaseIterable {
         case files = "Files"
         case search = "Search"
+        case outline = "アウトライン"
     }
 
     var body: some View {
@@ -26,7 +27,7 @@ struct SidebarView: View {
                             .padding(.vertical, 7)
                     }
                     .buttonStyle(.plain)
-                    .help(tab == .files ? "ファイルツリーを表示" : "ワークスペース内を全文検索")
+                    .help(helpText(for: tab))
                     .background(
                         selectedTab == tab
                             ? Color.kobaSurface
@@ -49,6 +50,8 @@ struct SidebarView: View {
                 filePanel
             case .search:
                 SearchView(fileTreeViewModel: fileTreeViewModel)
+            case .outline:
+                OutlineView(outlineViewModel: appViewModel.outlineViewModel)
             }
         }
         .background(Color.kobaSidebar)
@@ -194,6 +197,17 @@ struct SidebarView: View {
 
                 FileTreeView(fileTreeViewModel: fileTreeViewModel)
             }
+        }
+    }
+
+    private func helpText(for tab: SidebarTab) -> String {
+        switch tab {
+        case .files:
+            return "ファイルツリーを表示"
+        case .search:
+            return "ワークスペース内を全文検索"
+        case .outline:
+            return "見出し一覧でナビゲーション"
         }
     }
 

@@ -23,11 +23,104 @@ struct NSTextViewWrapper: View {
     }
 
     var body: some View {
-        TextEditor(text: $text)
-            .font(Self.editorFont)
-            .foregroundStyle(Self.inkColor)
-            .scrollContentBackground(.hidden)
-            .background(Self.paperColor)
-            .padding(.horizontal, 4)
+        ZStack {
+            TextEditor(text: $text)
+                .font(Self.editorFont)
+                .foregroundStyle(Self.inkColor)
+                .scrollContentBackground(.hidden)
+                .background(Self.paperColor)
+                .padding(.horizontal, 4)
+
+            // 不可視の NSViewRepresentable — jumpToLine 通知を受け取り TextEditor 内の
+            // NSTextView にアクセスしてカーソル移動・スクロールを行う
+            JumpToLineHandler()
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+// MARK: - Jump to line handler
+
+/// TextEditor 配下の NSTextView を探して jumpToLine 通知を受信し、
+/// 対象行にカーソルを移動してスクロールさせる。
+private struct JumpToLineHandler: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.frame = .zero
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            context.coordinator.attach(to: view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject {
+        private var jumpObserver: Any?
+        private weak var textViewRef: NSTextView?
+
+        func attach(to view: NSView) {
+            // TextEditor 配下の NSTextView を階層探索で取得
+            var current: NSView? = view
+            for _ in 0..<25 {
+                guard let parent = current?.superview else { break }
+                if let tv = findView(NSTextView.self, in: parent, excluding: current) {
+                    textViewRef = tv
+                    subscribeJumpToLine()
+                    break
+                }
+                current = parent
+            }
+        }
+
+        private func subscribeJumpToLine() {
+            jumpObserver = NotificationCenter.default.addObserver(
+                forName: .jumpToLine,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let line = notification.userInfo?["line"] as? Int else { return }
+                self?.jumpToLine(line)
+            }
+        }
+
+        private func jumpToLine(_ line: Int) {
+            guard let tv = textViewRef else { return }
+
+            let nsStr = tv.string as NSString
+            let targetLine = max(1, line) - 1  // 0-indexed
+            var currentLine = 0
+            var charPos = 0
+
+            while currentLine < targetLine && charPos < nsStr.length {
+                let lineRange = nsStr.lineRange(for: NSRange(location: charPos, length: 0))
+                charPos = NSMaxRange(lineRange)
+                currentLine += 1
+            }
+
+            let range = NSRange(location: charPos, length: 0)
+            tv.window?.makeFirstResponder(tv)
+            tv.setSelectedRange(range)
+            tv.scrollRangeToVisible(range)
+        }
+
+        /// 指定型の NSView をサブツリーから再帰探索する（excluding を除外）
+        private func findView<T: NSView>(_ type: T.Type, in view: NSView, excluding: NSView?) -> T? {
+            for subview in view.subviews {
+                if subview === excluding { continue }
+                if let found = subview as? T { return found }
+                if let found = findView(type, in: subview, excluding: excluding) { return found }
+            }
+            return nil
+        }
+
+        deinit {
+            if let jumpObserver {
+                NotificationCenter.default.removeObserver(jumpObserver)
+            }
+        }
     }
 }
