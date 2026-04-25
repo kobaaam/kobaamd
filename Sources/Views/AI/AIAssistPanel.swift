@@ -25,7 +25,7 @@ struct AIAssistPanel: View {
                 Spacer()
                 Picker("", selection: $provider) {
                     ForEach(APIKeyStore.Provider.allCases, id: \.self) { p in
-                        Text(p.rawValue).tag(p)
+                        Text(p.displayName).tag(p)
                     }
                 }
                 .labelsHidden()

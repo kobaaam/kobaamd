@@ -12,6 +12,7 @@ struct TabBarView: View {
                     ForEach(appViewModel.tabs) { tab in
                         TabItemView(tab: tab)
                     }
+                    DiffTabItemView()
                 }
             }
 
@@ -31,6 +32,36 @@ struct TabBarView: View {
         .frame(height: 34)
         .background(Color.kobaSurface)
         .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
+    }
+}
+
+// MARK: - Diff tab item (fixed, right side)
+
+struct DiffTabItemView: View {
+    @Environment(AppViewModel.self) private var appViewModel
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 10))
+                .foregroundStyle(appViewModel.isDiffMode ? Color.kobaAccent : Color.kobaMute)
+            Text("Diff")
+                .font(.system(size: 12))
+                .foregroundStyle(appViewModel.isDiffMode ? Color.kobaInk : Color.kobaMute)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(appViewModel.isDiffMode ? Color.kobaPaper : Color.kobaSurface)
+        .overlay(
+            appViewModel.isDiffMode
+                ? Rectangle().fill(Color.kobaAccent).frame(height: 2)
+                : Rectangle().fill(Color.clear).frame(height: 2),
+            alignment: .bottom
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appViewModel.isDiffMode = true
+        }
     }
 }
 
@@ -88,6 +119,7 @@ struct TabItemView: View {
         .overlay(Rectangle().fill(Color.kobaLine).frame(width: 1), alignment: .trailing)
         .contentShape(Rectangle())
         .onTapGesture {
+            appViewModel.isDiffMode = false
             appViewModel.switchToTab(id: tab.id)
         }
         .onHover { isHovered = $0 }

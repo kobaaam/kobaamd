@@ -2,14 +2,14 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(AppViewModel.self) private var appViewModel
-    @State private var fileTreeViewModel = FileTreeViewModel()
     @State private var selectedTab: SidebarTab = .files
+
+    private var fileTreeViewModel: FileTreeViewModel { appViewModel.fileTreeViewModel }
     @State private var reloadDebounceTask: Task<Void, Never>? = nil
 
     enum SidebarTab: String, CaseIterable {
         case files = "Files"
         case search = "Search"
-        case outline = "アウトライン"
     }
 
     var body: some View {
@@ -27,7 +27,7 @@ struct SidebarView: View {
                             .padding(.vertical, 7)
                     }
                     .buttonStyle(.plain)
-                    .help(helpText(for: tab))
+                    .help(tab == .files ? "ファイルツリーを表示" : "ワークスペース内を全文検索")
                     .background(
                         selectedTab == tab
                             ? Color.kobaSurface
@@ -50,17 +50,9 @@ struct SidebarView: View {
                 filePanel
             case .search:
                 SearchView(fileTreeViewModel: fileTreeViewModel)
-            case .outline:
-                OutlineView(outlineViewModel: appViewModel.outlineViewModel)
             }
         }
         .background(Color.kobaSidebar)
-        .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
-            fileTreeViewModel.openFolder()
-            if let root = fileTreeViewModel.rootURL {
-                appViewModel.gitViewModel.configure(repoURL: root)
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .openRecentNotification)) { notification in
             if let url = notification.object as? URL {
                 openRecent(url)
@@ -76,10 +68,7 @@ struct SidebarView: View {
             }
         }
         .onAppear {
-            fileTreeViewModel.restoreLastFolder()
-            if let root = fileTreeViewModel.rootURL {
-                appViewModel.gitViewModel.configure(repoURL: root)
-            }
+            fileTreeViewModel.restoreWorkspace()
 
             // 前回開いていたファイルを復元（Finder 経由のオープンは MainWindowView.onChange が担当）
             if let lastURL = AppState.loadLastFile(),
@@ -97,7 +86,7 @@ struct SidebarView: View {
 
     var filePanel: some View {
         VStack(spacing: 0) {
-            if fileTreeViewModel.nodes.isEmpty {
+            if fileTreeViewModel.folders.isEmpty {
                 // Empty state
                 VStack(spacing: 16) {
                     ZStack {
@@ -118,10 +107,10 @@ struct SidebarView: View {
                             .multilineTextAlignment(.center)
                     }
                     Button {
-                        fileTreeViewModel.openFolder()
+                        fileTreeViewModel.addFolder()
                     } label: {
                         HStack(spacing: 6) {
-                            Text("Open Folder")
+                            Text("Add Folder")
                                 .font(.system(size: 12, weight: .semibold))
                             Text("⌘O")
                                 .font(.system(size: 11, design: .monospaced))
@@ -163,63 +152,8 @@ struct SidebarView: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Section header
-                HStack {
-                    Text("FILES")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.kobaMute2)
-                    Spacer()
-                    // New file in current workspace
-                    Button {
-                        createNewFile()
-                    } label: {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.kobaMute)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(fileTreeViewModel.rootURL == nil)
-                    .help("New file in workspace")
-
-                    // Open / change folder
-                    Button {
-                        fileTreeViewModel.openFolder()
-                    } label: {
-                        Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.kobaMute)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open folder")
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-
                 FileTreeView(fileTreeViewModel: fileTreeViewModel)
             }
-        }
-    }
-
-    private func helpText(for tab: SidebarTab) -> String {
-        switch tab {
-        case .files:
-            return "ファイルツリーを表示"
-        case .search:
-            return "ワークスペース内を全文検索"
-        case .outline:
-            return "見出し一覧でナビゲーション"
-        }
-    }
-
-    private func createNewFile() {
-        do {
-            let url = try fileTreeViewModel.createNewFileInRoot()
-            appViewModel.selectedFileURL = url
-            appViewModel.editorText = ""
-            appViewModel.markSaved()
-            AppState.saveLastFile(url)
-        } catch {
-            appViewModel.showAppError(.fileWriteFailed(url: URL(fileURLWithPath: "Untitled.md"), underlying: error))
         }
     }
 

@@ -1,10 +1,9 @@
 import SwiftUI
 
 struct FileTreeView: View {
-    var fileTreeViewModel: FileTreeViewModel
+    @Bindable var fileTreeViewModel: FileTreeViewModel
     @Environment(AppViewModel.self) private var appViewModel
 
-    @State private var listSelection: FileNode? = nil
     @State private var renamingNode: FileNode? = nil
     @State private var showRenameAlert: Bool = false
     @State private var renameText: String = ""
@@ -12,68 +11,48 @@ struct FileTreeView: View {
     @State private var showDeleteConfirm: Bool = false
 
     var body: some View {
-        Group {
-            if fileTreeViewModel.nodes.isEmpty {
-                Text("No folder opened")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: $listSelection) {
-                    OutlineGroup(fileTreeViewModel.nodes, id: \.id, children: \.children) { node in
-                        let isSelected = listSelection?.url == node.url
-                        Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
-                            .lineLimit(1)
-                            .font(.system(size: 12))
-                            .foregroundStyle(isSelected ? Color.kobaAccent : Color.kobaInk)
-                            .fontWeight(isSelected ? .semibold : .regular)
-                            .tag(node)
-                            .onTapGesture {
-                                guard !node.isDirectory else { return }
-                                listSelection = node
-                                select(node: node)
-                            }
-                            .contextMenu {
-                                if node.isDirectory {
-                                    Button {
-                                        do {
-                                            let newURL = try fileTreeViewModel.createNewFile(in: node.url)
-                                            appViewModel.selectedFileURL = newURL
-                                            appViewModel.editorText = ""
-                                            appViewModel.markSaved()
-                                            AppState.saveLastFile(newURL)
-                                            let newFileNode = FileNode(name: newURL.lastPathComponent,
-                                                                       url: newURL,
-                                                                       isDirectory: false,
-                                                                       children: nil)
-                                            renamingNode = newFileNode
-                                            renameText = newURL.lastPathComponent
-                                            showRenameAlert = true
-                                        } catch {
-                                            appViewModel.showAppError(.fileWriteFailed(url: node.url, underlying: error))
-                                        }
-                                    } label: {
-                                        Label("新規ファイル...", systemImage: "doc.badge.plus")
-                                    }
-                                }
-                                Button {
-                                    renamingNode = node
-                                    renameText = node.name
-                                    showRenameAlert = true
-                                } label: {
-                                    Label("名前を変更...", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) {
-                                    deletingNode = node
-                                    showDeleteConfirm = true
-                                } label: {
-                                    Label("削除", systemImage: "trash")
-                                }
-                            }
+        List {
+            // ── Add Folder to Workspace ───────────────────────────
+            Button {
+                fileTreeViewModel.addFolder()
+            } label: {
+                Label("フォルダをワークスペースに追加", systemImage: "folder.badge.plus")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.kobaMute)
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .padding(.vertical, 2)
+
+            ForEach($fileTreeViewModel.folders) { $folder in
+                FolderSection(
+                    folder: $folder,
+                    fileTreeViewModel: fileTreeViewModel,
+                    renamingNode: $renamingNode,
+                    showRenameAlert: $showRenameAlert,
+                    renameText: $renameText,
+                    deletingNode: $deletingNode,
+                    showDeleteConfirm: $showDeleteConfirm,
+                    onSelect: select,
+                    onRemove: { fileTreeViewModel.removeFolder(id: folder.id) }
+                )
+            }
+
+            // 空きエリア（右クリックでワークスペース操作メニュー）
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .contextMenu {
+                    Button {
+                        fileTreeViewModel.addFolder()
+                    } label: {
+                        Label("フォルダをワークスペースに追加", systemImage: "folder.badge.plus")
                     }
                 }
-                .listStyle(.sidebar)
-            }
         }
+        .listStyle(.sidebar)
         .alert("名前を変更", isPresented: $showRenameAlert) {
             TextField("新しい名前", text: $renameText)
             Button("変更") { renameNode() }
@@ -86,18 +65,6 @@ struct FileTreeView: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text(deletingNode?.name ?? "")
-        }
-    }
-
-    private func iconName(for url: URL) -> String {
-        switch url.pathExtension.lowercased() {
-        case "md", "markdown": return "doc.text"
-        case "swift":          return "swift"
-        case "json", "yaml", "yml", "toml": return "curlybraces"
-        case "html", "css", "scss", "xml": return "globe"
-        case "sh", "zsh", "bash": return "terminal"
-        case "py":             return "doc.text.below.echelon"
-        default:               return "doc"
         }
     }
 
@@ -143,6 +110,154 @@ struct FileTreeView: View {
             fileTreeViewModel.reload()
         } catch {
             appViewModel.showAppError(.fileDeleteFailed(url: node.url, underlying: error))
+        }
+    }
+}
+
+// MARK: - Per-folder section
+
+private struct FolderSection: View {
+    @Binding var folder: WorkspaceFolder
+    var fileTreeViewModel: FileTreeViewModel
+    @Binding var renamingNode: FileNode?
+    @Binding var showRenameAlert: Bool
+    @Binding var renameText: String
+    @Binding var deletingNode: FileNode?
+    @Binding var showDeleteConfirm: Bool
+    var onSelect: (FileNode) -> Void
+    var onRemove: () -> Void
+
+    @Environment(AppViewModel.self) private var appViewModel
+    @State private var isHoveringHeader = false
+
+    var body: some View {
+        Section(isExpanded: $folder.isExpanded) {
+            OutlineGroup(folder.nodes, id: \.id, children: \.children) { node in
+                NodeRow(
+                    node: node,
+                    fileTreeViewModel: fileTreeViewModel,
+                    renamingNode: $renamingNode,
+                    showRenameAlert: $showRenameAlert,
+                    renameText: $renameText,
+                    deletingNode: $deletingNode,
+                    showDeleteConfirm: $showDeleteConfirm,
+                    onSelect: onSelect
+                )
+            }
+        } header: {
+            HStack(spacing: 4) {
+                Text(folder.displayName.uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.kobaMute2)
+                    .lineLimit(1)
+                    .help((folder.url.path as NSString).abbreviatingWithTildeInPath)
+                Spacer()
+                if isHoveringHeader {
+                    // 新規ファイル
+                    Button {
+                        do {
+                            let url = try fileTreeViewModel.createNewFile(in: folder.url)
+                            appViewModel.selectedFileURL = url
+                            appViewModel.editorText = ""
+                            appViewModel.markSaved()
+                            AppState.saveLastFile(url)
+                        } catch {
+                            appViewModel.showAppError(.fileWriteFailed(url: folder.url, underlying: error))
+                        }
+                    } label: {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.kobaMute)
+                    }
+                    .buttonStyle(.plain)
+                    .help("新規ファイル")
+
+                    // フォルダを削除
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.kobaMute)
+                    }
+                    .buttonStyle(.plain)
+                    .help("ワークスペースから削除")
+                }
+            }
+            .padding(.vertical, 2)
+            .onHover { isHoveringHeader = $0 }
+        }
+    }
+}
+
+// MARK: - Node row
+
+private struct NodeRow: View {
+    let node: FileNode
+    var fileTreeViewModel: FileTreeViewModel
+    @Binding var renamingNode: FileNode?
+    @Binding var showRenameAlert: Bool
+    @Binding var renameText: String
+    @Binding var deletingNode: FileNode?
+    @Binding var showDeleteConfirm: Bool
+    var onSelect: (FileNode) -> Void
+
+    @Environment(AppViewModel.self) private var appViewModel
+
+    var body: some View {
+        Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
+            .lineLimit(1)
+            .font(.system(size: 12))
+            .foregroundStyle(Color.kobaInk)
+            .onTapGesture {
+                guard !node.isDirectory else { return }
+                onSelect(node)
+            }
+            .contextMenu {
+                if node.isDirectory {
+                    Button {
+                        do {
+                            let newURL = try fileTreeViewModel.createNewFile(in: node.url)
+                            appViewModel.selectedFileURL = newURL
+                            appViewModel.editorText = ""
+                            appViewModel.markSaved()
+                            AppState.saveLastFile(newURL)
+                            renamingNode = FileNode(name: newURL.lastPathComponent,
+                                                    url: newURL,
+                                                    isDirectory: false,
+                                                    children: nil)
+                            renameText = newURL.lastPathComponent
+                            showRenameAlert = true
+                        } catch {
+                            appViewModel.showAppError(.fileWriteFailed(url: node.url, underlying: error))
+                        }
+                    } label: {
+                        Label("新規ファイル...", systemImage: "doc.badge.plus")
+                    }
+                }
+                Button {
+                    renamingNode = node
+                    renameText = node.name
+                    showRenameAlert = true
+                } label: {
+                    Label("名前を変更...", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    deletingNode = node
+                    showDeleteConfirm = true
+                } label: {
+                    Label("削除", systemImage: "trash")
+                }
+            }
+    }
+
+    private func iconName(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "md", "markdown": return "doc.text"
+        case "swift":          return "swift"
+        case "json", "yaml", "yml", "toml": return "curlybraces"
+        case "html", "css", "scss", "xml": return "globe"
+        case "sh", "zsh", "bash": return "terminal"
+        case "py":             return "doc.text.below.echelon"
+        default:               return "doc"
         }
     }
 }

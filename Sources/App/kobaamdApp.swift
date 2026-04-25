@@ -55,8 +55,6 @@ struct kobaamdApp: App {
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
-                Button("Git パネル") { AppCommand.toggleGitPanel.post() }
-                    .keyboardShortcut("g", modifiers: .command)
                 Divider()
             }
         }
@@ -77,10 +75,11 @@ extension Notification.Name {
     static let openFolderRequested    = AppCommand.openFolder.notificationName
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
-    static let gitPanelRequested      = AppCommand.toggleGitPanel.notificationName
     static let newTabRequested        = AppCommand.newTab.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
+    static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
+    static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
 }
 

@@ -73,6 +73,10 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
             showAIPanel.toggle()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .aiInlineRequested)) { note in
+            guard let lineContent = note.userInfo?["lineContent"] as? String else { return }
+            appViewModel.startAIInlineCompletion(lineContent: lineContent)
+        }
     }
 
     private func scheduleAutoSave() {
