@@ -18,10 +18,11 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Instant preview / リアルタイムプレビュー** — Split view or WYSIWYG mode / スプリットビューまたは WYSIWYG モード
 - **Folder workspace / フォルダワークスペース** — Open a folder and browse all files in a sidebar / フォルダを開いてサイドバーでファイルを管理
 - **Mermaid diagrams / Mermaid ダイアグラム** — Flowcharts, sequence diagrams, Gantt charts rendered inline / フローチャート・シーケンス図・ガントチャートをインラインで描画
+- **D2 diagrams / D2 ダイアグラム** — D2 diagram preview rendered in the preview pane / D2 図をプレビューペインでレンダリング
 - **Tabbed editing / タブ編集** — Multiple files open simultaneously (⌘T) / 複数ファイルを同時に開く（⌘T）
 - **Syntax highlighting / シンタックスハイライト** — Markdown syntax highlighted in the editor / エディタ内の Markdown 構文をハイライト
 - **Full-text search / 全文検索** — Search across all files in your workspace / ワークスペース全ファイルを横断検索
-- **Git panel / Git パネル** — View branch and status at a glance / ブランチ・差分をひと目で確認
+- **Outline panel / アウトラインパネル** — Navigate headings (H1–H6) with editor + preview sync / 見出し一覧からエディタ・プレビューを同期ジャンプ
 - **AI assist / AI アシスト** — Send selected text to OpenAI / Anthropic / Gemini / 選択テキストを AI API に送信
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
@@ -83,12 +84,11 @@ kobaamd/
 │   ├── Models/                 # FileNode, EditorTab
 │   ├── Views/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
-│   │   ├── Sidebar/               # FileTreeView, SearchView
+│   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView
 │   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar
-│   │   ├── Preview/               # WKWebView-based Markdown renderer
-│   │   ├── Git/                   # GitPanel
+│   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
 │   │   └── AI/                    # AI assist panel
-│   ├── ViewModels/             # @Observable state — FileTree, Preview, Editor, Git
+│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline
 │   ├── Services/               # FileService, MarkdownService, AIService, GitService
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns
 ├── scripts/
@@ -97,7 +97,7 @@ kobaamd/
 └── Package.swift
 ```
 
-**Stack:** SwiftUI + AppKit · MVVM (`@Observable`) · `swift-markdown` (Apple) · WKWebView · Mermaid.js
+**Stack:** SwiftUI + AppKit · MVVM (`@Observable`) · `swift-markdown` (Apple) · WKWebView · Mermaid.js · D2
 
 ---
 
@@ -112,7 +112,6 @@ kobaamd/
 | ⌘S | Save / 保存 |
 | ⌘F | Find & Replace / 検索・置換 |
 | ⌘B | Toggle sidebar / サイドバー表示切替 |
-| ⌘G | Toggle Git panel / Git パネル表示切替 |
 | ⌘E | AI assist / AI アシスト |
 | ⌘, | Settings / 設定 |
 
@@ -123,7 +122,6 @@ kobaamd/
 - [ ] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
 - [ ] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
 - [ ] **Export** — PDF, HTML export / PDF・HTML エクスポート
-- [ ] **Outline panel** — Navigate headings / 見出しナビゲーション
 - [ ] **Custom themes** — Light/dark/custom color schemes / カスタムカラーテーマ
 
 ---
