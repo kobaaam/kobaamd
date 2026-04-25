@@ -11,10 +11,11 @@ import Observation
 
     static let shared = AppState()
 
-    private static let lastFolderKey  = "lastFolderURL"
-    private static let lastFileKey    = "lastFileURL"
-    private static let recentFilesKey = "recentFiles"
-    private static let maxRecentFiles = 10
+    private static let lastFolderKey      = "lastFolderURL"
+    private static let lastFileKey        = "lastFileURL"
+    private static let recentFilesKey     = "recentFiles"
+    private static let workspaceBookmarks = "workspaceFolderBookmarks"
+    private static let maxRecentFiles     = 10
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -53,6 +54,42 @@ import Observation
     func clearRecentFiles() {
         defaults.removeObject(forKey: Self.recentFilesKey)
     }
+
+    // MARK: - Workspace folders (multi-root, Security-Scoped Bookmarks)
+
+    func saveWorkspaceFolders(_ urls: [URL]) {
+        let bookmarks = urls.compactMap { url -> Data? in
+            try? url.bookmarkData(options: .withSecurityScope,
+                                  includingResourceValuesForKeys: nil,
+                                  relativeTo: nil)
+        }
+        defaults.set(bookmarks, forKey: Self.workspaceBookmarks)
+    }
+
+    func loadWorkspaceFolders() -> [URL] {
+        // 新形式（bookmarks）を優先して読み込み
+        if let saved = defaults.array(forKey: Self.workspaceBookmarks) as? [Data], !saved.isEmpty {
+            return saved.compactMap { data -> URL? in
+                var stale = false
+                guard let url = try? URL(resolvingBookmarkData: data,
+                                         options: .withSecurityScope,
+                                         relativeTo: nil,
+                                         bookmarkDataIsStale: &stale),
+                      FileManager.default.fileExists(atPath: url.path) else { return nil }
+                _ = url.startAccessingSecurityScopedResource()
+                return url
+            }
+        }
+        // レガシーマイグレーション: 旧 lastFolderURL を1件として移行
+        if let url = loadLastFolder() {
+            saveWorkspaceFolders([url])
+            return [url]
+        }
+        return []
+    }
+
+    static func saveWorkspaceFolders(_ urls: [URL]) { shared.saveWorkspaceFolders(urls) }
+    static func loadWorkspaceFolders() -> [URL]     { shared.loadWorkspaceFolders() }
 
     // MARK: - Static shims (backward compatibility)
     // Call sites can migrate to AppState.shared.xxx() over time.

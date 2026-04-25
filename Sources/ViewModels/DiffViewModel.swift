@@ -6,6 +6,8 @@ import Observation
 final class DiffViewModel {
     var textA: String = ""
     var textB: String = ""
+    var fileNameA: String = ""
+    var fileNameB: String = ""
     var lines: [DiffLine] = []
 
     private var debounceTask: Task<Void, Never>?

@@ -10,7 +10,6 @@ enum AppCommand: String {
     case openFolder        = "kobaamd.openFolderRequested"
     case aiAssist          = "kobaamd.aiAssistRequested"
     case toggleSidebar     = "kobaamd.sidebarToggleRequested"
-    case toggleGitPanel    = "kobaamd.gitPanelRequested"
     case newTab            = "kobaamd.newTabRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
