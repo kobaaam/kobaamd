@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct OutlineView: View {
+    @Environment(AppViewModel.self) private var appViewModel
     let outlineViewModel: OutlineViewModel
     @State private var hoveredID: UUID? = nil
 
@@ -50,6 +51,9 @@ struct OutlineView: View {
                                 hoveredID = hovering ? item.id : (hoveredID == item.id ? nil : hoveredID)
                             }
                             .onTapGesture {
+                                if outlineViewModel.totalLines > 1 {
+                                    appViewModel.previewScrollRatio = Double(item.line - 1) / Double(outlineViewModel.totalLines - 1)
+                                }
                                 NotificationCenter.default.post(
                                     name: .jumpToLine,
                                     object: nil,
