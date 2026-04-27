@@ -26,8 +26,7 @@
 	<string>NSApplication</string>
 
 	<!-- Sparkle 自動アップデート設定 -->
-	<key>SUPublicEDKey</key>
-	<string>PLACEHOLDER_EDDSA_PUBLIC_KEY</string>
+	<!-- SUPublicEDKey は実キー確定後に追加する -->
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/kobaaam/kobaamd/main/appcast.xml</string>
 
