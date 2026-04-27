@@ -72,11 +72,3 @@ struct SettingsView: View {
         .navigationTitle("設定")
     }
 }
-
-// MARK: - UpdateCheckInterval
-
-enum UpdateCheckInterval: String, CaseIterable {
-    case atLaunch = "atLaunch"
-    case daily    = "daily"
-    case weekly   = "weekly"
-}
