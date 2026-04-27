@@ -35,6 +35,7 @@ final class AppViewModel {
     var showFormatToast: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
+    let todoViewModel = TodoViewModel()
     private var formatToastTask: Task<Void, Never>? = nil
 
     // MARK: - Tabs
@@ -157,6 +158,7 @@ final class AppViewModel {
         savedText = editorText
         isDirty = false
         scheduleStatsUpdate()
+        todoViewModel.update(text: editorText)
     }
 
     func markEdited() {
@@ -186,6 +188,7 @@ final class AppViewModel {
     func updateEditorText(_ text: String) {
         editorText = text
         markEdited()
+        todoViewModel.update(text: text)
     }
 
     func formatCurrentDocument() {
