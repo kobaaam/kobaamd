@@ -84,6 +84,7 @@ struct MarkdownWebView: NSViewRepresentable {
         var pendingScrollRatio: Double = 0
         weak var webView: WKWebView?
         private var blockObserver: Any?
+        private var pdfObserver: Any?
 
         override init() {
             super.init()
@@ -97,10 +98,47 @@ struct MarkdownWebView: NSViewRepresentable {
                       let wv = self.webView else { return }
                 self.highlightBySourceLine(line, in: wv)
             }
+            pdfObserver = NotificationCenter.default.addObserver(
+                forName: .exportPDFWithURL,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let url = note.object as? URL else { return }
+                self.exportPDF(to: url) { result in
+                    NotificationCenter.default.post(
+                        name: .exportPDFCompleted,
+                        object: result as AnyObject
+                    )
+                }
+            }
         }
 
         deinit {
             if let blockObserver { NotificationCenter.default.removeObserver(blockObserver) }
+            if let pdfObserver { NotificationCenter.default.removeObserver(pdfObserver) }
+        }
+
+        func exportPDF(to url: URL, completion: @escaping (Result<Void, Error>) -> Void) {
+            guard let wv = webView else {
+                completion(.failure(NSError(domain: "kobaamd", code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "WebViewが見つかりません"])))
+                return
+            }
+            let config = WKPDFConfiguration()
+            wv.createPDF(configuration: config) { result in
+                switch result {
+                case .success(let data):
+                    do {
+                        try data.write(to: url, options: .atomic)
+                        DispatchQueue.main.async { completion(.success(())) }
+                    } catch {
+                        DispatchQueue.main.async { completion(.failure(error)) }
+                    }
+                case .failure(let error):
+                    DispatchQueue.main.async { completion(.failure(error)) }
+                }
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
