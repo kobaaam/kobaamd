@@ -115,8 +115,12 @@ struct MainWindowView: View {
         .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
             guard let url = fileURL else { return }
             AppState.shared.pendingOpenFileURL = nil
-            Task {
-                await appViewModel.openDroppedFile(url: url)
+            Task.detached(priority: .userInitiated) {
+                if let content = try? FileService().readFile(at: url) {
+                    await MainActor.run {
+                        appViewModel.openInTab(url: url, content: content)
+                    }
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
