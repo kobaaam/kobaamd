@@ -8,6 +8,8 @@ struct ConfluencePageSettingSheet: View {
     @State private var parentPageId: String = ""
     @State private var pageTitle: String = ""
     @State private var existingPageId: String = ""
+    @State private var showError: Bool = false
+    @State private var errorMessage: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -63,6 +65,11 @@ struct ConfluencePageSettingSheet: View {
         .padding(24)
         .frame(width: 480, height: 340)
         .onAppear { loadExisting() }
+        .alert("保存エラー", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
     }
 
     private func loadExisting() {
@@ -83,7 +90,12 @@ struct ConfluencePageSettingSheet: View {
             pageTitle: pageTitle,
             pageId: existingPageId.isEmpty ? nil : existingPageId
         )
-        try? ConfluenceService().saveMapping(mapping, for: fileURL)
-        dismiss()
+        do {
+            try ConfluenceService().saveMapping(mapping, for: fileURL)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
     }
 }

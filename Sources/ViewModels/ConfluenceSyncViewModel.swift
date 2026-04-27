@@ -9,7 +9,11 @@ final class ConfluenceSyncViewModel {
     var isPageSettingSheetPresented: Bool = false
     var currentFileURL: URL? = nil
 
-    private var statusTask: Task<Void, Never>? = nil
+    nonisolated(unsafe) private var statusTask: Task<Void, Never>? = nil
+
+    deinit {
+        statusTask?.cancel()
+    }
 
     func performSync(fileURL: URL?, markdownContent: String, onError: @escaping (AppError) -> Void) {
         guard let fileURL else {

@@ -22,9 +22,12 @@ final class AIService {
 
     func complete(prompt: String, context: String, provider: APIKeyStore.Provider) async throws -> String {
         switch provider {
-        case .openai:    return try await openAI(prompt: prompt, context: context)
-        case .anthropic: return try await anthropic(prompt: prompt, context: context)
-        default:         throw AIError.noAPIKey(provider: provider.displayName)
+        case .openai:
+            return try await openAI(prompt: prompt, context: context)
+        case .anthropic:
+            return try await anthropic(prompt: prompt, context: context)
+        case .confluenceURL, .confluenceEmail, .confluenceToken:
+            throw AIError.noAPIKey(provider: provider.displayName)
         }
     }
 
