@@ -96,4 +96,21 @@ struct AppViewModelTests {
         vm.openInTab(url: URL(fileURLWithPath: "/tmp/x.md"), content: "x")
         #expect(vm.activeTab?.url?.lastPathComponent == "x.md")
     }
+
+    @Test("openDroppedFile: サポート対象外拡張子(.png)ではタブが開かれないこと")
+    func openDroppedFileIgnoresUnsupportedExtension() async {
+        let vm = AppViewModel()
+        let url = URL(fileURLWithPath: "/tmp/image.png")
+        await vm.openDroppedFile(url: url)
+        #expect(vm.tabs.isEmpty)
+    }
+
+    @Test("openDroppedFile: ディレクトリURLではfileTreeViewModelにフォルダが追加されること")
+    func openDroppedFileAddsDirectoryToFileTree() async {
+        let vm = AppViewModel()
+        // /tmp は実在するディレクトリ
+        let dirURL = URL(fileURLWithPath: "/tmp")
+        await vm.openDroppedFile(url: dirURL)
+        #expect(vm.fileTreeViewModel.folders.contains(where: { $0.url == dirURL }))
+    }
 }
