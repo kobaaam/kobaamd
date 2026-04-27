@@ -134,48 +134,12 @@ struct EditorView: View {
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         guard !providers.isEmpty else { return false }
-
         Task {
             for provider in providers {
-                guard let url = await loadDroppedURL(from: provider) else { continue }
-                await openDroppedItem(at: url)
+                guard let url = await appViewModel.loadDroppedURL(from: provider) else { continue }
+                await appViewModel.openDroppedFile(url: url)
             }
         }
-
         return true
-    }
-
-    private func loadDroppedURL(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                let url: URL?
-                switch item {
-                case let data as Data:
-                    url = URL(dataRepresentation: data, relativeTo: nil)
-                case let droppedURL as URL:
-                    url = droppedURL
-                case let string as String:
-                    url = URL(string: string)
-                default:
-                    url = nil
-                }
-                continuation.resume(returning: url)
-            }
-        }
-    }
-
-    @MainActor
-    private func openDroppedItem(at url: URL) async {
-        let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
-        if values?.isDirectory == true {
-            appViewModel.fileTreeViewModel.addFolder(url: url)
-            return
-        }
-
-        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
-        let task = Task.detached(priority: .userInitiated) { try FileService().readFile(at: url) }
-        guard let content = try? await task.value else { return }
-
-        appViewModel.openInTab(url: url, content: content)
     }
 }

@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Main window
 
@@ -116,12 +115,8 @@ struct MainWindowView: View {
         .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
             guard let url = fileURL else { return }
             AppState.shared.pendingOpenFileURL = nil
-            Task.detached(priority: .userInitiated) {
-                if let content = try? FileService().readFile(at: url) {
-                    await MainActor.run {
-                        appViewModel.openInTab(url: url, content: content)
-                    }
-                }
+            Task {
+                await appViewModel.openDroppedFile(url: url)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
@@ -240,43 +235,13 @@ struct MainWindowView: View {
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         guard !providers.isEmpty else { return false }
-
         Task {
             for provider in providers {
-                guard let url = await loadDroppedURL(from: provider) else { continue }
-                await openDroppedFile(at: url)
+                guard let url = await appViewModel.loadDroppedURL(from: provider) else { continue }
+                await appViewModel.openDroppedFile(url: url)
             }
         }
-
         return true
-    }
-
-    private func loadDroppedURL(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                let url: URL?
-                switch item {
-                case let data as Data:
-                    url = URL(dataRepresentation: data, relativeTo: nil)
-                case let droppedURL as URL:
-                    url = droppedURL
-                case let string as String:
-                    url = URL(string: string)
-                default:
-                    url = nil
-                }
-                continuation.resume(returning: url)
-            }
-        }
-    }
-
-    @MainActor
-    private func openDroppedFile(at url: URL) async {
-        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
-        let task = Task.detached(priority: .userInitiated) { try FileService().readFile(at: url) }
-        guard let content = try? await task.value else { return }
-
-        appViewModel.openInTab(url: url, content: content)
     }
 }
 

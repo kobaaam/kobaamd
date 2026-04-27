@@ -213,6 +213,44 @@ final class AppViewModel {
         showError = true
     }
 
+    /// NSItemProvider から URL を解決するヘルパー。View の重複を排除。
+    func loadDroppedURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                let url: URL?
+                switch item {
+                case let data as Data:
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                case let droppedURL as URL:
+                    url = droppedURL
+                case let string as String:
+                    url = URL(string: string)
+                default:
+                    url = nil
+                }
+                continuation.resume(returning: url)
+            }
+        }
+    }
+
+    /// ドロップされた URL をタブで開く。エラー時は showAppError を呼ぶ。
+    @MainActor
+    func openDroppedFile(url: URL) async {
+        // ディレクトリはサイドバーに追加
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+        if values?.isDirectory == true {
+            fileTreeViewModel.addFolder(url: url)
+            return
+        }
+        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+        do {
+            let content = try await Task.detached(priority: .userInitiated) { try FileService().readFile(at: url) }.value
+            openInTab(url: url, content: content)
+        } catch {
+            showAppError(.fileReadFailed(url: url, underlying: error))
+        }
+    }
+
     // MARK: - PDF Export
 
     var isPDFExporting: Bool = false
