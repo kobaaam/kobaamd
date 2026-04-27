@@ -1,6 +1,6 @@
 ---
 linear: KMD-10
-status: in-progress
+status: in-review
 created_at: 2026-04-27
 author: kobaamd_implement_code
 ---
@@ -101,6 +101,12 @@ kobaamd のビジョン「AI が生成した Markdown を Mac で最も快適に
 - AppDelegate のウィンドウフレーム保存・復元ロジック — 変更不要
 - 既存 Notification.Name の値文字列 — 変更不要（追加のみ）
 - 既存 AppCommand の case — 変更不要（追加のみ）
+
+### 事後更新（実装後）
+
+実際に触れたファイルは PRD 予測と完全に一致した。
+
+補足: `AppViewModel.showQuickOpen: Bool` を追加したが、実装では `MainWindowView` の `@State private var isQuickOpenPresented: Bool` で状態管理する設計に落ち着いたため、`showQuickOpen` は将来の拡張用に残置。削除しても動作に影響はない。
 
 ### その他リスク
 

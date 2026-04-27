@@ -33,6 +33,7 @@ final class AppViewModel {
     var isDiffMode: Bool = false
     var formatChangeCount: Int = 0
     var showFormatToast: Bool = false
+    var showQuickOpen: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
     let outlineViewModel = OutlineViewModel()

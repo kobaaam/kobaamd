@@ -8,6 +8,8 @@ struct MainWindowView: View {
     @State private var isDiffSheetPresented: Bool = false
     @State private var diffInitialText: String = ""
     @State private var diffInitialFileName: String = ""
+    @State private var isQuickOpenPresented: Bool = false
+    @State private var quickOpenViewModel: QuickOpenViewModel = QuickOpenViewModel()
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -77,6 +79,37 @@ struct MainWindowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .padding(.bottom, 42)
             }
+        }
+        .overlay(alignment: .top) {
+            if isQuickOpenPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture { isQuickOpenPresented = false }
+                    QuickOpenView(
+                        viewModel: quickOpenViewModel,
+                        onSelect: { url in
+                            isQuickOpenPresented = false
+                            Task.detached {
+                                if let content = try? FileService().readFile(at: url) {
+                                    await MainActor.run {
+                                        appViewModel.openInTab(url: url, content: content)
+                                    }
+                                }
+                            }
+                        },
+                        onDismiss: { isQuickOpenPresented = false }
+                    )
+                    .padding(.top, 44)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .quickOpenRequested)) { _ in
+            quickOpenViewModel = QuickOpenViewModel()
+            quickOpenViewModel.indexFiles(from: appViewModel.fileTreeViewModel.folders)
+            quickOpenViewModel.filter()
+            isQuickOpenPresented = true
         }
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
