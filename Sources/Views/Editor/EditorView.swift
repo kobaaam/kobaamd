@@ -57,7 +57,8 @@ struct EditorView: View {
         .onChange(of: scrollRatio) { _, r in
             appViewModel.previewScrollRatio = r
         }
-        .onChange(of: vm.editorText) { _, _ in
+        .onChange(of: vm.editorText) { _, newValue in
+            appViewModel.outlineViewModel.update(text: newValue)
             appViewModel.markEdited()
             scheduleAutoSave()
         }

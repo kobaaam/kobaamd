@@ -35,6 +35,7 @@ final class AppViewModel {
     var showFormatToast: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
+    let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     private var formatToastTask: Task<Void, Never>? = nil
 
@@ -107,6 +108,7 @@ final class AppViewModel {
             selectedFileURL = nil
             isDirty = false
             savedText = ""
+            outlineViewModel.update(text: "")
             return
         }
         activeTabID = tab.id
@@ -114,6 +116,7 @@ final class AppViewModel {
         selectedFileURL = tab.url
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
+        outlineViewModel.update(text: tab.content)
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新

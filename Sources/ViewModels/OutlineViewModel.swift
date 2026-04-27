@@ -11,6 +11,7 @@ struct OutlineItem: Identifiable, Equatable {
 @Observable
 final class OutlineViewModel {
     var items: [OutlineItem] = []
+    var totalLines: Int = 0
 
     private var debounceTask: Task<Void, Never>? = nil
 
@@ -27,7 +28,10 @@ final class OutlineViewModel {
             }.value
 
             guard !Task.isCancelled else { return }
-            self.items = extracted
+            await MainActor.run { [weak self] in
+                self?.items = extracted
+                self?.totalLines = text.components(separatedBy: "\n").count
+            }
         }
     }
 
