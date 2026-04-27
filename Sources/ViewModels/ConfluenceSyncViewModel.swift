@@ -9,10 +9,21 @@ final class ConfluenceSyncViewModel {
     var isPageSettingSheetPresented: Bool = false
     var currentFileURL: URL? = nil
 
+    // deinit は actor isolation を受けないため nonisolated(unsafe) が必要（@Observable マクロの mutable 制約による）
     nonisolated(unsafe) private var statusTask: Task<Void, Never>? = nil
 
     deinit {
         statusTask?.cancel()
+    }
+
+    // MARK: - Mapping (View 経由アクセス用)
+
+    func loadMapping(for fileURL: URL) -> ConfluenceService.PageMapping? {
+        ConfluenceService().loadMapping(for: fileURL)
+    }
+
+    func saveMapping(_ mapping: ConfluenceService.PageMapping, for fileURL: URL) throws {
+        try ConfluenceService().saveMapping(mapping, for: fileURL)
     }
 
     func performSync(fileURL: URL?, markdownContent: String, onError: @escaping (AppError) -> Void) {

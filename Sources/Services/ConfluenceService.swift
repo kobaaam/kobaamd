@@ -13,8 +13,13 @@ final class ConfluenceService {
     private static var mappingsURL: URL {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/kobaamd", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("confluence_mappings.json")
+    }
+
+    private static func ensureMappingsDirectory() throws {
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/kobaamd", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     }
 
     func loadMapping(for fileURL: URL) -> PageMapping? {
@@ -24,6 +29,7 @@ final class ConfluenceService {
     }
 
     func saveMapping(_ mapping: PageMapping, for fileURL: URL) throws {
+        try Self.ensureMappingsDirectory()
         var dict: [String: PageMapping] = [:]
         if let data = try? Data(contentsOf: Self.mappingsURL) {
             dict = (try? JSONDecoder().decode([String: PageMapping].self, from: data)) ?? [:]
@@ -73,10 +79,14 @@ final class ConfluenceService {
 
         if let existingId = mapping.pageId, !existingId.isEmpty {
             // GET current version
-            let getURL = URL(string: "\(baseURL)/wiki/rest/api/content/\(existingId)?expand=version")!
+            guard let getURL = URL(string: "\(baseURL)/wiki/rest/api/content/\(existingId)?expand=version") else {
+                throw ConfluenceError.invalidURL
+            }
             var getReq = URLRequest(url: getURL)
             getReq.setValue(auth, forHTTPHeaderField: "Authorization")
-            let (getData, _) = try await URLSession.shared.data(for: getReq)
+            let (getData, getResp) = try await URLSession.shared.data(for: getReq)
+            let getCode = (getResp as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(getCode) else { throw ConfluenceError.apiError(statusCode: getCode) }
             struct VersionResp: Decodable {
                 struct V: Decodable { var number: Int }
                 var version: V
@@ -90,7 +100,9 @@ final class ConfluenceService {
                 "type": "page",
                 "body": ["storage": ["value": storageContent, "representation": "storage"]]
             ]
-            let putURL = URL(string: "\(baseURL)/wiki/rest/api/content/\(existingId)")!
+            guard let putURL = URL(string: "\(baseURL)/wiki/rest/api/content/\(existingId)") else {
+                throw ConfluenceError.invalidURL
+            }
             var putReq = URLRequest(url: putURL)
             putReq.httpMethod = "PUT"
             putReq.setValue(auth, forHTTPHeaderField: "Authorization")
@@ -110,7 +122,9 @@ final class ConfluenceService {
             if let parentId = mapping.parentPageId, !parentId.isEmpty {
                 body["ancestors"] = [["id": parentId]]
             }
-            let postURL = URL(string: "\(baseURL)/wiki/rest/api/content")!
+            guard let postURL = URL(string: "\(baseURL)/wiki/rest/api/content") else {
+                throw ConfluenceError.invalidURL
+            }
             var postReq = URLRequest(url: postURL)
             postReq.httpMethod = "POST"
             postReq.setValue(auth, forHTTPHeaderField: "Authorization")
@@ -176,9 +190,10 @@ private struct StorageFormatWalker: MarkupWalker {
 
     mutating func visitCodeBlock(_ codeBlock: CodeBlock) {
         let lang = codeBlock.language ?? "none"
+        let escapedCode = codeBlock.code.replacingOccurrences(of: "]]>", with: "]]]]><![CDATA[>")
         result += "<ac:structured-macro ac:name=\"code\">"
         result += "<ac:parameter ac:name=\"language\">\(lang)</ac:parameter>"
-        result += "<ac:plain-text-body><![CDATA[\(codeBlock.code)]]></ac:plain-text-body>"
+        result += "<ac:plain-text-body><![CDATA[\(escapedCode)]]></ac:plain-text-body>"
         result += "</ac:structured-macro>"
     }
 

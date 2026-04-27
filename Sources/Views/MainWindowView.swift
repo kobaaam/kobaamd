@@ -145,6 +145,7 @@ struct MainWindowView: View {
         .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
             if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
                 ConfluencePageSettingSheet(fileURL: url)
+                    .environment(appViewModel.confluenceSyncViewModel)
             }
         }
         .toolbar {

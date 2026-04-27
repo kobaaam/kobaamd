@@ -74,6 +74,7 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    // Confluence 機能のみ使用するユーザーへの対応として confluence token も条件に含める（PRD section 3-1 対応）
                     .disabled(openAIKey.isEmpty && anthropicKey.isEmpty && confluenceToken.isEmpty)
 
                     if saved {

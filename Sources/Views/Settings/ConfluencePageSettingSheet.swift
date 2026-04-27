@@ -3,6 +3,7 @@ import SwiftUI
 struct ConfluencePageSettingSheet: View {
     let fileURL: URL
     @Environment(\.dismiss) private var dismiss
+    @Environment(ConfluenceSyncViewModel.self) private var confluenceVM
 
     @State private var spaceKey: String = ""
     @State private var parentPageId: String = ""
@@ -73,7 +74,7 @@ struct ConfluencePageSettingSheet: View {
     }
 
     private func loadExisting() {
-        if let mapping = ConfluenceService().loadMapping(for: fileURL) {
+        if let mapping = confluenceVM.loadMapping(for: fileURL) {
             spaceKey = mapping.spaceKey
             parentPageId = mapping.parentPageId ?? ""
             pageTitle = mapping.pageTitle
@@ -91,7 +92,7 @@ struct ConfluencePageSettingSheet: View {
             pageId: existingPageId.isEmpty ? nil : existingPageId
         )
         do {
-            try ConfluenceService().saveMapping(mapping, for: fileURL)
+            try confluenceVM.saveMapping(mapping, for: fileURL)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
