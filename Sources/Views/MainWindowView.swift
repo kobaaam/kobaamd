@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Main window
 
@@ -8,6 +9,7 @@ struct MainWindowView: View {
     @State private var isDiffSheetPresented: Bool = false
     @State private var diffInitialText: String = ""
     @State private var diffInitialFileName: String = ""
+    @State private var isWindowDragTargeted: Bool = false
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -64,6 +66,28 @@ struct MainWindowView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
+                .overlay {
+                    if isWindowDragTargeted {
+                        ZStack {
+                            Color.kobaAccent
+                                .opacity(0.04)
+                                .allowsHitTesting(false)
+
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    Color.kobaAccent,
+                                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                )
+                                .padding(10)
+                                .allowsHitTesting(false)
+
+                            Text("Drop to open")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.kobaAccent.opacity(0.7))
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
 
                 // ── Status / command bar ───────────────────────────────
                 StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
@@ -78,6 +102,7 @@ struct MainWindowView: View {
                     .padding(.bottom, 42)
             }
         }
+        .onDrop(of: [.fileURL], isTargeted: $isWindowDragTargeted, perform: handleDrop(providers:))
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
@@ -209,6 +234,49 @@ struct MainWindowView: View {
                 .help("Diff ビュー (⌘D)")
             }
         }
+    }
+
+    // MARK: - Drag & Drop
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+
+        Task {
+            for provider in providers {
+                guard let url = await loadDroppedURL(from: provider) else { continue }
+                await openDroppedFile(at: url)
+            }
+        }
+
+        return true
+    }
+
+    private func loadDroppedURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                let url: URL?
+                switch item {
+                case let data as Data:
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                case let droppedURL as URL:
+                    url = droppedURL
+                case let string as String:
+                    url = URL(string: string)
+                default:
+                    url = nil
+                }
+                continuation.resume(returning: url)
+            }
+        }
+    }
+
+    @MainActor
+    private func openDroppedFile(at url: URL) async {
+        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+        let task = Task.detached(priority: .userInitiated) { try FileService().readFile(at: url) }
+        guard let content = try? await task.value else { return }
+
+        appViewModel.openInTab(url: url, content: content)
     }
 }
 
