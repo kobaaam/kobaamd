@@ -5,6 +5,9 @@ import SwiftUI
 struct MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var splitFraction: CGFloat = 0.55
+    @State private var isDiffSheetPresented: Bool = false
+    @State private var diffInitialText: String = ""
+    @State private var diffInitialFileName: String = ""
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -27,7 +30,11 @@ struct MainWindowView: View {
                 VStack(spacing: 0) {
                     TabBarView()
 
-                    if appViewModel.previewMode == .wysiwyg {
+                    if appViewModel.isDiffMode {
+                        DiffInlineView(preloadText: appViewModel.activeTab?.content ?? "",
+                                       preloadFileName: appViewModel.activeTab?.title ?? "")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if appViewModel.previewMode == .wysiwyg {
                         @Bindable var vm = appViewModel
                         WYSIWYGEditorView(text: $vm.editorText)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -53,17 +60,9 @@ struct MainWindowView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                // Git panel (trailing, slides in from right)
-                if appViewModel.isGitPanelVisible {
-                    KobaDivider()
-                    GitPanel(gitVM: appViewModel.gitViewModel)
-                        .frame(width: 300)
-                        .transition(.move(edge: .trailing))
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
-            .animation(.easeInOut(duration: 0.2), value: appViewModel.isGitPanelVisible)
 
             // ── Status / command bar ───────────────────────────────
             StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
@@ -89,6 +88,12 @@ struct MainWindowView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
+            appViewModel.saveCurrentFile()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
+            appViewModel.fileTreeViewModel.addFolder()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
             appViewModel.newTab()
         }
@@ -97,10 +102,16 @@ struct MainWindowView: View {
                 appViewModel.isSidebarVisible.toggle()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .gitPanelRequested)) { _ in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                appViewModel.isGitPanelVisible.toggle()
+        .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
+            appViewModel.exportPDF()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
+            if let result = note.object as? Result<Void, Error> {
+                appViewModel.handlePDFExportResult(result)
             }
+        }
+        .sheet(isPresented: $isDiffSheetPresented) {
+            DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -172,14 +183,13 @@ struct MainWindowView: View {
                 .help("AI アシスト (⌘E)")
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        vm.isGitPanelVisible.toggle()
-                    }
+                    diffInitialText = appViewModel.activeTab?.content ?? ""
+                    diffInitialFileName = appViewModel.activeTab?.title ?? ""
+                    isDiffSheetPresented = true
                 } label: {
-                    Image(systemName: "sourcecontrol.changes")
-                        .symbolVariant(vm.isGitPanelVisible ? .fill : .none)
+                    Image(systemName: "arrow.left.arrow.right")
                 }
-                .help("Git パネル (⌘G)")
+                .help("Diff ビュー (⌘D)")
             }
         }
     }
@@ -227,19 +237,23 @@ struct StatusCommandBar: View {
 
             Spacer()
 
-            // Right — git branch + version + preview toggle + keyboard hints
-            HStack(spacing: 14) {
-                if appViewModel.gitViewModel.isGitRepo && !appViewModel.gitViewModel.branch.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 9))
-                        Text(appViewModel.gitViewModel.branch)
-                            .font(.system(size: 10, design: .monospaced))
+            // PDF書き出しステータス
+            if let msg = appViewModel.pdfStatusMessage {
+                HStack(spacing: 4) {
+                    if appViewModel.isPDFExporting {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.6)
                     }
-                    .foregroundStyle(Color.kobaMute)
-                    kobaLineSep()
+                    Text(msg)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute)
                 }
+                .padding(.horizontal, 8)
+            }
 
+            // Right — version + preview toggle + keyboard hints
+            HStack(spacing: 14) {
                 Text(AppVersion.display)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(Color.kobaMute2)

@@ -45,6 +45,10 @@ struct kobaamdApp: App {
                 Button("Save") { AppCommand.save.post() }
                     .keyboardShortcut("s", modifiers: .command)
             }
+            CommandGroup(after: .saveItem) {
+                Button("PDFに書き出し...") { AppCommand.exportPDF.post() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .textEditing) {
                 Button("Find & Replace") { AppCommand.find.post() }
                     .keyboardShortcut("f", modifiers: .command)
@@ -55,8 +59,6 @@ struct kobaamdApp: App {
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
-                Button("Git パネル") { AppCommand.toggleGitPanel.post() }
-                    .keyboardShortcut("g", modifiers: .command)
                 Divider()
             }
         }
@@ -77,11 +79,15 @@ extension Notification.Name {
     static let openFolderRequested    = AppCommand.openFolder.notificationName
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
-    static let gitPanelRequested      = AppCommand.toggleGitPanel.notificationName
     static let newTabRequested        = AppCommand.newTab.notificationName
     static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
+    static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
+    static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
+    static let exportPDFRequested     = AppCommand.exportPDF.notificationName
+    static let exportPDFWithURL       = Notification.Name("kobaamd.exportPDFWithURL")
+    static let exportPDFCompleted     = Notification.Name("kobaamd.exportPDFCompleted")
 }
 
 // MARK: - App Delegate (window frame save/restore)

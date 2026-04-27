@@ -1,49 +1,119 @@
 import AppKit
 import Observation
 
+// MARK: - Workspace folder model
+
+struct WorkspaceFolder: Identifiable {
+    let id: UUID
+    var url: URL
+    var nodes: [FileNode]
+    var isExpanded: Bool
+
+    init(url: URL, nodes: [FileNode] = [], isExpanded: Bool = true) {
+        self.id = UUID()
+        self.url = url
+        self.nodes = nodes
+        self.isExpanded = isExpanded
+    }
+
+    var displayName: String { url.lastPathComponent }
+}
+
+// MARK: - ViewModel
+
 @MainActor
 @Observable
 final class FileTreeViewModel {
-    var rootURL: URL? = nil
-    var nodes: [FileNode] = []
+    var folders: [WorkspaceFolder] = []
     var selectedNode: FileNode? = nil
     var isLoading: Bool = false
 
-    func openFolder() {
-        let openPanel = NSOpenPanel()
-        openPanel.canChooseDirectories = true
-        openPanel.canChooseFiles = false
-        openPanel.allowsMultipleSelection = false
-        guard openPanel.runModal() == .OK, let url = openPanel.url else { return }
-        rootURL = url
-        AppState.saveLastFolder(url)
-        reload()
+    // MARK: - Legacy compat
+
+    var rootURL: URL? { folders.first?.url }
+    var nodes: [FileNode] { folders.first?.nodes ?? [] }
+
+    // MARK: - Add / Remove
+
+    func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        addFolder(url: url)
     }
 
-    func openFolder(url: URL) {
-        rootURL = url
-        AppState.saveLastFolder(url)
-        reload()
+    func addFolder(url: URL) {
+        if let existing = folders.first(where: { $0.url == url }) {
+            reloadFolder(id: existing.id)
+            return
+        }
+        let folder = WorkspaceFolder(url: url)
+        folders.append(folder)
+        saveWorkspace()
+        reloadFolder(id: folder.id)
+        NotificationCenter.default.post(name: .workspaceRootChanged, object: url)
     }
 
-    func restoreLastFolder() {
-        guard let url = AppState.loadLastFolder(),
-              FileManager.default.fileExists(atPath: url.path) else { return }
-        rootURL = url
-        reload()
+    func removeFolder(id: UUID) {
+        folders.removeAll { $0.id == id }
+        saveWorkspace()
     }
 
-    func reload() {
-        guard let rootURL else { return }
-        let url = rootURL
+    // MARK: - Reload
+
+    func reloadFolder(id: UUID) {
+        guard let idx = folders.firstIndex(where: { $0.id == id }) else { return }
+        let url = folders[idx].url
         isLoading = true
         Task.detached(priority: .userInitiated) { [weak self] in
             let newNodes = FileService().loadNodes(at: url)
             await MainActor.run {
-                self?.nodes = newNodes
-                self?.isLoading = false
+                guard let self,
+                      let i = self.folders.firstIndex(where: { $0.id == id }) else { return }
+                self.folders[i].nodes = newNodes
+                self.isLoading = false
             }
         }
+    }
+
+    func reload() {
+        for folder in folders { reloadFolder(id: folder.id) }
+    }
+
+    // MARK: - Persistence
+
+    func saveWorkspace() {
+        AppState.saveWorkspaceFolders(folders.map(\.url))
+    }
+
+    func restoreWorkspace() {
+        let urls = AppState.loadWorkspaceFolders()
+        folders = urls.map { WorkspaceFolder(url: $0) }
+        for folder in folders { reloadFolder(id: folder.id) }
+        if let first = folders.first {
+            NotificationCenter.default.post(name: .workspaceRootChanged, object: first.url)
+        }
+    }
+
+    // MARK: - File operations
+
+    func createNewFile(in directory: URL) throws -> URL {
+        let target = uniqueNewFileURL(in: directory)
+        try FileService().saveFile(at: target, content: "")
+        if let folder = folders.first(where: { directory.path.hasPrefix($0.url.path) }) {
+            reloadFolder(id: folder.id)
+        }
+        return target
+    }
+
+    func createNewFileInRoot() throws -> URL {
+        guard let rootURL else {
+            throw NSError(domain: "kobaamd", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "No folder open"])
+        }
+        return try createNewFile(in: rootURL)
     }
 
     private func uniqueNewFileURL(in directory: URL) -> URL {
@@ -58,25 +128,13 @@ final class FileTreeViewModel {
         return target
     }
 
-    /// Creates a new .md file in the given directory with a unique name and returns its URL.
-    func createNewFile(in directory: URL) throws -> URL {
-        let service = FileService()
-        let target = uniqueNewFileURL(in: directory)
-        try service.saveFile(at: target, content: "")
-        reload()
-        return target
-    }
+    // MARK: - Legacy shims
 
-    /// Creates a new .md file in rootURL with a unique name and returns its URL.
-    func createNewFileInRoot() throws -> URL {
-        guard let rootURL else {
-            throw NSError(domain: "kobaamd", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "No folder open"])
-        }
-        let service = FileService()
-        let target = uniqueNewFileURL(in: rootURL)
-        try service.saveFile(at: target, content: "")
-        reload()
-        return target
-    }
+    func openFolder() { addFolder() }
+    func openFolder(url: URL) { addFolder(url: url) }
+    func restoreLastFolder() { restoreWorkspace() }
+}
+
+extension Notification.Name {
+    static let workspaceRootChanged = Notification.Name("workspaceRootChanged")
 }

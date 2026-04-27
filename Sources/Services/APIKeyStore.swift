@@ -6,15 +6,16 @@ import Security
 final class APIKeyStore {
 
     enum Provider: String, CaseIterable {
-        case openai    = "OpenAI (GPT-4o)"
-        case anthropic = "Anthropic (Claude)"
+        case openai    = "openai"
+        case anthropic = "anthropic"
 
-        var keychainAccount: String {
+        var displayName: String {
             switch self {
-            case .openai:    return "openai"
-            case .anthropic: return "anthropic"
+            case .openai:    return "OpenAI (GPT-5.4)"
+            case .anthropic: return "Anthropic (Claude)"
             }
         }
+        var keychainAccount: String { rawValue }
         var envKey: String {
             switch self {
             case .openai:    return "OPENAI_API_KEY"
