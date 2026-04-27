@@ -55,6 +55,8 @@ struct kobaamdApp: App {
                 Divider()
                 Button("AI アシスト…") { AppCommand.aiAssist.post() }
                     .keyboardShortcut("e", modifiers: .command)
+                Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
+                    .keyboardShortcut(".", modifiers: .command)
             }
             CommandMenu("Format") {
                 Button("Format Document") { AppCommand.formatDocument.post() }
@@ -91,6 +93,7 @@ extension Notification.Name {
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let exportPDFRequested     = AppCommand.exportPDF.notificationName
+    static let cancelAIGenerationRequested = AppCommand.cancelAIGeneration.notificationName
     static let exportPDFWithURL       = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted     = Notification.Name("kobaamd.exportPDFCompleted")
 }

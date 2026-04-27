@@ -33,11 +33,15 @@ final class AppViewModel {
     var isDiffMode: Bool = false
     var formatChangeCount: Int = 0
     var showFormatToast: Bool = false
+    /// AI インライン補完のストリーミング中を示すフラグ。ステータスバー表示に使用。
+    var isAIGenerating: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     private var formatToastTask: Task<Void, Never>? = nil
+    /// AI インライン補完のアクティブタスク。キャンセル用。
+    private var aiTask: Task<Void, Never>? = nil
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -295,22 +299,49 @@ final class AppViewModel {
         let ph = Self.aiPlaceholder
         guard let lineRange = editorText.range(of: lineContent) else { return }
         editorText.replaceSubrange(lineRange, with: "\(ph)\n")
+        isAIGenerating = true
         markEdited()
 
-        Task { @MainActor [weak self] in
+        aiTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { self.aiTask = nil }
             do {
-                let result = try await AIService().complete(prompt: prompt, context: context, provider: provider)
-                if let r = self.editorText.range(of: ph) {
-                    self.editorText.replaceSubrange(r, with: result)
-                    self.markEdited()
+                let stream = AIService().stream(prompt: prompt, context: context, provider: provider)
+                for try await token in stream {
+                    if Task.isCancelled {
+                        throw CancellationError()
+                    }
+                    // プレースホルダーの直前にトークンを挿入する
+                    if let r = self.editorText.range(of: ph) {
+                        self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: token)
+                    }
                 }
+                // ストリーミング完了後にプレースホルダーを削除
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.removeSubrange(r)
+                }
+                self.isAIGenerating = false
+                self.markEdited()
+            } catch is CancellationError {
+                // キャンセル時: プレースホルダーを削除し、それまでのテキストは残す
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.removeSubrange(r)
+                }
+                self.isAIGenerating = false
+                self.markEdited()
             } catch {
                 if let r = self.editorText.range(of: ph) {
                     self.editorText.replaceSubrange(r, with: "> **AI エラー:** \(error.localizedDescription)")
                     self.markEdited()
                 }
+                self.isAIGenerating = false
             }
         }
+    }
+
+    /// AI インライン補完をキャンセルする。生成済みテキストはエディタに残る。
+    func cancelAIGeneration() {
+        aiTask?.cancel()
+        aiTask = nil
     }
 }

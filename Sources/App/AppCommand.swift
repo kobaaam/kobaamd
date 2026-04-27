@@ -13,6 +13,7 @@ enum AppCommand: String {
     case newTab            = "kobaamd.newTabRequested"
     case formatDocument    = "kobaamd.formatDocumentRequested"
     case exportPDF         = "kobaamd.exportPDFRequested"
+    case cancelAIGeneration = "kobaamd.cancelAIGenerationRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

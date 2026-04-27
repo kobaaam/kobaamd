@@ -127,6 +127,9 @@ struct MainWindowView: View {
                 appViewModel.handlePDFExportResult(result)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cancelAIGenerationRequested)) { _ in
+            appViewModel.cancelAIGeneration()
+        }
         .sheet(isPresented: $isDiffSheetPresented) {
             DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
         }
@@ -253,6 +256,19 @@ struct StatusCommandBar: View {
             .padding(.leading, 14)
 
             Spacer()
+
+            // AI生成ステータス
+            if appViewModel.isAIGenerating {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.6)
+                    Text("AI生成中... ⌘. でキャンセル")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 8)
+            }
 
             // PDF書き出しステータス
             if let msg = appViewModel.pdfStatusMessage {
