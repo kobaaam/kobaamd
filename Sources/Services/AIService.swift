@@ -1,5 +1,15 @@
 import Foundation
 
+// MARK: - Protocol
+
+/// テスト時にモックを注入できるようにするためのプロトコル。
+protocol AIServiceProtocol: AnyObject, Sendable {
+    func complete(prompt: String, context: String, provider: APIKeyStore.Provider) async throws -> String
+    func stream(prompt: String, context: String, provider: APIKeyStore.Provider) -> AsyncThrowingStream<String, Error>
+}
+
+// MARK: - Errors
+
 enum AIError: LocalizedError {
     case noAPIKey(provider: String)
     case apiError(provider: String, statusCode: Int, message: String)
@@ -20,7 +30,7 @@ enum AIError: LocalizedError {
     }
 }
 
-final class AIService {
+final class AIService: AIServiceProtocol {
     // MARK: - Public API
 
     func complete(prompt: String, context: String, provider: APIKeyStore.Provider) async throws -> String {

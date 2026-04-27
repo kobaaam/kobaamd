@@ -42,6 +42,12 @@ final class AppViewModel {
     private var formatToastTask: Task<Void, Never>? = nil
     /// AI インライン補完のアクティブタスク。キャンセル用。
     private var aiTask: Task<Void, Never>? = nil
+    /// AIService の注入ポイント（テスト時はモックを渡す）。
+    private let aiService: AIServiceProtocol
+
+    init(aiService: AIServiceProtocol = AIService()) {
+        self.aiService = aiService
+    }
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -306,15 +312,28 @@ final class AppViewModel {
             guard let self else { return }
             defer { self.aiTask = nil }
             do {
-                let stream = AIService().stream(prompt: prompt, context: context, provider: provider)
+                // 30fps（33ms）バッファリング: トークンを溜めてまとめて editorText に反映する
+                var buffer = ""
+                var lastFlush = ContinuousClock.now
+                let stream = self.aiService.stream(prompt: prompt, context: context, provider: provider)
                 for try await token in stream {
                     if Task.isCancelled {
                         throw CancellationError()
                     }
-                    // プレースホルダーの直前にトークンを挿入する
-                    if let r = self.editorText.range(of: ph) {
-                        self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: token)
+                    buffer += token
+                    let now = ContinuousClock.now
+                    // 33ms 以上経過していたらバッファをフラッシュ
+                    if now - lastFlush >= .milliseconds(33) {
+                        if let r = self.editorText.range(of: ph) {
+                            self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
+                        }
+                        buffer = ""
+                        lastFlush = now
                     }
+                }
+                // 残りバッファをフラッシュ
+                if !buffer.isEmpty, let r = self.editorText.range(of: ph) {
+                    self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
                 }
                 // ストリーミング完了後にプレースホルダーを削除
                 if let r = self.editorText.range(of: ph) {
