@@ -17,6 +17,7 @@ enum AppCommand: String {
     case confluencePageSettings = "kobaamd.confluencePageSettingsRequested"
     case quickOpen              = "kobaamd.quickOpenRequested"
     case cancelAIGeneration     = "kobaamd.cancelAIGenerationRequested"
+    case quickInsert            = "kobaamd.quickInsertRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

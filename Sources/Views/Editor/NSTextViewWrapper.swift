@@ -61,6 +61,7 @@ private struct EditorObserver: NSViewRepresentable {
     final class Coordinator: NSObject {
         private var scrollObserver: Any?
         private var selectionObserver: Any?
+        private var insertSnippetObserver: Any?
         private var eventMonitor: Any?
         private weak var textViewRef: NSTextView?
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
@@ -92,6 +93,17 @@ private struct EditorObserver: NSViewRepresentable {
 
                 if foundScrollView && foundTextView { break }
                 current = parent
+            }
+
+            insertSnippetObserver = NotificationCenter.default.addObserver(
+                forName: Notification.Name("kobaamd.insertSnippetAtCursor"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let tv = self?.textViewRef,
+                      let text = note.userInfo?["text"] as? String else { return }
+                let range = tv.selectedRange()
+                tv.insertText(text, replacementRange: range)
             }
         }
 
@@ -273,7 +285,7 @@ private struct EditorObserver: NSViewRepresentable {
         }
 
         deinit {
-            [scrollObserver, selectionObserver].compactMap { $0 }.forEach {
+            [scrollObserver, selectionObserver, insertSnippetObserver].compactMap { $0 }.forEach {
                 NotificationCenter.default.removeObserver($0)
             }
             if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }

@@ -59,6 +59,18 @@ struct EditorView: View {
                     .padding(16)
             }
         }
+        .overlay {
+            if appViewModel.showQuickInsert {
+                QuickInsertView(
+                    isVisible: Bindable(appViewModel).showQuickInsert,
+                    onInsert: { prompt in
+                        appViewModel.insertSnippet(prompt)
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 40)
+            }
+        }
         .onChange(of: scrollRatio) { _, r in
             appViewModel.previewScrollRatio = r
         }
@@ -78,6 +90,9 @@ struct EditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
             showAIPanel.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .quickInsertRequested)) { _ in
+            appViewModel.showQuickInsert.toggle()
         }
         .onReceive(NotificationCenter.default.publisher(for: .aiInlineRequested)) { note in
             guard let lineContent = note.userInfo?["lineContent"] as? String else { return }

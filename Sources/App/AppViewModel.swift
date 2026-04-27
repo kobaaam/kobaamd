@@ -36,6 +36,10 @@ final class AppViewModel {
     /// AI インライン補完のストリーミング中を示すフラグ。ステータスバー表示に使用。
     var isAIGenerating: Bool = false
 
+    // MARK: - Quick Insert
+    let snippetStore = SnippetStore()
+    var showQuickInsert: Bool = false
+
     let fileTreeViewModel = FileTreeViewModel()
     let quickOpenViewModel = QuickOpenViewModel()
     let outlineViewModel = OutlineViewModel()
@@ -280,6 +284,17 @@ final class AppViewModel {
         } catch {
             showAppError(.fileReadFailed(url: url, underlying: error))
         }
+    }
+
+    // MARK: - Quick Insert
+    func insertSnippet(_ prompt: String) {
+        let text = "{{\(prompt)}}"
+        NotificationCenter.default.post(
+            name: Notification.Name("kobaamd.insertSnippetAtCursor"),
+            object: nil,
+            userInfo: ["text": text]
+        )
+        showQuickInsert = false
     }
 
     // MARK: - PDF Export

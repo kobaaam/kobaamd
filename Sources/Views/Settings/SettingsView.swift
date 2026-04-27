@@ -11,6 +11,13 @@ struct SettingsView: View {
     @State private var confluenceToken: String = APIKeyStore.load(for: .confluenceToken) ?? ""
     @State private var saved: Bool = false
     @State private var connectionTestResult: String? = nil
+    @Environment(AppViewModel.self) private var appViewModel
+    @State private var snippetTitle: String = ""
+    @State private var snippetPrompt: String = ""
+    private var canAddSnippet: Bool {
+        !snippetTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !snippetPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         @Bindable var appState = AppState.shared
@@ -76,6 +83,43 @@ struct SettingsView: View {
 
             Section("Formatting") {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
+            }
+
+            Section("クイックインサート テンプレート") {
+                if appViewModel.snippetStore.customSnippets.isEmpty {
+                    Text("カスタムテンプレートはまだありません")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(appViewModel.snippetStore.customSnippets) { snippet in
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(snippet.title)
+                                Text(snippet.prompt)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                appViewModel.snippetStore.removeCustom(id: snippet.id)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+
+                TextField("タイトル", text: $snippetTitle)
+                TextField("プロンプト", text: $snippetPrompt, axis: .vertical)
+                    .lineLimit(2...4)
+
+                Button("+ 追加") {
+                    appViewModel.snippetStore.addCustom(title: snippetTitle, prompt: snippetPrompt)
+                    snippetTitle = ""
+                    snippetPrompt = ""
+                }
+                .disabled(!canAddSnippet)
             }
 
             Section {
