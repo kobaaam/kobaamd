@@ -24,6 +24,7 @@ final class AIService {
         switch provider {
         case .openai:    return try await openAI(prompt: prompt, context: context)
         case .anthropic: return try await anthropic(prompt: prompt, context: context)
+        default:         throw AIError.noAPIKey(provider: provider.displayName)
         }
     }
 

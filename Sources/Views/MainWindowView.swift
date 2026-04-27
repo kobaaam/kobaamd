@@ -66,7 +66,12 @@ struct MainWindowView: View {
                 .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
 
                 // ── Status / command bar ───────────────────────────────
-                StatusCommandBar(previewMode: $vm.previewMode, isMDFile: isMDFile)
+                StatusCommandBar(
+                    previewMode: $vm.previewMode,
+                    isMDFile: isMDFile,
+                    confluenceSyncMessage: appViewModel.confluenceSyncViewModel.syncStatusMessage,
+                    isConfluenceSyncing: appViewModel.confluenceSyncViewModel.isSyncing
+                )
             }
 
             if appViewModel.showFormatToast {
@@ -127,8 +132,20 @@ struct MainWindowView: View {
                 appViewModel.handlePDFExportResult(result)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
+            appViewModel.syncToConfluence()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
+            appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
+            appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
+        }
         .sheet(isPresented: $isDiffSheetPresented) {
             DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
+        }
+        .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
+            if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
+                ConfluencePageSettingSheet(fileURL: url)
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -218,6 +235,8 @@ struct StatusCommandBar: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Binding var previewMode: PreviewMode
     var isMDFile: Bool = true
+    var confluenceSyncMessage: String? = nil
+    var isConfluenceSyncing: Bool = false
 
     var filePath: String {
         guard let url = appViewModel.selectedFileURL else { return "" }
@@ -258,6 +277,21 @@ struct StatusCommandBar: View {
             if let msg = appViewModel.pdfStatusMessage {
                 HStack(spacing: 4) {
                     if appViewModel.isPDFExporting {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.6)
+                    }
+                    Text(msg)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 8)
+            }
+
+            // Confluence 同期ステータス
+            if let msg = confluenceSyncMessage {
+                HStack(spacing: 4) {
+                    if isConfluenceSyncing {
                         ProgressView()
                             .progressViewStyle(.circular)
                             .scaleEffect(0.6)
