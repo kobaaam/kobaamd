@@ -21,6 +21,11 @@ import Observation
         self.defaults = defaults
     }
 
+    var autoFormatOnSave: Bool {
+        get { defaults.bool(forKey: "autoFormatOnSave") }
+        set { defaults.set(newValue, forKey: "autoFormatOnSave") }
+    }
+
     // MARK: - Instance API (preferred for testing)
 
     func saveLastFolder(_ url: URL) {

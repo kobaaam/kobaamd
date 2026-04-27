@@ -31,9 +31,12 @@ final class AppViewModel {
     var isSidebarVisible: Bool = true
     var isFileLoading: Bool = false
     var isDiffMode: Bool = false
+    var formatChangeCount: Int = 0
+    var showFormatToast: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
     let todoViewModel = TodoViewModel()
+    private var formatToastTask: Task<Void, Never>? = nil
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -186,6 +189,20 @@ final class AppViewModel {
         editorText = text
         markEdited()
         todoViewModel.update(text: text)
+    }
+
+    func formatCurrentDocument() {
+        let formatted = MarkdownFormatterService().format(editorText)
+        updateEditorText(formatted.result)
+        formatChangeCount = formatted.changeCount
+        showFormatToast = true
+
+        formatToastTask?.cancel()
+        formatToastTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.showFormatToast = false
+        }
     }
 
     func showAppError(_ error: AppError) {
