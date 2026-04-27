@@ -45,6 +45,10 @@ struct kobaamdApp: App {
                 Button("Save") { AppCommand.save.post() }
                     .keyboardShortcut("s", modifiers: .command)
             }
+            CommandGroup(after: .saveItem) {
+                Button("PDFに書き出し...") { AppCommand.exportPDF.post() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .textEditing) {
                 Button("Find & Replace") { AppCommand.find.post() }
                     .keyboardShortcut("f", modifiers: .command)
@@ -86,6 +90,9 @@ extension Notification.Name {
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
+    static let exportPDFRequested     = AppCommand.exportPDF.notificationName
+    static let exportPDFWithURL       = Notification.Name("kobaamd.exportPDFWithURL")
+    static let exportPDFCompleted     = Notification.Name("kobaamd.exportPDFCompleted")
 }
 
 // MARK: - App Delegate (window frame save/restore)

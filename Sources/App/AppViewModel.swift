@@ -207,6 +207,49 @@ final class AppViewModel {
         showError = true
     }
 
+    // MARK: - PDF Export
+
+    var isPDFExporting: Bool = false
+    var pdfStatusMessage: String? = nil
+    private var pdfStatusTask: Task<Void, Never>? = nil
+
+    func exportPDF() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        let defaultName: String
+        if let url = selectedFileURL {
+            defaultName = url.deletingPathExtension().lastPathComponent + ".pdf"
+        } else {
+            defaultName = "Untitled.pdf"
+        }
+        panel.nameFieldStringValue = defaultName
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isPDFExporting = true
+        pdfStatusMessage = "PDF生成中..."
+
+        NotificationCenter.default.post(
+            name: .exportPDFWithURL,
+            object: url
+        )
+    }
+
+    func handlePDFExportResult(_ result: Result<Void, Error>) {
+        isPDFExporting = false
+        pdfStatusTask?.cancel()
+        switch result {
+        case .success:
+            pdfStatusMessage = "PDFを書き出しました"
+            pdfStatusTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                self?.pdfStatusMessage = nil
+            }
+        case .failure(let error):
+            pdfStatusMessage = nil
+            showAppError(.fileWriteFailed(url: URL(fileURLWithPath: ""), underlying: error))
+        }
+    }
+
     // MARK: - AI Inline Completion
 
     private static let aiPlaceholder = "<!-- kobaamd-ai-generating -->"
