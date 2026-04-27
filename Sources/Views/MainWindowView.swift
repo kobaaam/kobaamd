@@ -9,7 +9,6 @@ struct MainWindowView: View {
     @State private var diffInitialText: String = ""
     @State private var diffInitialFileName: String = ""
     @State private var isQuickOpenPresented: Bool = false
-    @State private var quickOpenViewModel: QuickOpenViewModel = QuickOpenViewModel()
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -87,15 +86,11 @@ struct MainWindowView: View {
                         .ignoresSafeArea()
                         .onTapGesture { isQuickOpenPresented = false }
                     QuickOpenView(
-                        viewModel: quickOpenViewModel,
+                        viewModel: appViewModel.quickOpenViewModel,
                         onSelect: { url in
                             isQuickOpenPresented = false
-                            Task.detached {
-                                if let content = try? FileService().readFile(at: url) {
-                                    await MainActor.run {
-                                        appViewModel.openInTab(url: url, content: content)
-                                    }
-                                }
+                            Task {
+                                await appViewModel.openFile(url: url)
                             }
                         },
                         onDismiss: { isQuickOpenPresented = false }
@@ -106,9 +101,8 @@ struct MainWindowView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .quickOpenRequested)) { _ in
-            quickOpenViewModel = QuickOpenViewModel()
-            quickOpenViewModel.indexFiles(from: appViewModel.fileTreeViewModel.folders)
-            quickOpenViewModel.filter()
+            appViewModel.quickOpenViewModel.query = ""
+            appViewModel.quickOpenViewModel.filter()
             isQuickOpenPresented = true
         }
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
@@ -121,15 +115,14 @@ struct MainWindowView: View {
                 appViewModel.previewMode = .split
             }
         }
+        .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
+            appViewModel.refreshQuickOpenIndex()
+        }
         .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
             guard let url = fileURL else { return }
             AppState.shared.pendingOpenFileURL = nil
-            Task.detached(priority: .userInitiated) {
-                if let content = try? FileService().readFile(at: url) {
-                    await MainActor.run {
-                        appViewModel.openInTab(url: url, content: content)
-                    }
-                }
+            Task {
+                await appViewModel.openFile(url: url)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
