@@ -1,10 +1,12 @@
 import SwiftUI
 import AppKit
+import Sparkle
 
 @main
 struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
+    @State private var updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     var body: some Scene {
         WindowGroup("kobaamd") {
@@ -65,6 +67,9 @@ struct kobaamdApp: App {
                     .keyboardShortcut("b", modifiers: .command)
                 Divider()
             }
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
         }
 
         // Settings window (⌘,)
@@ -90,9 +95,10 @@ extension Notification.Name {
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
-    static let exportPDFRequested     = AppCommand.exportPDF.notificationName
-    static let exportPDFWithURL       = Notification.Name("kobaamd.exportPDFWithURL")
-    static let exportPDFCompleted     = Notification.Name("kobaamd.exportPDFCompleted")
+    static let exportPDFRequested        = AppCommand.exportPDF.notificationName
+    static let exportPDFWithURL          = Notification.Name("kobaamd.exportPDFWithURL")
+    static let exportPDFCompleted        = Notification.Name("kobaamd.exportPDFCompleted")
+    static let checkForUpdatesRequested  = AppCommand.checkForUpdates.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)

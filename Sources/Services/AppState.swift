@@ -26,6 +26,14 @@ import Observation
         set { defaults.set(newValue, forKey: "autoFormatOnSave") }
     }
 
+    var updateCheckInterval: UpdateCheckInterval {
+        get {
+            let raw = defaults.string(forKey: "updateCheckInterval") ?? UpdateCheckInterval.atLaunch.rawValue
+            return UpdateCheckInterval(rawValue: raw) ?? .atLaunch
+        }
+        set { defaults.set(newValue.rawValue, forKey: "updateCheckInterval") }
+    }
+
     // MARK: - Instance API (preferred for testing)
 
     func saveLastFolder(_ url: URL) {

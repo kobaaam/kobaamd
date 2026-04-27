@@ -22,6 +22,24 @@ struct SettingsView: View {
                 }
             }
 
+            Section("アップデート") {
+                LabeledContent("自動確認") {
+                    Picker("", selection: Binding(
+                        get: { AppState.shared.updateCheckInterval },
+                        set: { AppState.shared.updateCheckInterval = $0 }
+                    )) {
+                        Text("起動時のみ").tag(UpdateCheckInterval.atLaunch)
+                        Text("毎日").tag(UpdateCheckInterval.daily)
+                        Text("毎週").tag(UpdateCheckInterval.weekly)
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+                Button("今すぐ確認") {
+                    AppCommand.checkForUpdates.post()
+                }
+            }
+
             Section("Formatting") {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
@@ -50,7 +68,15 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 320)
+        .frame(width: 520, height: 400)
         .navigationTitle("設定")
     }
+}
+
+// MARK: - UpdateCheckInterval
+
+enum UpdateCheckInterval: String, CaseIterable {
+    case atLaunch = "atLaunch"
+    case daily    = "daily"
+    case weekly   = "weekly"
 }
