@@ -1,6 +1,9 @@
 import SwiftUI
+import Sparkle
 
 struct SettingsView: View {
+    let updater: SPUUpdater
+
     @State private var openAIKey:    String = APIKeyStore.load(for: .openai)    ?? ""
     @State private var anthropicKey: String = APIKeyStore.load(for: .anthropic) ?? ""
     @State private var saved: Bool = false
@@ -35,9 +38,7 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(width: 120)
                 }
-                Button("今すぐ確認") {
-                    AppCommand.checkForUpdates.post()
-                }
+                CheckForUpdatesView(updater: updater)
             }
 
             Section("Formatting") {

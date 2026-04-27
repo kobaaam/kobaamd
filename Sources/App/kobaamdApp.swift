@@ -74,7 +74,7 @@ struct kobaamdApp: App {
 
         // Settings window (⌘,)
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
         }
     }
 }
@@ -98,7 +98,6 @@ extension Notification.Name {
     static let exportPDFRequested        = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL          = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted        = Notification.Name("kobaamd.exportPDFCompleted")
-    static let checkForUpdatesRequested  = AppCommand.checkForUpdates.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)
