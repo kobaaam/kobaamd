@@ -56,6 +56,10 @@ struct kobaamdApp: App {
                 Button("AI アシスト…") { AppCommand.aiAssist.post() }
                     .keyboardShortcut("e", modifiers: .command)
             }
+            CommandMenu("Format") {
+                Button("Format Document") { AppCommand.formatDocument.post() }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
@@ -79,8 +83,9 @@ extension Notification.Name {
     static let openFolderRequested    = AppCommand.openFolder.notificationName
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
-    static let newTabRequested        = AppCommand.newTab.notificationName
-    static let openRecentNotification = Notification.Name("kobaamd.openRecentRequested")
+    static let newTabRequested          = AppCommand.newTab.notificationName
+    static let formatDocumentRequested = AppCommand.formatDocument.notificationName
+    static let openRecentNotification  = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")

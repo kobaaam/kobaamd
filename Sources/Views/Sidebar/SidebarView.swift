@@ -10,6 +10,7 @@ struct SidebarView: View {
     enum SidebarTab: String, CaseIterable {
         case files = "Files"
         case search = "Search"
+        case todo = "TODO"
     }
 
     var body: some View {
@@ -27,7 +28,13 @@ struct SidebarView: View {
                             .padding(.vertical, 7)
                     }
                     .buttonStyle(.plain)
-                    .help(tab == .files ? "ファイルツリーを表示" : "ワークスペース内を全文検索")
+                    .help(
+                        tab == .files
+                            ? "ファイルツリーを表示"
+                            : tab == .search
+                                ? "ワークスペース内を全文検索"
+                                : "TODO/FIXME の一覧を表示"
+                    )
                     .background(
                         selectedTab == tab
                             ? Color.kobaSurface
@@ -50,6 +57,8 @@ struct SidebarView: View {
                 filePanel
             case .search:
                 SearchView(fileTreeViewModel: fileTreeViewModel)
+            case .todo:
+                TodoView(todoViewModel: appViewModel.todoViewModel)
             }
         }
         .background(Color.kobaSidebar)
