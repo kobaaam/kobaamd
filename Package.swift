@@ -13,13 +13,15 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-markdown.git", .upToNextMajor(from: "0.4.0"))
+        .package(url: "https://github.com/apple/swift-markdown.git", .upToNextMajor(from: "0.4.0")),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1")
     ],
     targets: [
         .executableTarget(
             name: "kobaamd",
             dependencies: [
-                .product(name: "Markdown", package: "swift-markdown")
+                .product(name: "Markdown", package: "swift-markdown"),
+                .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources",
             resources: [

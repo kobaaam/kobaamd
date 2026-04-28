@@ -1,6 +1,9 @@
 import SwiftUI
+import Sparkle
 
 struct SettingsView: View {
+    let updater: SPUUpdater
+
     @State private var openAIKey:       String = APIKeyStore.load(for: .openai)          ?? ""
     @State private var anthropicKey:    String = APIKeyStore.load(for: .anthropic)       ?? ""
     @State private var confluenceURL:   String = APIKeyStore.load(for: .confluenceURL)   ?? ""
@@ -55,6 +58,22 @@ struct SettingsView: View {
                 }
             }
 
+            Section("アップデート") {
+                LabeledContent("自動確認") {
+                    Picker("", selection: Binding(
+                        get: { AppState.shared.updateCheckInterval },
+                        set: { AppState.shared.updateCheckInterval = $0 }
+                    )) {
+                        Text("起動時のみ").tag(UpdateCheckInterval.atLaunch)
+                        Text("毎日").tag(UpdateCheckInterval.daily)
+                        Text("毎週").tag(UpdateCheckInterval.weekly)
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+                CheckForUpdatesView(updater: updater)
+            }
+
             Section("Formatting") {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
@@ -87,7 +106,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 480)
+        .frame(width: 520, height: 560)
         .navigationTitle("設定")
     }
 

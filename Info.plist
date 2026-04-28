@@ -25,6 +25,13 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 
+	<!-- Sparkle 自動アップデート設定 -->
+	<!-- SUPublicEDKey は実キー確定後に追加する -->
+	<key>SUPublicEDKey</key>
+	<string></string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/kobaaam/kobaamd/main/appcast.xml</string>
+
 	<!-- .md / .markdown をデフォルトで開くエディタとして登録 -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
