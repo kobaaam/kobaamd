@@ -10,6 +10,7 @@ struct MainWindowView: View {
     @State private var diffInitialFileName: String = ""
     @State private var isWindowDragTargeted: Bool = false
     @State private var isQuickOpenPresented: Bool = false
+    @State private var isChatSidebarVisible: Bool = false
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -89,6 +90,13 @@ struct MainWindowView: View {
             .help("AI アシスト (⌘E)")
 
             Button {
+                NotificationCenter.default.post(name: .aiChatRequested, object: nil)
+            } label: {
+                Image(systemName: "bubble.left.and.bubble.right")
+            }
+            .help("AI チャット (⌘⇧E)")
+
+            Button {
                 diffInitialText = appViewModel.activeTab?.content ?? ""
                 diffInitialFileName = appViewModel.activeTab?.title ?? ""
                 isDiffSheetPresented = true
@@ -146,9 +154,21 @@ struct MainWindowView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+                    if isChatSidebarVisible {
+                        KobaDivider()
+                        AIChatView(
+                            viewModel: appViewModel.aiChatViewModel,
+                            onInsertToEditor: { text in
+                                appViewModel.editorText += "\n\n" + text
+                            }
+                        )
+                        .frame(width: 320)
+                        .transition(.move(edge: .trailing))
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
+                .animation(.easeInOut(duration: 0.2), value: isChatSidebarVisible)
                 .overlay {
                     if isWindowDragTargeted {
                         ZStack {
@@ -212,13 +232,17 @@ struct MainWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
+        .onAppear {
+            isChatSidebarVisible = appViewModel.isChatSidebarVisible
+        }
         .modifier(
             MainWindowCommandReceiver(
                 appViewModel: appViewModel,
                 isDiffSheetPresented: $isDiffSheetPresented,
                 diffInitialText: $diffInitialText,
                 diffInitialFileName: $diffInitialFileName,
-                isQuickOpenPresented: $isQuickOpenPresented
+                isQuickOpenPresented: $isQuickOpenPresented,
+                isChatSidebarVisible: $isChatSidebarVisible
             )
         )
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
@@ -250,6 +274,7 @@ extension MainWindowView {
         @Binding var diffInitialText: String
         @Binding var diffInitialFileName: String
         @Binding var isQuickOpenPresented: Bool
+        @Binding var isChatSidebarVisible: Bool
 
         func body(content: Content) -> some View {
             content
@@ -297,6 +322,12 @@ extension MainWindowView {
                 ))
                 .onReceive(NotificationCenter.default.publisher(for: .cancelAIGenerationRequested)) { _ in
                     appViewModel.cancelAIGeneration()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .aiChatRequested)) { _ in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isChatSidebarVisible.toggle()
+                        appViewModel.isChatSidebarVisible = isChatSidebarVisible
+                    }
                 }
         }
     }
