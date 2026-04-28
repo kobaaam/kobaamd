@@ -9,6 +9,7 @@ struct MainWindowView: View {
     @State private var diffInitialText: String = ""
     @State private var diffInitialFileName: String = ""
     @State private var isWindowDragTargeted: Bool = false
+    @State private var isQuickOpenPresented: Bool = false
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -107,71 +108,39 @@ struct MainWindowView: View {
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $isWindowDragTargeted, perform: handleDrop(providers:))
+        .overlay(alignment: .top) {
+            if isQuickOpenPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture { isQuickOpenPresented = false }
+                    QuickOpenView(
+                        viewModel: appViewModel.quickOpenViewModel,
+                        onSelect: { url in
+                            isQuickOpenPresented = false
+                            Task {
+                                await appViewModel.openFile(url: url)
+                            }
+                        },
+                        onDismiss: { isQuickOpenPresented = false }
+                    )
+                    .padding(.top, 44)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .modifier(
+            MainWindowCommandReceiver(
+                appViewModel: appViewModel,
+                isDiffSheetPresented: $isDiffSheetPresented,
+                diffInitialText: $diffInitialText,
+                diffInitialFileName: $diffInitialFileName,
+                isQuickOpenPresented: $isQuickOpenPresented
+            )
+        )
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
-        .onChange(of: appViewModel.selectedFileURL) { _, url in
-            let ext = url?.pathExtension.lowercased() ?? ""
-            let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
-            if !isMD && appViewModel.previewMode == .wysiwyg {
-                appViewModel.previewMode = .split
-            }
-        }
-        .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
-            guard let url = fileURL else { return }
-            AppState.shared.pendingOpenFileURL = nil
-            Task.detached(priority: .userInitiated) {
-                if let content = try? FileService().readFile(at: url) {
-                    await MainActor.run {
-                        appViewModel.openInTab(url: url, content: content)
-                    }
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
-            if AppState.shared.autoFormatOnSave {
-                appViewModel.formatCurrentDocument()
-            }
-            appViewModel.saveCurrentFile()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .formatDocumentRequested)) { _ in
-            appViewModel.formatCurrentDocument()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
-            appViewModel.fileTreeViewModel.addFolder()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
-            appViewModel.newTab()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                appViewModel.isSidebarVisible.toggle()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
-            appViewModel.exportPDF()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
-            if let result = note.object as? Result<Void, Error> {
-                appViewModel.handlePDFExportResult(result)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
-            appViewModel.syncToConfluence()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
-            appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
-            appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
-        }
-        .sheet(isPresented: $isDiffSheetPresented) {
-            DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
-        }
-        .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
-            if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
-                ConfluencePageSettingSheet(fileURL: url)
-                    .environment(appViewModel.confluenceSyncViewModel)
-            }
-        }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button {
@@ -264,6 +233,86 @@ struct MainWindowView: View {
             }
         }
         return true
+    }
+}
+
+extension MainWindowView {
+    struct MainWindowCommandReceiver: ViewModifier {
+        let appViewModel: AppViewModel
+        @Binding var isDiffSheetPresented: Bool
+        @Binding var diffInitialText: String
+        @Binding var diffInitialFileName: String
+        @Binding var isQuickOpenPresented: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .onReceive(NotificationCenter.default.publisher(for: .quickOpenRequested)) { _ in
+                    appViewModel.quickOpenViewModel.query = ""
+                    appViewModel.quickOpenViewModel.filter()
+                    isQuickOpenPresented = true
+                }
+                .onChange(of: appViewModel.selectedFileURL) { _, url in
+                    let ext = url?.pathExtension.lowercased() ?? ""
+                    let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
+                    if !isMD && appViewModel.previewMode == .wysiwyg {
+                        appViewModel.previewMode = .split
+                    }
+                }
+                .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
+                    appViewModel.refreshQuickOpenIndex()
+                }
+                .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
+                    guard let url = fileURL else { return }
+                    AppState.shared.pendingOpenFileURL = nil
+                    Task {
+                        await appViewModel.openFile(url: url)
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
+                    if AppState.shared.autoFormatOnSave {
+                        appViewModel.formatCurrentDocument()
+                    }
+                    appViewModel.saveCurrentFile()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .formatDocumentRequested)) { _ in
+                    appViewModel.formatCurrentDocument()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
+                    appViewModel.fileTreeViewModel.addFolder()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
+                    appViewModel.newTab()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        appViewModel.isSidebarVisible.toggle()
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
+                    appViewModel.exportPDF()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
+                    if let result = note.object as? Result<Void, Error> {
+                        appViewModel.handlePDFExportResult(result)
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
+                    appViewModel.syncToConfluence()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
+                    appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
+                    appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
+                }
+                .sheet(isPresented: $isDiffSheetPresented) {
+                    DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
+                }
+                .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
+                    if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
+                        ConfluencePageSettingSheet(fileURL: url)
+                            .environment(appViewModel.confluenceSyncViewModel)
+                    }
+                }
+        }
     }
 }
 
