@@ -51,6 +51,7 @@ struct QuickInsertView: View {
                                 .id(snippet.id)
                                 .onTapGesture {
                                     selectedIndex = index
+                                    insertSelectedSnippet()
                                 }
                         }
                     }
