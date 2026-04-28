@@ -64,6 +64,10 @@ struct kobaamdApp: App {
                 Button("Format Document") { AppCommand.formatDocument.post() }
                     .keyboardShortcut("f", modifiers: [.command, .shift])
             }
+            CommandGroup(replacing: .printItem) {
+                Button("Quick Open…") { AppCommand.quickOpen.post() }
+                    .keyboardShortcut("p", modifiers: .command)
+            }
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
@@ -99,6 +103,7 @@ extension Notification.Name {
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
     static let confluenceSyncRequested         = AppCommand.confluenceSync.notificationName
     static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
+    static let quickOpenRequested              = AppCommand.quickOpen.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)

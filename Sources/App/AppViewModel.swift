@@ -9,6 +9,15 @@ enum PreviewMode: String, CaseIterable {
     case off     = "Off"
 }
 
+extension WorkspaceFolder: Equatable {
+    static func == (lhs: WorkspaceFolder, rhs: WorkspaceFolder) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.url == rhs.url &&
+        lhs.nodes == rhs.nodes &&
+        lhs.isExpanded == rhs.isExpanded
+    }
+}
+
 @Observable
 @MainActor
 final class AppViewModel {
@@ -33,8 +42,10 @@ final class AppViewModel {
     var isDiffMode: Bool = false
     var formatChangeCount: Int = 0
     var showFormatToast: Bool = false
+    var showQuickOpen: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
+    let quickOpenViewModel = QuickOpenViewModel()
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
@@ -60,6 +71,25 @@ final class AppViewModel {
         let tab = EditorTab(url: url, content: content)
         tabs.append(tab)
         activate(tab: tab)
+    }
+
+    /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
+    func refreshQuickOpenIndex() {
+        quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
+        quickOpenViewModel.filter()
+    }
+
+    @MainActor
+    func openFile(url: URL) async {
+        guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+        do {
+            let content = try await Task.detached(priority: .userInitiated) {
+                try FileService().readFile(at: url)
+            }.value
+            openInTab(url: url, content: content)
+        } catch {
+            showAppError(.fileReadFailed(url: url, underlying: error))
+        }
     }
 
     /// 新しい空タブを追加する。
