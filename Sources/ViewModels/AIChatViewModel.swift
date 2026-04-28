@@ -23,11 +23,11 @@ final class AIChatViewModel {
     var selectedProvider: APIKeyStore.Provider = .openai
     var streamingContent: String = ""
 
-    private let aiService: AIService
+    private let aiService: AIServiceProtocol
     private var activeTask: Task<Void, Never>? = nil
     private let maxMessages = 100
 
-    init(aiService: AIService = AIService()) {
+    init(aiService: AIServiceProtocol = AIService()) {
         self.aiService = aiService
     }
 

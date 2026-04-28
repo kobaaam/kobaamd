@@ -352,7 +352,9 @@ private extension AIService {
         guard let key = APIKeyStore.load(for: .openai), !key.isEmpty else {
             return failingStream(AIError.noAPIKey(provider: "OpenAI"))
         }
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+            return failingStream(AIError.invalidResponse)
+        }
         let apiMessages: [[String: Any]] = [
             ["role": "system", "content": systemPrompt],
         ] + messages.map { ["role": $0.role.rawValue, "content": $0.content] }
@@ -415,7 +417,9 @@ private extension AIService {
         guard let key = APIKeyStore.load(for: .anthropic), !key.isEmpty else {
             return failingStream(AIError.noAPIKey(provider: "Anthropic"))
         }
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+            return failingStream(AIError.invalidResponse)
+        }
         let apiMessages = messages.map { ["role": $0.role.rawValue, "content": $0.content] }
         let body: [String: Any] = [
             "model": "claude-haiku-4-5-20251001",

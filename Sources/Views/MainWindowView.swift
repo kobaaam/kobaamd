@@ -157,7 +157,7 @@ struct MainWindowView: View {
                     if isChatSidebarVisible {
                         KobaDivider()
                         AIChatView(
-                            viewModel: appViewModel.aIChatViewModel,
+                            viewModel: appViewModel.aiChatViewModel,
                             onInsertToEditor: { text in
                                 appViewModel.editorText += "\n\n" + text
                             }
