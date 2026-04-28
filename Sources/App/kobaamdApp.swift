@@ -63,6 +63,8 @@ struct kobaamdApp: App {
                     .keyboardShortcut("e", modifiers: .command)
                 Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
                     .keyboardShortcut(".", modifiers: .command)
+                Button("クイックインサート") { AppCommand.quickInsert.post() }
+                    .keyboardShortcut("k", modifiers: .command)
             }
             CommandMenu("Format") {
                 Button("Format Document") { AppCommand.formatDocument.post() }
@@ -85,6 +87,7 @@ struct kobaamdApp: App {
         // Settings window (⌘,)
         Settings {
             SettingsView(updater: updaterController.updater)
+                .environment(appViewModel)
         }
     }
 }
@@ -97,6 +100,7 @@ extension Notification.Name {
     static let findRequested          = AppCommand.find.notificationName
     static let openFolderRequested    = AppCommand.openFolder.notificationName
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
+    static let quickInsertRequested   = AppCommand.quickInsert.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
     static let newTabRequested          = AppCommand.newTab.notificationName
     static let formatDocumentRequested = AppCommand.formatDocument.notificationName
@@ -112,6 +116,7 @@ extension Notification.Name {
     static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
     static let quickOpenRequested              = AppCommand.quickOpen.notificationName
     static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
+    static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
 }
 
 // MARK: - App Delegate (window frame save/restore)
