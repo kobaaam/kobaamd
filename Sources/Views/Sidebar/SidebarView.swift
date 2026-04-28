@@ -9,6 +9,7 @@ struct SidebarView: View {
     // MARK: - Split & collapse state
 
     @State private var outlinePanelRatio: CGFloat = 0.35
+    @State private var dragStartRatio: CGFloat = 0.35
     @State private var isTodoExpanded: Bool = false
     @State private var isDraggingHandle: Bool = false
 
@@ -22,7 +23,8 @@ struct SidebarView: View {
                 let todoHeaderHeight: CGFloat = 28
                 let todoBodyHeight: CGFloat = isTodoExpanded ? min(200, geo.size.height * 0.3) : 0
                 let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight
-                let outlineHeight = max(60, availableHeight * outlinePanelRatio)
+                let isOutlineEmpty = appViewModel.outlineViewModel.items.isEmpty
+                let outlineHeight: CGFloat = isOutlineEmpty ? 60 : max(60, availableHeight * outlinePanelRatio)
                 let fileHeight = max(60, availableHeight - outlineHeight)
 
                 VStack(spacing: 0) {
@@ -37,11 +39,19 @@ struct SidebarView: View {
                     // ── Outline header + panel ──
                     sectionHeader("OUTLINE")
 
-                    OutlineView(outlineViewModel: appViewModel.outlineViewModel)
-                        .frame(height: outlineHeight - 28) // subtract outline header height
-                        .clipped()
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("アウトライン")
+                    if isOutlineEmpty {
+                        Text("見出しが見つかりません")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.kobaMute)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(height: outlineHeight - 28)
+                    } else {
+                        OutlineView(outlineViewModel: appViewModel.outlineViewModel)
+                            .frame(height: outlineHeight - 28) // subtract outline header height
+                            .clipped()
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("アウトライン")
+                    }
 
                     // ── TODO collapsible area ──
                     todoSection
@@ -106,9 +116,9 @@ struct SidebarView: View {
                     .onChanged { value in
                         if !isDraggingHandle {
                             isDraggingHandle = true
+                            dragStartRatio = outlinePanelRatio
                         }
-                        let delta = value.translation.height / availableHeight
-                        let newRatio = outlinePanelRatio - delta
+                        let newRatio = dragStartRatio - value.translation.height / availableHeight
                         outlinePanelRatio = min(0.9, max(0.1, newRatio))
                     }
                     .onEnded { _ in
