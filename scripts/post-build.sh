@@ -20,6 +20,7 @@ echo "[post-build] binary updated → $APP/Contents/MacOS/kobaamd"
 
 # Copy app icon
 cp Sources/Resources/AppIcon.icns "$RESOURCES/AppIcon.icns"
+echo "[post-build] icon injected → $RESOURCES/AppIcon.icns"
 
 # Copy resource bundle (JS/CSS assets for WYSIWYG, Mermaid など)
 BUNDLE=".build/arm64-apple-macosx/$CONFIG/kobaamd_kobaamd.bundle"
@@ -36,7 +37,8 @@ echo "[post-build] Info.plist updated → $PLIST"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$APP" 2>/dev/null && echo "[post-build] Launch Services registered"
 
-echo "[post-build] icon injected → $RESOURCES/AppIcon.icns"
+codesign --force --deep --sign - "$APP"
+echo "[post-build] codesign applied (ad-hoc) → $APP"
 
 # Touch the app so Dock / Finder picks up the new icon
 touch "$APP"
