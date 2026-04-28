@@ -1,10 +1,12 @@
 import SwiftUI
 import AppKit
+import Sparkle
 
 @main
 struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel()
+    @State private var updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     var body: some Scene {
         WindowGroup("kobaamd") {
@@ -69,11 +71,14 @@ struct kobaamdApp: App {
                     .keyboardShortcut("b", modifiers: .command)
                 Divider()
             }
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
         }
 
         // Settings window (⌘,)
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
         }
     }
 }
