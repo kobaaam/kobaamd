@@ -290,39 +290,57 @@ extension MainWindowView {
                 .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
                     appViewModel.newTab()
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appViewModel.isSidebarVisible.toggle()
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
-                    appViewModel.exportPDF()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
-                    if let result = note.object as? Result<Void, Error> {
-                        appViewModel.handlePDFExportResult(result)
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
-                    appViewModel.syncToConfluence()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
-                    appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
-                    appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
-                }
-                .sheet(isPresented: $isDiffSheetPresented) {
-                    DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
-                }
+                .modifier(MainWindowCommandReceiverPart2(
+                    appViewModel: appViewModel,
+                    isDiffSheetPresented: $isDiffSheetPresented,
+                    confluenceSheetPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented
+                ))
                 .onReceive(NotificationCenter.default.publisher(for: .cancelAIGenerationRequested)) { _ in
                     appViewModel.cancelAIGeneration()
                 }
-                .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
-                    if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
-                        ConfluencePageSettingSheet(fileURL: url)
-                            .environment(appViewModel.confluenceSyncViewModel)
-                    }
-                }
         }
+    }
+}
+
+// MARK: - Command receiver part 2 (sheets + secondary commands)
+
+private struct MainWindowCommandReceiverPart2: ViewModifier {
+    let appViewModel: AppViewModel
+    @Binding var isDiffSheetPresented: Bool
+    @Binding var confluenceSheetPresented: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .sidebarToggleRequested)) { _ in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    appViewModel.isSidebarVisible.toggle()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .exportPDFRequested)) { _ in
+                appViewModel.exportPDF()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .exportPDFCompleted)) { note in
+                if let result = note.object as? Result<Void, Error> {
+                    appViewModel.handlePDFExportResult(result)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
+                appViewModel.syncToConfluence()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
+                appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
+                appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
+            }
+            .sheet(isPresented: $isDiffSheetPresented) {
+                DiffSheetView(preloadText: appViewModel.activeTab?.content ?? "",
+                              preloadFileName: appViewModel.activeTab?.title ?? "")
+            }
+            .sheet(isPresented: $confluenceSheetPresented) {
+                if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
+                    ConfluencePageSettingSheet(fileURL: url)
+                        .environment(appViewModel.confluenceSyncViewModel)
+                }
+            }
     }
 }
 
