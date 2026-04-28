@@ -37,6 +37,7 @@ final class AppViewModel {
     let fileTreeViewModel = FileTreeViewModel()
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
+    let confluenceSyncViewModel = ConfluenceSyncViewModel()
     private var formatToastTask: Task<Void, Never>? = nil
 
     // MARK: - Tabs
@@ -312,5 +313,15 @@ final class AppViewModel {
                 }
             }
         }
+    }
+
+    // MARK: - Confluence Sync
+
+    func syncToConfluence() {
+        confluenceSyncViewModel.performSync(
+            fileURL: selectedFileURL,
+            markdownContent: editorText,
+            onError: { [weak self] error in self?.showAppError(error) }
+        )
     }
 }

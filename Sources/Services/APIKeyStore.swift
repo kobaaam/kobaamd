@@ -6,20 +6,35 @@ import Security
 final class APIKeyStore {
 
     enum Provider: String, CaseIterable {
-        case openai    = "openai"
-        case anthropic = "anthropic"
+        case openai          = "openai"
+        case anthropic       = "anthropic"
+        case confluenceURL   = "confluenceURL"
+        case confluenceEmail = "confluenceEmail"
+        case confluenceToken = "confluenceToken"
 
         var displayName: String {
             switch self {
-            case .openai:    return "OpenAI (GPT-5.4)"
-            case .anthropic: return "Anthropic (Claude)"
+            case .openai:          return "OpenAI (GPT-5.4)"
+            case .anthropic:       return "Anthropic (Claude)"
+            case .confluenceURL:   return "Confluence Base URL"
+            case .confluenceEmail: return "Confluence Email"
+            case .confluenceToken: return "Confluence API Token"
+            }
+        }
+        var isAIProvider: Bool {
+            switch self {
+            case .openai, .anthropic: return true
+            case .confluenceURL, .confluenceEmail, .confluenceToken: return false
             }
         }
         var keychainAccount: String { rawValue }
         var envKey: String {
             switch self {
-            case .openai:    return "OPENAI_API_KEY"
-            case .anthropic: return "ANTHROPIC_API_KEY"
+            case .openai:          return "OPENAI_API_KEY"
+            case .anthropic:       return "ANTHROPIC_API_KEY"
+            case .confluenceURL:   return "CONFLUENCE_URL"
+            case .confluenceEmail: return "CONFLUENCE_EMAIL"
+            case .confluenceToken: return "CONFLUENCE_TOKEN"
             }
         }
     }

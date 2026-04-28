@@ -48,6 +48,10 @@ struct kobaamdApp: App {
             CommandGroup(after: .saveItem) {
                 Button("PDFに書き出し...") { AppCommand.exportPDF.post() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
+                Divider()
+                Button("Confluence に同期") { AppCommand.confluenceSync.post() }
+                    .keyboardShortcut("u", modifiers: [.command, .shift])
+                Button("Confluence ページ設定...") { AppCommand.confluencePageSettings.post() }
             }
             CommandGroup(after: .textEditing) {
                 Button("Find & Replace") { AppCommand.find.post() }
@@ -90,9 +94,11 @@ extension Notification.Name {
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
-    static let exportPDFRequested     = AppCommand.exportPDF.notificationName
-    static let exportPDFWithURL       = Notification.Name("kobaamd.exportPDFWithURL")
-    static let exportPDFCompleted     = Notification.Name("kobaamd.exportPDFCompleted")
+    static let exportPDFRequested             = AppCommand.exportPDF.notificationName
+    static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
+    static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
+    static let confluenceSyncRequested         = AppCommand.confluenceSync.notificationName
+    static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)

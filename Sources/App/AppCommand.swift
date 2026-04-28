@@ -12,7 +12,9 @@ enum AppCommand: String {
     case toggleSidebar     = "kobaamd.sidebarToggleRequested"
     case newTab            = "kobaamd.newTabRequested"
     case formatDocument    = "kobaamd.formatDocumentRequested"
-    case exportPDF         = "kobaamd.exportPDFRequested"
+    case exportPDF              = "kobaamd.exportPDFRequested"
+    case confluenceSync         = "kobaamd.confluenceSyncRequested"
+    case confluencePageSettings = "kobaamd.confluencePageSettingsRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 
