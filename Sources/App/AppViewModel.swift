@@ -290,7 +290,7 @@ final class AppViewModel {
     func insertSnippet(_ prompt: String) {
         let text = "{{\(prompt)}}"
         NotificationCenter.default.post(
-            name: Notification.Name("kobaamd.insertSnippetAtCursor"),
+            name: .insertSnippetAtCursor,
             object: nil,
             userInfo: ["text": text]
         )
