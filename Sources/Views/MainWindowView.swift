@@ -8,6 +8,7 @@ struct MainWindowView: View {
     @State private var isDiffSheetPresented: Bool = false
     @State private var diffInitialText: String = ""
     @State private var diffInitialFileName: String = ""
+    @State private var isWindowDragTargeted: Bool = false
 
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
@@ -64,6 +65,28 @@ struct MainWindowView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
+                .overlay {
+                    if isWindowDragTargeted {
+                        ZStack {
+                            Color.kobaAccent
+                                .opacity(0.04)
+                                .allowsHitTesting(false)
+
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    Color.kobaAccent,
+                                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                )
+                                .padding(10)
+                                .allowsHitTesting(false)
+
+                            Text("Drop to open")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.kobaAccent.opacity(0.7))
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
 
                 // ── Status / command bar ───────────────────────────────
                 StatusCommandBar(
@@ -83,6 +106,7 @@ struct MainWindowView: View {
                     .padding(.bottom, 42)
             }
         }
+        .onDrop(of: [.fileURL], isTargeted: $isWindowDragTargeted, perform: handleDrop(providers:))
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
@@ -227,6 +251,19 @@ struct MainWindowView: View {
                 .help("Diff ビュー (⌘D)")
             }
         }
+    }
+
+    // MARK: - Drag & Drop
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+        Task {
+            for provider in providers {
+                guard let url = await appViewModel.loadDroppedURL(from: provider) else { continue }
+                await appViewModel.openDroppedFile(url: url)
+            }
+        }
+        return true
     }
 }
 

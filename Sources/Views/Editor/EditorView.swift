@@ -9,6 +9,7 @@ struct EditorView: View {
     @State private var showAIPanel:    Bool = false
     @State private var scrollRatio: Double = 0
     @State private var autoSaveTask: Task<Void, Never>? = nil
+    @State private var isDragTargeted: Bool = false
 
     var body: some View {
         @Bindable var vm = appViewModel
@@ -23,24 +24,28 @@ struct EditorView: View {
                         .progressViewStyle(.circular)
                         .scaleEffect(0.8)
                 }
+
+                if isDragTargeted {
+                    Color.kobaAccent
+                        .opacity(0.06)
+                        .allowsHitTesting(false)
+
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(
+                            Color.kobaAccent,
+                            style: StrokeStyle(lineWidth: 2, dash: [6, 3])
+                        )
+                        .padding(8)
+                        .allowsHitTesting(false)
+
+                    Text("Drop to open")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.kobaMute)
+                        .allowsHitTesting(false)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-                    guard let provider = providers.first else { return false }
-                    provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
-                        guard let data = item as? Data,
-                              let url = URL(dataRepresentation: data, relativeTo: nil),
-                              FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
-                        Task.detached {
-                            if let content = try? FileService().readFile(at: url) {
-                                await MainActor.run {
-                                    appViewModel.openInTab(url: url, content: content)
-                                }
-                            }
-                        }
-                    }
-                    return true
-                }
+            .onDrop(of: [.fileURL], isTargeted: $isDragTargeted, perform: handleDrop(providers:))
 
             if showFindReplace {
                 Rectangle().fill(Color.kobaLine).frame(height: 1)
@@ -125,5 +130,16 @@ struct EditorView: View {
         appViewModel.isDirty = false
         appViewModel.selectedFileURL = nil
         showFindReplace = false
+    }
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard !providers.isEmpty else { return false }
+        Task {
+            for provider in providers {
+                guard let url = await appViewModel.loadDroppedURL(from: provider) else { continue }
+                await appViewModel.openDroppedFile(url: url)
+            }
+        }
+        return true
     }
 }
