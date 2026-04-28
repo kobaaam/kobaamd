@@ -381,7 +381,7 @@ struct StatusCommandBar: View {
         }
         .frame(height: 30)
         .background(Color.kobaSurface)
-        .overlay(KobaDivider(), alignment: .top)
+        .overlay(KobaHDivider(), alignment: .top)
     }
 
     func kobaLineSep() -> some View {
@@ -407,6 +407,16 @@ struct KobaDivider: View {
             .fill(Color.kobaLine)
             .frame(width: 1)
             .frame(maxHeight: .infinity)
+    }
+}
+
+/// 水平方向の 1px セパレーター（StatusCommandBar 上部など横線に使う）
+struct KobaHDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.kobaLine)
+            .frame(height: 1)
+            .frame(maxWidth: .infinity)
     }
 }
 
