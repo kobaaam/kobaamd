@@ -96,7 +96,7 @@ private struct EditorObserver: NSViewRepresentable {
             }
 
             insertSnippetObserver = NotificationCenter.default.addObserver(
-                forName: Notification.Name("kobaamd.insertSnippetAtCursor"),
+                forName: .insertSnippetAtCursor,
                 object: nil,
                 queue: .main
             ) { [weak self] note in
