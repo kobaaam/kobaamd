@@ -19,6 +19,15 @@ struct WorkspaceFolder: Identifiable {
     var displayName: String { url.lastPathComponent }
 }
 
+extension WorkspaceFolder: Equatable {
+    static func == (lhs: WorkspaceFolder, rhs: WorkspaceFolder) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.url == rhs.url &&
+        lhs.nodes == rhs.nodes &&
+        lhs.isExpanded == rhs.isExpanded
+    }
+}
+
 // MARK: - ViewModel
 
 @MainActor
