@@ -45,6 +45,8 @@ final class AppViewModel {
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
+    let aIChatViewModel = AIChatViewModel()
+    var isChatSidebarVisible: Bool = false
     private var formatToastTask: Task<Void, Never>? = nil
     /// AI インライン補完のアクティブタスク。キャンセル用。
     private var aiTask: Task<Void, Never>? = nil

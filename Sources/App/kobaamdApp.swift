@@ -49,7 +49,7 @@ struct kobaamdApp: App {
             }
             CommandGroup(after: .saveItem) {
                 Button("PDFに書き出し...") { AppCommand.exportPDF.post() }
-                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
                 Divider()
                 Button("Confluence に同期") { AppCommand.confluenceSync.post() }
                     .keyboardShortcut("u", modifiers: [.command, .shift])
@@ -61,6 +61,8 @@ struct kobaamdApp: App {
                 Divider()
                 Button("AI アシスト…") { AppCommand.aiAssist.post() }
                     .keyboardShortcut("e", modifiers: .command)
+                Button("AI チャット") { AppCommand.aiChat.post() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
                     .keyboardShortcut(".", modifiers: .command)
                 Button("クイックインサート") { AppCommand.quickInsert.post() }
@@ -100,6 +102,7 @@ extension Notification.Name {
     static let findRequested          = AppCommand.find.notificationName
     static let openFolderRequested    = AppCommand.openFolder.notificationName
     static let aiAssistRequested      = AppCommand.aiAssist.notificationName
+    static let aiChatRequested        = AppCommand.aiChat.notificationName
     static let quickInsertRequested   = AppCommand.quickInsert.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
     static let newTabRequested          = AppCommand.newTab.notificationName
