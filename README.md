@@ -16,7 +16,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 ## Features / 機能
 
 - **Instant preview / リアルタイムプレビュー** — Split view or WYSIWYG mode / スプリットビューまたは WYSIWYG モード
-- **Folder workspace / フォルダワークスペース** — Open a folder and browse all files in a sidebar / フォルダを開いてサイドバーでファイルを管理
+- **Folder workspace / フォルダワークスペース** — File tree, outline, and TODO panel in a VS Code-style sidebar / VS Code 風サイドバーにファイルツリー・アウトライン・TODO を常時表示
 - **Mermaid diagrams / Mermaid ダイアグラム** — Flowcharts, sequence diagrams, Gantt charts rendered inline / フローチャート・シーケンス図・ガントチャートをインラインで描画
 - **D2 diagrams / D2 ダイアグラム** — D2 diagram preview rendered in the preview pane / D2 図をプレビューペインでレンダリング
 - **Tabbed editing / タブ編集** — Multiple files open simultaneously (⌘T) / 複数ファイルを同時に開く（⌘T）
