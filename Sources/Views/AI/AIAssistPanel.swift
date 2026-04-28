@@ -135,12 +135,15 @@ struct AIAssistPanel: View {
         defer { isLoading = false }
 
         do {
-            result = try await service.complete(
+            let stream = service.stream(
                 prompt: prompt,
                 context: editorText,
                 provider: provider
             )
-            showResult = true
+            for try await token in stream {
+                result += token
+                showResult = true
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -16,6 +16,89 @@ struct MainWindowView: View {
         return ext == "md" || ext == "markdown" || ext.isEmpty
     }
 
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        @Bindable var vm = appViewModel
+
+        ToolbarItemGroup(placement: .navigation) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    vm.isSidebarVisible.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.left")
+            }
+            .help("サイドバーの表示/非表示 (⌘B)")
+
+            Button {
+                NotificationCenter.default.post(name: .openFolderRequested, object: nil)
+            } label: {
+                Image(systemName: "folder")
+            }
+            .help("Open Folder (⌘O)")
+        }
+
+        // Center: preview mode selector (only when a file is open)
+        ToolbarItem(placement: .principal) {
+            if vm.selectedFileURL != nil {
+                Picker("", selection: $vm.previewMode) {
+                    Image(systemName: "pencil").tag(PreviewMode.off)
+                    Image(systemName: "rectangle.split.2x1").tag(PreviewMode.split)
+                    if isMDFile {
+                        Image(systemName: "eye").tag(PreviewMode.wysiwyg)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .labelsHidden()
+                .help("プレビューモード切り替え")
+            }
+        }
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                NotificationCenter.default.post(name: .newFileRequested, object: nil)
+            } label: {
+                Image(systemName: "doc.badge.plus")
+            }
+            .help("New File (⌘N)")
+
+            // Save button doubles as autosave indicator
+            Button {
+                NotificationCenter.default.post(name: .saveRequested, object: nil)
+            } label: {
+                Image(systemName: vm.isDirty ? "circle.fill" : "checkmark.circle")
+                    .foregroundStyle(vm.isDirty ? Color.kobaAccent : .secondary)
+            }
+            .help("Save (⌘S)")
+
+            Divider()
+
+            Button {
+                NotificationCenter.default.post(name: .findRequested, object: nil)
+            } label: {
+                Image(systemName: "magnifyingglass")
+            }
+            .help("Find & Replace (⌘F)")
+
+            Button {
+                NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
+            } label: {
+                Image(systemName: "sparkles")
+            }
+            .help("AI アシスト (⌘E)")
+
+            Button {
+                diffInitialText = appViewModel.activeTab?.content ?? ""
+                diffInitialFileName = appViewModel.activeTab?.title ?? ""
+                isDiffSheetPresented = true
+            } label: {
+                Image(systemName: "arrow.left.arrow.right")
+            }
+            .help("Diff ビュー (⌘D)")
+        }
+    }
+
     var body: some View {
         @Bindable var vm = appViewModel
         ZStack(alignment: .bottom) {
@@ -142,83 +225,7 @@ struct MainWindowView: View {
         .background(Color.kobaPaper)
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
         .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        vm.isSidebarVisible.toggle()
-                    }
-                } label: {
-                    Image(systemName: "sidebar.left")
-                }
-                .help("サイドバーの表示/非表示 (⌘B)")
-
-                Button {
-                    NotificationCenter.default.post(name: .openFolderRequested, object: nil)
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .help("Open Folder (⌘O)")
-            }
-
-            // Center: preview mode selector (only when a file is open)
-            ToolbarItem(placement: .principal) {
-                if vm.selectedFileURL != nil {
-                    Picker("", selection: $vm.previewMode) {
-                        Image(systemName: "pencil").tag(PreviewMode.off)
-                        Image(systemName: "rectangle.split.2x1").tag(PreviewMode.split)
-                        if isMDFile {
-                            Image(systemName: "eye").tag(PreviewMode.wysiwyg)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-                    .labelsHidden()
-                    .help("プレビューモード切り替え")
-                }
-            }
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    NotificationCenter.default.post(name: .newFileRequested, object: nil)
-                } label: {
-                    Image(systemName: "doc.badge.plus")
-                }
-                .help("New File (⌘N)")
-
-                // Save button doubles as autosave indicator
-                Button {
-                    NotificationCenter.default.post(name: .saveRequested, object: nil)
-                } label: {
-                    Image(systemName: vm.isDirty ? "circle.fill" : "checkmark.circle")
-                        .foregroundStyle(vm.isDirty ? Color.kobaAccent : .secondary)
-                }
-                .help("Save (⌘S)")
-
-                Divider()
-
-                Button {
-                    NotificationCenter.default.post(name: .findRequested, object: nil)
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-                .help("Find & Replace (⌘F)")
-
-                Button {
-                    NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
-                } label: {
-                    Image(systemName: "sparkles")
-                }
-                .help("AI アシスト (⌘E)")
-
-                Button {
-                    diffInitialText = appViewModel.activeTab?.content ?? ""
-                    diffInitialFileName = appViewModel.activeTab?.title ?? ""
-                    isDiffSheetPresented = true
-                } label: {
-                    Image(systemName: "arrow.left.arrow.right")
-                }
-                .help("Diff ビュー (⌘D)")
-            }
+            toolbarContent
         }
     }
 
@@ -306,6 +313,9 @@ extension MainWindowView {
                 .sheet(isPresented: $isDiffSheetPresented) {
                     DiffSheetView(preloadText: diffInitialText, preloadFileName: diffInitialFileName)
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .cancelAIGenerationRequested)) { _ in
+                    appViewModel.cancelAIGeneration()
+                }
                 .sheet(isPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented) {
                     if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
                         ConfluencePageSettingSheet(fileURL: url)
@@ -359,6 +369,19 @@ struct StatusCommandBar: View {
             .padding(.leading, 14)
 
             Spacer()
+
+            // AI生成ステータス
+            if appViewModel.isAIGenerating {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.6)
+                    Text("AI生成中... ⌘. でキャンセル")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 8)
+            }
 
             // PDF書き出しステータス
             if let msg = appViewModel.pdfStatusMessage {
