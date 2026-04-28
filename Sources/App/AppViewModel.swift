@@ -9,6 +9,15 @@ enum PreviewMode: String, CaseIterable {
     case off     = "Off"
 }
 
+extension WorkspaceFolder: Equatable {
+    static func == (lhs: WorkspaceFolder, rhs: WorkspaceFolder) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.url == rhs.url &&
+        lhs.nodes == rhs.nodes &&
+        lhs.isExpanded == rhs.isExpanded
+    }
+}
+
 @Observable
 @MainActor
 final class AppViewModel {
