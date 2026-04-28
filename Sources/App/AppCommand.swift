@@ -15,6 +15,7 @@ enum AppCommand: String {
     case exportPDF              = "kobaamd.exportPDFRequested"
     case confluenceSync         = "kobaamd.confluenceSyncRequested"
     case confluencePageSettings = "kobaamd.confluencePageSettingsRequested"
+    case cancelAIGeneration     = "kobaamd.cancelAIGenerationRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

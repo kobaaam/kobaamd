@@ -33,12 +33,22 @@ final class AppViewModel {
     var isDiffMode: Bool = false
     var formatChangeCount: Int = 0
     var showFormatToast: Bool = false
+    /// AI インライン補完のストリーミング中を示すフラグ。ステータスバー表示に使用。
+    var isAIGenerating: Bool = false
 
     let fileTreeViewModel = FileTreeViewModel()
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
     private var formatToastTask: Task<Void, Never>? = nil
+    /// AI インライン補完のアクティブタスク。キャンセル用。
+    private var aiTask: Task<Void, Never>? = nil
+    /// AIService の注入ポイント（テスト時はモックを渡す）。
+    private let aiService: AIServiceProtocol
+
+    init(aiService: AIServiceProtocol = AIService()) {
+        self.aiService = aiService
+    }
 
     // MARK: - Tabs
     var tabs: [EditorTab] = []
@@ -334,23 +344,63 @@ final class AppViewModel {
         let ph = Self.aiPlaceholder
         guard let lineRange = editorText.range(of: lineContent) else { return }
         editorText.replaceSubrange(lineRange, with: "\(ph)\n")
+        isAIGenerating = true
         markEdited()
 
-        Task { @MainActor [weak self] in
+        aiTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { self.aiTask = nil }
             do {
-                let result = try await AIService().complete(prompt: prompt, context: context, provider: provider)
-                if let r = self.editorText.range(of: ph) {
-                    self.editorText.replaceSubrange(r, with: result)
-                    self.markEdited()
+                // 30fps（33ms）バッファリング: トークンを溜めてまとめて editorText に反映する
+                var buffer = ""
+                var lastFlush = ContinuousClock.now
+                let stream = self.aiService.stream(prompt: prompt, context: context, provider: provider)
+                for try await token in stream {
+                    if Task.isCancelled {
+                        throw CancellationError()
+                    }
+                    buffer += token
+                    let now = ContinuousClock.now
+                    // 33ms 以上経過していたらバッファをフラッシュ
+                    if now - lastFlush >= .milliseconds(33) {
+                        if let r = self.editorText.range(of: ph) {
+                            self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
+                        }
+                        buffer = ""
+                        lastFlush = now
+                    }
                 }
+                // 残りバッファをフラッシュ
+                if !buffer.isEmpty, let r = self.editorText.range(of: ph) {
+                    self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
+                }
+                // ストリーミング完了後にプレースホルダーを削除
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.removeSubrange(r)
+                }
+                self.isAIGenerating = false
+                self.markEdited()
+            } catch is CancellationError {
+                // キャンセル時: プレースホルダーを削除し、それまでのテキストは残す
+                if let r = self.editorText.range(of: ph) {
+                    self.editorText.removeSubrange(r)
+                }
+                self.isAIGenerating = false
+                self.markEdited()
             } catch {
                 if let r = self.editorText.range(of: ph) {
                     self.editorText.replaceSubrange(r, with: "> **AI エラー:** \(error.localizedDescription)")
                     self.markEdited()
                 }
+                self.isAIGenerating = false
             }
         }
+    }
+
+    /// AI インライン補完をキャンセルする。生成済みテキストはエディタに残る。
+    func cancelAIGeneration() {
+        aiTask?.cancel()
+        aiTask = nil
     }
 
     // MARK: - Confluence Sync

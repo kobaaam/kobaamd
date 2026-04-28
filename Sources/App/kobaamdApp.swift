@@ -59,6 +59,8 @@ struct kobaamdApp: App {
                 Divider()
                 Button("AI アシスト…") { AppCommand.aiAssist.post() }
                     .keyboardShortcut("e", modifiers: .command)
+                Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
+                    .keyboardShortcut(".", modifiers: .command)
             }
             CommandMenu("Format") {
                 Button("Format Document") { AppCommand.formatDocument.post() }
@@ -99,6 +101,7 @@ extension Notification.Name {
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
     static let confluenceSyncRequested         = AppCommand.confluenceSync.notificationName
     static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
+    static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
 }
 
 // MARK: - App Delegate (window frame save/restore)
