@@ -26,7 +26,7 @@ final class ConfluenceSyncViewModel {
         try ConfluenceService().saveMapping(mapping, for: fileURL)
     }
 
-    func performSync(fileURL: URL?, markdownContent: String, onError: @escaping (AppError) -> Void) {
+    func performSync(fileURL: URL?, markdownContent: String, onError: @MainActor @escaping (AppError) -> Void) {
         guard let fileURL else {
             onError(.unknown(underlying: NSError(
                 domain: "Confluence",

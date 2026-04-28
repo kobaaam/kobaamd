@@ -24,7 +24,7 @@ struct AIAssistPanel: View {
                     .foregroundStyle(Color.kobaInk)
                 Spacer()
                 Picker("", selection: $provider) {
-                    ForEach(APIKeyStore.Provider.allCases, id: \.self) { p in
+                    ForEach(APIKeyStore.Provider.allCases.filter { $0.isAIProvider }, id: \.self) { p in
                         Text(p.displayName).tag(p)
                     }
                 }

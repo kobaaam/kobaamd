@@ -21,6 +21,12 @@ final class APIKeyStore {
             case .confluenceToken: return "Confluence API Token"
             }
         }
+        var isAIProvider: Bool {
+            switch self {
+            case .openai, .anthropic: return true
+            case .confluenceURL, .confluenceEmail, .confluenceToken: return false
+            }
+        }
         var keychainAccount: String { rawValue }
         var envKey: String {
             switch self {
