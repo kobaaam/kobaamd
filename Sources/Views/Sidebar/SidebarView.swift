@@ -2,63 +2,62 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(AppViewModel.self) private var appViewModel
-    @State private var selectedTab: SidebarTab = .files
 
     private var fileTreeViewModel: FileTreeViewModel { appViewModel.fileTreeViewModel }
     @State private var reloadDebounceTask: Task<Void, Never>? = nil
 
-    enum SidebarTab: String, CaseIterable {
-        case files = "Files"
-        case search = "Search"
-        case todo = "TODO"
-    }
+    // MARK: - Split & collapse state
+
+    @State private var outlinePanelRatio: CGFloat = 0.35
+    @State private var dragStartRatio: CGFloat = 0.35
+    @State private var isTodoExpanded: Bool = false
+    @State private var isDraggingHandle: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 0) {
-                ForEach(SidebarTab.allCases, id: \.self) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        Text(tab.rawValue)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(selectedTab == tab ? Color.kobaInk : Color.kobaMute)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                    }
-                    .buttonStyle(.plain)
-                    .help(
-                        tab == .files
-                            ? "ファイルツリーを表示"
-                            : tab == .search
-                                ? "ワークスペース内を全文検索"
-                                : "TODO/FIXME の一覧を表示"
-                    )
-                    .background(
-                        selectedTab == tab
-                            ? Color.kobaSurface
-                            : Color.kobaSidebar
-                    )
-                    .overlay(
-                        selectedTab == tab
-                            ? Rectangle().fill(Color.kobaAccent).frame(height: 2)
-                            : Rectangle().fill(Color.clear).frame(height: 2),
-                        alignment: .bottom
-                    )
-                }
-            }
-            .frame(height: 34)
-            .background(Color.kobaSidebar)
-            .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
+            // MARK: Section header — EXPLORER
+            sectionHeader("EXPLORER")
 
-            switch selectedTab {
-            case .files:
-                filePanel
-            case .search:
-                SearchView(fileTreeViewModel: fileTreeViewModel)
-            case .todo:
-                TodoView(todoViewModel: appViewModel.todoViewModel)
+            // MARK: File tree + resize handle + outline (flex area)
+            GeometryReader { geo in
+                let todoHeaderHeight: CGFloat = 28
+                let todoBodyHeight: CGFloat = isTodoExpanded ? min(200, geo.size.height * 0.3) : 0
+                let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight
+                let isOutlineEmpty = appViewModel.outlineViewModel.items.isEmpty
+                let outlineHeight: CGFloat = isOutlineEmpty ? 60 : max(60, availableHeight * outlinePanelRatio)
+                let fileHeight = max(60, availableHeight - outlineHeight)
+
+                VStack(spacing: 0) {
+                    // ── File panel ──
+                    filePanel
+                        .frame(height: fileHeight)
+                        .clipped()
+
+                    // ── Resize handle ──
+                    resizeHandle(availableHeight: availableHeight)
+
+                    // ── Outline header + panel ──
+                    sectionHeader("OUTLINE")
+
+                    if isOutlineEmpty {
+                        Text("見出しが見つかりません")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.kobaMute)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(height: outlineHeight - 28)
+                    } else {
+                        OutlineView(outlineViewModel: appViewModel.outlineViewModel)
+                            .frame(height: outlineHeight - 28) // subtract outline header height
+                            .clipped()
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("アウトライン")
+                    }
+
+                    // ── TODO collapsible area ──
+                    todoSection
+                        .frame(height: todoHeaderHeight + todoBodyHeight)
+                        .clipped()
+                }
             }
         }
         .background(Color.kobaSidebar)
@@ -92,6 +91,96 @@ struct SidebarView: View {
             }
         }
     }
+
+    // MARK: - Section header
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(Color.kobaMute2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(height: 28)
+    }
+
+    // MARK: - Resize handle
+
+    private func resizeHandle(availableHeight: CGFloat) -> some View {
+        Color.kobaLine
+            .frame(height: 1)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle().inset(by: -4))
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                    .onChanged { value in
+                        if !isDraggingHandle {
+                            isDraggingHandle = true
+                            dragStartRatio = outlinePanelRatio
+                        }
+                        let newRatio = dragStartRatio - value.translation.height / availableHeight
+                        outlinePanelRatio = min(0.9, max(0.1, newRatio))
+                    }
+                    .onEnded { _ in
+                        isDraggingHandle = false
+                    }
+            )
+            .onHover { inside in
+                if inside { NSCursor.resizeUpDown.push() }
+                else { NSCursor.pop() }
+            }
+            .accessibilityLabel("アウトラインパネルのサイズ調整")
+    }
+
+    // MARK: - TODO collapsible section
+
+    private var todoSection: some View {
+        let todoCount = appViewModel.todoViewModel.items.count
+        let headerColor: Color = todoCount > 0 ? .kobaInk : .kobaMute2
+
+        return VStack(spacing: 0) {
+            // Separator
+            Color.kobaLine
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+
+            // Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isTodoExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isTodoExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("TODO")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    if todoCount > 0 {
+                        Text("(\(todoCount))")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                    Spacer()
+                }
+                .foregroundStyle(headerColor)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.kobaSurface)
+            .accessibilityLabel("TODO一覧")
+            .accessibilityHint("クリックで展開・折り畳み")
+
+            // Body (expanded)
+            if isTodoExpanded {
+                TodoView(todoViewModel: appViewModel.todoViewModel)
+                    .frame(maxHeight: 200)
+            }
+        }
+    }
+
+    // MARK: - File panel (preserved from original)
 
     var filePanel: some View {
         VStack(spacing: 0) {
@@ -165,6 +254,8 @@ struct SidebarView: View {
             }
         }
     }
+
+    // MARK: - Open recent (preserved from original)
 
     private func openRecent(_ url: URL) {
         let folder = url.deletingLastPathComponent()
