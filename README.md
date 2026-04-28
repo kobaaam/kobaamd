@@ -24,6 +24,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Full-text search / 全文検索** — Search across all files in your workspace / ワークスペース全ファイルを横断検索
 - **Outline panel / アウトラインパネル** — Navigate headings (H1–H6) with editor + preview sync / 見出し一覧からエディタ・プレビューを同期ジャンプ
 - **AI assist / AI アシスト** — Send selected text to OpenAI / Anthropic / Gemini / 選択テキストを AI API に送信
+- **AI chat sidebar / AI チャットサイドバー** — Multi-turn conversation with persistent context in a dedicated sidebar (⌘E) / 専用サイドバーで履歴を保ちながら AI とマルチターン会話（⌘E）
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
 - **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
@@ -87,8 +88,8 @@ kobaamd/
 │   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView
 │   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar
 │   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
-│   │   └── AI/                    # AI assist panel
-│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline
+│   │   └── AI/                    # AI assist panel, AIChatView (multi-turn chat)
+│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel
 │   ├── Services/               # FileService, MarkdownService, AIService, GitService
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns
 ├── scripts/
