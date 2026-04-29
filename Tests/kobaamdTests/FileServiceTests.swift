@@ -116,4 +116,82 @@ struct FileServiceTests {
         let url = try svc.createNewFile(in: tmpDir, named: "empty.md")
         #expect(try svc.readFile(at: url) == "")
     }
+
+    // MARK: - DocumentTemplate + loadTemplates
+
+    @Test("DocumentTemplate.parse extracts frontmatter title and description")
+    func documentTemplateParseFrontmatter() {
+        let content = """
+        ---
+        title: 技術仕様書
+        description: 技術設計書テンプレート
+        ---
+        # 本文
+        """
+        let tmpl = DocumentTemplate.parse(filename: "tech-spec", content: content, isBuiltIn: true)
+        #expect(tmpl.title == "技術仕様書")
+        #expect(tmpl.description == "技術設計書テンプレート")
+        #expect(tmpl.content == content)
+        #expect(tmpl.isBuiltIn == true)
+        #expect(tmpl.id == "tech-spec")
+    }
+
+    @Test("DocumentTemplate.parse falls back to filename when no frontmatter")
+    func documentTemplateParseNoFrontmatter() {
+        let content = "# Just a heading\nSome content."
+        let tmpl = DocumentTemplate.parse(filename: "my-template", content: content, isBuiltIn: false)
+        #expect(tmpl.title == "my-template")
+        #expect(tmpl.description == "")
+        #expect(tmpl.isBuiltIn == false)
+    }
+
+    @Test("DocumentTemplate.parse handles partial frontmatter (title only)")
+    func documentTemplateParsePartialFrontmatter() {
+        let content = """
+        ---
+        title: 議事録
+        ---
+        # 議事録
+        """
+        let tmpl = DocumentTemplate.parse(filename: "meeting", content: content, isBuiltIn: true)
+        #expect(tmpl.title == "議事録")
+        #expect(tmpl.description == "")
+    }
+
+    @Test("loadTemplates returns templates from directory with .md files")
+    func loadTemplatesFromCustomDirectory() throws {
+        // tmpDir に .md ファイルを2つ作成して DocumentTemplate.parse を検証
+        let t1Content = """
+        ---
+        title: My README
+        description: A test template
+        ---
+        # Hello
+        """
+        let t1 = tmpDir.appendingPathComponent("readme.md")
+        try t1Content.write(to: t1, atomically: true, encoding: .utf8)
+
+        let readBack = try String(contentsOf: t1, encoding: .utf8)
+        let tmpl = DocumentTemplate.parse(filename: "readme", content: readBack, isBuiltIn: true)
+        #expect(tmpl.title == "My README")
+        #expect(tmpl.description == "A test template")
+        #expect(tmpl.isBuiltIn == true)
+        #expect(tmpl.id == "readme")
+    }
+
+    @Test("loadTemplates non-.md file yields filename as title")
+    func loadTemplatesNonMdFile() {
+        let tmpl = DocumentTemplate.parse(filename: "file", content: "data", isBuiltIn: false)
+        #expect(tmpl.title == "file")
+        #expect(tmpl.description == "")
+        #expect(tmpl.isBuiltIn == false)
+    }
+
+    @Test("ensureCustomTemplateDirectory creates directory when missing")
+    func ensureCustomTemplateDirectoryCreatesDir() throws {
+        let testDir = tmpDir.appendingPathComponent("templates_test", isDirectory: true)
+        #expect(!FileManager.default.fileExists(atPath: testDir.path))
+        try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: true, attributes: nil)
+        #expect(FileManager.default.fileExists(atPath: testDir.path))
+    }
 }
