@@ -2,14 +2,7 @@ import AppKit
 
 final class HighlightService {
 
-    // Fixed sRGB colours — never use dynamic colours (labelColor goes white on macOS 26 dark mode)
-    private let inkColor    = NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1.0) // #1a1a1a
-    private let mutedColor  = NSColor(srgbRed: 0.55,  green: 0.55,  blue: 0.55,  alpha: 1.0)
-    private let accentColor = NSColor(srgbRed: 1.0,   green: 0.357, blue: 0.122, alpha: 1.0) // #FF5B1F
-    private let blueColor   = NSColor(srgbRed: 0.0,   green: 0.44,  blue: 0.87,  alpha: 1.0)
-    private let greenColor  = NSColor(srgbRed: 0.18,  green: 0.56,  blue: 0.27,  alpha: 1.0)
-    private let purpleColor = NSColor(srgbRed: 0.55,  green: 0.27,  blue: 0.82,  alpha: 1.0)
-    private let redColor    = NSColor(srgbRed: 0.75,  green: 0.20,  blue: 0.17,  alpha: 1.0)
+    private var theme: ColorTheme { AppState.shared.selectedTheme }
 
     private let editorFont  = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     private let boldFont    = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
@@ -21,6 +14,8 @@ final class HighlightService {
     func highlight(_ textStorage: NSTextStorage) {
         guard !textStorage.string.isEmpty else { return }
 
+        let currentTheme = theme
+
         textStorage.beginEditing()
         defer { textStorage.endEditing() }
 
@@ -28,7 +23,7 @@ final class HighlightService {
 
         // ── Reset to defaults ───────────────────────────────────────
         textStorage.setAttributes([
-            .foregroundColor: inkColor,
+            .foregroundColor: currentTheme.editorText,
             .font: editorFont,
         ], range: fullRange)
 
@@ -36,86 +31,86 @@ final class HighlightService {
         // Must be at the very start of the document
         applyRegex(#"^---\n[\s\S]*?\n---"#, to: textStorage,
                    options: [.anchorsMatchLines, .dotMatchesLineSeparators],
-                   attributes: [.foregroundColor: mutedColor, .font: codeFont])
+                   attributes: [.foregroundColor: currentTheme.mutedColor, .font: codeFont])
 
         // ── ATX Headings (size + colour) ────────────────────────────
         applyRegex(#"^# .+$"#, to: textStorage,
-                   attributes: [.foregroundColor: inkColor, .font: h1Font])
+                   attributes: [.foregroundColor: currentTheme.headingColor, .font: h1Font])
         applyRegex(#"^## .+$"#, to: textStorage,
-                   attributes: [.foregroundColor: inkColor, .font: h2Font])
+                   attributes: [.foregroundColor: currentTheme.headingColor, .font: h2Font])
         applyRegex(#"^#{3,6} .+$"#, to: textStorage,
-                   attributes: [.foregroundColor: blueColor, .font: h3Font])
+                   attributes: [.foregroundColor: currentTheme.linkColor, .font: h3Font])
 
         // ── Fenced Code Blocks ──────────────────────────────────────
         applyRegex(#"```[\s\S]*?```"#, to: textStorage,
                    options: [.anchorsMatchLines, .dotMatchesLineSeparators],
-                   attributes: [.foregroundColor: greenColor, .font: codeFont])
+                   attributes: [.foregroundColor: currentTheme.codeColor, .font: codeFont])
 
         // ── Indented Code Blocks (4 spaces / tab) ──────────────────
         applyRegex(#"^(    |\t).+"#, to: textStorage,
-                   attributes: [.foregroundColor: greenColor, .font: codeFont])
+                   attributes: [.foregroundColor: currentTheme.codeColor, .font: codeFont])
 
         // ── Bold + Italic combined (***text***) ─────────────────────
         applyRegex(#"\*{3}[^*\n]+\*{3}"#, to: textStorage,
-                   attributes: [.foregroundColor: inkColor, .font: boldFont, .obliqueness: 0.2])
+                   attributes: [.foregroundColor: currentTheme.headingColor, .font: boldFont, .obliqueness: 0.2])
 
         // ── Bold (**text** or __text__) ─────────────────────────────
         applyRegex(#"\*\*[^*\n]+\*\*|__[^_\n]+__"#, to: textStorage,
-                   attributes: [.foregroundColor: inkColor, .font: boldFont])
+                   attributes: [.foregroundColor: currentTheme.headingColor, .font: boldFont])
 
         // ── Italic (*text* or _text_) ───────────────────────────────
         applyRegex(#"(?<!\*)\*(?!\*)[^*\n]+\*(?!\*)|(?<!_)_(?!_)[^_\n]+_(?!_)"#,
                    to: textStorage,
-                   attributes: [.foregroundColor: inkColor, .obliqueness: 0.2])
+                   attributes: [.foregroundColor: currentTheme.headingColor, .obliqueness: 0.2])
 
         // ── Strikethrough (~~text~~) ────────────────────────────────
         applyRegex(#"~~[^~\n]+~~"#, to: textStorage,
-                   attributes: [.foregroundColor: mutedColor,
+                   attributes: [.foregroundColor: currentTheme.mutedColor,
                                 .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                                .strikethroughColor: mutedColor])
+                                .strikethroughColor: currentTheme.mutedColor])
 
         // ── Inline Code (`code`) ────────────────────────────────────
         applyRegex(#"`[^`\n]+`"#, to: textStorage,
-                   attributes: [.foregroundColor: redColor, .font: codeFont])
+                   attributes: [.foregroundColor: currentTheme.redColor, .font: codeFont])
 
         // ── Links [label](url) ──────────────────────────────────────
         applyRegex(#"\[([^\]]+)\]\(([^)]+)\)"#, to: textStorage,
-                   attributes: [.foregroundColor: blueColor])
+                   attributes: [.foregroundColor: currentTheme.linkColor])
         // Highlight URL part in muted colour
         applyRegex(#"(?<=\]\()([^)]+)(?=\))"#, to: textStorage,
-                   attributes: [.foregroundColor: mutedColor])
+                   attributes: [.foregroundColor: currentTheme.mutedColor])
 
         // ── Reference Links [label][ref] ────────────────────────────
         applyRegex(#"\[([^\]]+)\]\[([^\]]*)\]"#, to: textStorage,
-                   attributes: [.foregroundColor: blueColor])
+                   attributes: [.foregroundColor: currentTheme.linkColor])
 
         // ── Images ![alt](url) ──────────────────────────────────────
         applyRegex(#"!\[([^\]]*)\]\([^)]+\)"#, to: textStorage,
-                   attributes: [.foregroundColor: purpleColor])
+                   attributes: [.foregroundColor: currentTheme.purpleColor])
 
         // ── Blockquote lines ────────────────────────────────────────
         applyRegex(#"^>+.*$"#, to: textStorage,
-                   attributes: [.foregroundColor: mutedColor, .obliqueness: 0.1])
+                   attributes: [.foregroundColor: currentTheme.mutedColor, .obliqueness: 0.1])
 
         // ── Unordered list markers (-, *, +) ────────────────────────
         applyRegex(#"^[ \t]*[-*+] "#, to: textStorage,
-                   attributes: [.foregroundColor: accentColor])
+                   attributes: [.foregroundColor: currentTheme.accentColor])
 
         // ── Task list checkboxes ─────────────────────────────────────
         applyRegex(#"^[ \t]*[-*+] \[[ xX]\] "#, to: textStorage,
-                   attributes: [.foregroundColor: accentColor])
+                   attributes: [.foregroundColor: currentTheme.accentColor])
 
         // ── Ordered list markers (1., 2.) ───────────────────────────
         applyRegex(#"^[ \t]*\d+\. "#, to: textStorage,
-                   attributes: [.foregroundColor: accentColor])
+                   attributes: [.foregroundColor: currentTheme.accentColor])
 
         // ── Horizontal rules ─────────────────────────────────────────
         applyRegex(#"^(---+|===+|\*\*\*+)$"#, to: textStorage,
-                   attributes: [.foregroundColor: mutedColor])
+                   attributes: [.foregroundColor: currentTheme.mutedColor])
 
         // ── HTML tags ────────────────────────────────────────────────
         applyRegex(#"</?[a-zA-Z][^>]*>"#, to: textStorage,
-                   attributes: [.foregroundColor: mutedColor, .font: codeFont])
+                   attributes: [.foregroundColor: currentTheme.mutedColor, .font: codeFont])
     }
 
     // MARK: - Private

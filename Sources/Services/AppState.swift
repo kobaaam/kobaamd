@@ -21,6 +21,14 @@ import Observation
         self.defaults = defaults
     }
 
+    var selectedTheme: ColorTheme {
+        get {
+            let raw = defaults.string(forKey: "selectedColorTheme") ?? ColorTheme.light.rawValue
+            return ColorTheme(rawValue: raw) ?? .light
+        }
+        set { defaults.set(newValue.rawValue, forKey: "selectedColorTheme") }
+    }
+
     var autoFormatOnSave: Bool {
         get { defaults.bool(forKey: "autoFormatOnSave") }
         set { defaults.set(newValue, forKey: "autoFormatOnSave") }
