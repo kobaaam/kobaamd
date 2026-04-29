@@ -25,6 +25,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Outline panel / アウトラインパネル** — Navigate headings (H1–H6) with editor + preview sync / 見出し一覧からエディタ・プレビューを同期ジャンプ
 - **AI assist / AI アシスト** — Send selected text to OpenAI / Anthropic / Gemini / 選択テキストを AI API に送信
 - **AI chat sidebar / AI チャットサイドバー** — Multi-turn conversation with persistent context in a dedicated sidebar (⌘E) / 専用サイドバーで履歴を保ちながら AI とマルチターン会話（⌘E）
+- **File templates / ファイルテンプレート** — AI-oriented presets for README, diary, meeting notes, and tech specs (⌘N picker) / AI フレンドリーな骨格を即挿入（⌘N ピッカー）
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
 - **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
@@ -82,16 +83,16 @@ kobaamd/
 ├── Sources/
 │   ├── App/                    # Entry point, AppViewModel, commands
 │   │                           # エントリポイント・グローバル状態・コマンド
-│   ├── Models/                 # FileNode, EditorTab
+│   ├── Models/                 # FileNode, EditorTab, DocumentTemplate
 │   ├── Views/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
 │   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView
-│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar
+│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView
 │   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
 │   │   └── AI/                    # AI assist panel, AIChatView (multi-turn chat)
 │   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel
 │   ├── Services/               # FileService, MarkdownService, AIService, GitService
-│   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns
+│   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/ (AI presets)
 ├── scripts/
 │   └── post-build.sh           # Bundles binary + resources → .app
 ├── Info.plist                  # App metadata + document type registration
