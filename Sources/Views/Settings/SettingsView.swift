@@ -85,6 +85,20 @@ struct SettingsView: View {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
 
+            Section("テンプレート") {
+                HStack {
+                    Text("カスタムテンプレートフォルダ")
+                    Spacer()
+                    Button("Finder で開く") {
+                        FileService().ensureCustomTemplateDirectory()
+                        NSWorkspace.shared.open(FileService.customTemplateDirectory)
+                    }
+                }
+                Text("~/.config/kobaamd/templates/ に .md ファイルを追加すると、新規ドキュメント作成時にテンプレートとして利用できます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("クイックインサート テンプレート") {
                 if appViewModel.snippetStore.customSnippets.isEmpty {
                     Text("カスタムテンプレートはまだありません")

@@ -315,6 +315,9 @@ extension MainWindowView {
                 .onReceive(NotificationCenter.default.publisher(for: .newTabRequested)) { _ in
                     appViewModel.newTab()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .newFileFromTemplateRequested)) { _ in
+                    appViewModel.showTemplatePicker = true
+                }
                 .modifier(MainWindowCommandReceiverPart2(
                     appViewModel: appViewModel,
                     isDiffSheetPresented: $isDiffSheetPresented,
@@ -371,6 +374,10 @@ private struct MainWindowCommandReceiverPart2: ViewModifier {
                     ConfluencePageSettingSheet(fileURL: url)
                         .environment(appViewModel.confluenceSyncViewModel)
                 }
+            }
+            .sheet(isPresented: Bindable(appViewModel).showTemplatePicker) {
+                TemplatePickerView(isPresented: Bindable(appViewModel).showTemplatePicker)
+                    .environment(appViewModel)
             }
     }
 }

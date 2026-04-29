@@ -47,6 +47,9 @@ final class AppViewModel {
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
     let aiChatViewModel = AIChatViewModel()
     var isChatSidebarVisible: Bool = false
+
+    // MARK: - Template Picker
+    var showTemplatePicker: Bool = false
     private var formatToastTask: Task<Void, Never>? = nil
     /// AI インライン補完のアクティブタスク。キャンセル用。
     private var aiTask: Task<Void, Never>? = nil
@@ -105,6 +108,16 @@ final class AppViewModel {
         let tab = EditorTab()
         tabs.append(tab)
         activate(tab: tab)
+    }
+
+    /// テンプレートの内容で新しいタブを開く。
+    func newTabFromTemplate(content: String) {
+        isDiffMode = false
+        flushActiveTab()
+        let tab = EditorTab(content: content)
+        tabs.append(tab)
+        activate(tab: tab)
+        isDirty = true
     }
 
     /// タブを切り替える。
