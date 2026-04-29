@@ -16,10 +16,10 @@ struct EditorView: View {
         VStack(spacing: 0) {
             ZStack {
                 NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
-                    .background(Color.kobaPaper)
+                    .background(Color(AppState.shared.selectedTheme.editorBackground))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if appViewModel.isFileLoading {
-                    Color.kobaPaper.opacity(0.6)
+                    Color(AppState.shared.selectedTheme.editorBackground).opacity(0.6)
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(0.8)

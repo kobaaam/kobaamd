@@ -13,8 +13,8 @@ struct NSTextViewWrapper: View {
     @Binding var text: String
     @Binding var scrollRatio: Double
 
-    private static let paperColor = Color(NSColor(srgbRed: 0.992, green: 0.988, blue: 0.973, alpha: 1))
-    private static let inkColor   = Color(NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1))
+    private static var paperColor: Color { Color(AppState.shared.selectedTheme.editorBackground) }
+    private static var inkColor: Color   { Color(AppState.shared.selectedTheme.editorText) }
     private static let editorFont = Font.system(size: 14, design: .monospaced)
 
     init(binding: Binding<String>, scrollRatio: Binding<Double>) {
@@ -66,8 +66,8 @@ private struct EditorObserver: NSViewRepresentable {
         private weak var textViewRef: NSTextView?
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
 
-        /// 淡いウォームグレー — kobaPaper(#FDFBF5) より少し暗い
-        private static let highlightColor = NSColor(srgbRed: 0.918, green: 0.910, blue: 0.890, alpha: 1)
+        /// テーマに応じたカーソル行ハイライト色
+        private static var highlightColor: NSColor { AppState.shared.selectedTheme.editorCurrentLineHighlight }
 
         func attach(to view: NSView, scrollRatio: Binding<Double>) {
             var current: NSView? = view

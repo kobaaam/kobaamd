@@ -12,6 +12,7 @@ final class PreviewViewModel {
 
     private var debounceTask: Task<Void, Never>? = nil
     private let service = MarkdownService()
+    private var lastTheme: ColorTheme?
 
     init() {}
 
@@ -23,10 +24,15 @@ final class PreviewViewModel {
 
             await MainActor.run { self.isRendering = true }
 
+            let currentTheme = AppState.shared.selectedTheme
+            let themeChanged = self.lastTheme != currentTheme
+            self.lastTheme = currentTheme
+
             // Markdown レンダリングをバックグラウンドで実行してメインスレッドをブロックしない
-            let (body, shell) = await Task.detached(priority: .userInitiated) { [service = self.service, shellEmpty = self.shellHTML.isEmpty] in
+            let needsShell = self.shellHTML.isEmpty || themeChanged
+            let (body, shell) = await Task.detached(priority: .userInitiated) { [service = self.service] in
                 let body = service.toBodyHTML(text)
-                let shell = shellEmpty ? service.toHTML(text) : ""
+                let shell = needsShell ? service.toHTML(text) : ""
                 return (body, shell)
             }.value
 

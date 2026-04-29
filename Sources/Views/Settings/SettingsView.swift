@@ -23,6 +23,21 @@ struct SettingsView: View {
         @Bindable var appState = AppState.shared
 
         Form {
+            Section("外観") {
+                LabeledContent("テーマ") {
+                    Picker("", selection: Binding(
+                        get: { AppState.shared.selectedTheme },
+                        set: { AppState.shared.selectedTheme = $0 }
+                    )) {
+                        ForEach(ColorTheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+            }
+
             Section("AI プロバイダー") {
                 LabeledContent("OpenAI API Key") {
                     SecureField("sk-...", text: $openAIKey)
