@@ -27,6 +27,8 @@ struct kobaamdApp: App {
                     .keyboardShortcut("t", modifiers: .command)
                 Button("New File") { AppCommand.newFile.post() }
                     .keyboardShortcut("n", modifiers: .command)
+                Button("New File from Template\u{2026}") { AppCommand.newFileFromTemplate.post() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Open Folder…") { AppCommand.openFolder.post() }
                     .keyboardShortcut("o", modifiers: .command)
                 if !recentFiles.isEmpty {
@@ -119,6 +121,7 @@ extension Notification.Name {
     static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
     static let quickOpenRequested              = AppCommand.quickOpen.notificationName
     static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
+    static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
 }
 

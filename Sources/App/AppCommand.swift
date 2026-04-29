@@ -19,6 +19,7 @@ enum AppCommand: String {
     case cancelAIGeneration     = "kobaamd.cancelAIGenerationRequested"
     case quickInsert            = "kobaamd.quickInsertRequested"
     case aiChat                 = "kobaamd.aiChatRequested"
+    case newFileFromTemplate    = "kobaamd.newFileFromTemplateRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 
