@@ -27,6 +27,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **AI chat sidebar / AI チャットサイドバー** — Multi-turn conversation with persistent context in a dedicated sidebar (⌘E) / 専用サイドバーで履歴を保ちながら AI とマルチターン会話（⌘E）
 - **File templates / ファイルテンプレート** — AI-oriented presets for README, diary, meeting notes, and tech specs (⌘N picker) / AI フレンドリーな骨格を即挿入（⌘N ピッカー）
 - **Color themes / カラーテーマ** — Built-in light, dark, solarized, and monokai themes for editor and preview / エディタ・プレビュー用ライト・ダーク・Solarized・Monokai テーマを内蔵
+- **Rendered Markdown diff viewer / レンダリング済み Markdown 差分ビューア** — View AI-generated diffs as formatted Markdown with green/red highlights, not raw syntax (⌘⇧D to toggle) / AI 生成差分をレンダリング済み Markdown で緑・赤ハイライト表示（⌘⇧D でトグル）
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
 - **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
@@ -89,9 +90,10 @@ kobaamd/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
 │   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView
 │   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView
+│   │   ├── Diff/                  # DiffView, rendered Markdown diff (WKWebView-based)
 │   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
 │   │   └── AI/                    # AI assist panel, AIChatView (multi-turn chat)
-│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel
+│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel, DiffViewModel
 │   ├── Services/               # FileService, MarkdownService, AIService, GitService
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/ (AI presets)
 ├── scripts/
@@ -122,7 +124,7 @@ kobaamd/
 
 ## Roadmap / ロードマップ
 
-- [ ] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
+- [x] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
 
 - [ ] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
 
