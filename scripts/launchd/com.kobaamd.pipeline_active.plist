@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.kobaamd.pipeline_active</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__KOBAAMD_DIR__/scripts/launchd/run_bundle.sh</string>
+    <string>kobaamd_pipeline_active</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>1800</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>__KOBAAMD_DIR__/.logs/pipeline_active.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>__KOBAAMD_DIR__/.logs/pipeline_active.stderr.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KOBAAMD_NOTIFY_LEVEL</key>
+    <string>all</string>
+  </dict>
+</dict>
+</plist>
