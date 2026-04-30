@@ -1,0 +1,23 @@
+#!/bin/bash
+# kobaamd pre-push hook
+# main ブランチへの直接 push を禁止して PR ワークフローを強制する
+
+REMOTE=$1
+CURRENT_BRANCH=$(git symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
+
+while read local_ref local_sha remote_ref remote_sha; do
+    # main への push を検出
+    if [[ "$remote_ref" == "refs/heads/main" ]]; then
+        echo "❌ main への直接 push は禁止されています。"
+        echo ""
+        echo "   feature ブランチを作成して PR を出してください："
+        echo ""
+        echo "   git checkout -b feature/your-feature"
+        echo "   git push -u origin feature/your-feature"
+        echo "   gh pr create"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0

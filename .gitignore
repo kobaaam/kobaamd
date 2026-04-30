@@ -29,6 +29,12 @@ CLAUDE.md
 test-*.md
 Untitled*.md
 
+# Pipeline logs / state cache
+.logs/
+
+# Distribution artifacts
+dist/
+
 # Editor configs
 .vscode/
 *.swp

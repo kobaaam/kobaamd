@@ -1,0 +1,57 @@
+#!/bin/bash
+# kobaamd pre-commit hook
+# Swift ファイルが変更された場合にビルド＋テストコンパイルを確認する
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Swift ファイルが変更対象に含まれるか確認
+SWIFT_CHANGED=$(git diff --cached --name-only | grep '\.swift$' || true)
+
+if [ -z "$SWIFT_CHANGED" ]; then
+    exit 0  # Swift 変更なし → スキップ
+fi
+
+echo "🔨 Swift ファイルが変更されています。ビルドを確認します..."
+echo "$SWIFT_CHANGED" | sed 's/^/  /'
+
+# メインビルド確認
+if ! swift build 2>&1 | tail -3; then
+    echo "❌ swift build 失敗。コミットを中止します。"
+    exit 1
+fi
+
+# テストコンパイル確認（実行はXcode必須のためコンパイルのみ）
+echo "🧪 テストのコンパイルを確認します..."
+if ! swift build --target kobaamdTests 2>&1 | tail -3; then
+    echo "❌ テストのコンパイル失敗。コミットを中止します。"
+    exit 1
+fi
+
+# シークレット検出（全ステージングファイル対象）
+echo "🔐 シークレット漏洩をチェックします..."
+SECRET_PATTERNS='(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{22,}|xoxb-[0-9]{10,}|xoxp-[0-9]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-ant-[a-zA-Z0-9-]{20,})'
+STAGED_DIFF=$(git diff --cached --diff-filter=ACMR)
+if echo "$STAGED_DIFF" | grep -qEi "$SECRET_PATTERNS"; then
+    echo "❌ シークレットらしき文字列を検出しました。コミットを中止します。"
+    echo "   検出箇所:"
+    echo "$STAGED_DIFF" | grep -nEi "$SECRET_PATTERNS" | head -5 | sed 's/^/   /'
+    echo ""
+    echo "   誤検出の場合は git commit --no-verify で回避できます（非推奨）"
+    exit 1
+fi
+
+# 禁止ファイルパターンの検出
+FORBIDDEN_FILES=$(git diff --cached --name-only | grep -Ei '\.(env|pem|key|p12|pfx|cer|keystore)$|credentials\.json|secrets\.json|auth\.json' || true)
+if [ -n "$FORBIDDEN_FILES" ]; then
+    echo "❌ シークレットファイルのコミットを検出しました:"
+    echo "$FORBIDDEN_FILES" | sed 's/^/   /'
+    echo ""
+    echo "   .gitignore に追加するか、git commit --no-verify で回避できます（非推奨）"
+    exit 1
+fi
+
+echo "✅ ビルド・テストコンパイル・シークレット検査 OK"
+exit 0
