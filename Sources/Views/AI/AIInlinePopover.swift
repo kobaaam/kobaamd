@@ -64,10 +64,8 @@ struct AIInlinePopover: View {
         )
         .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
         .onAppear {
-            // API キーチェック
-            let hasOpenAI = APIKeyStore.load(for: .openai).map { !$0.isEmpty } ?? false
-            let hasAnthropic = APIKeyStore.load(for: .anthropic).map { !$0.isEmpty } ?? false
-            if !hasOpenAI && !hasAnthropic {
+            // API キーチェックは ViewModel 経由で行う
+            if !appViewModel.hasAvailableAIProvider() {
                 errorMessage = "API キーが設定されていません（設定 ⌘, から登録）"
             }
             isPromptFocused = true
@@ -79,9 +77,7 @@ struct AIInlinePopover: View {
 
     private func submitPrompt() {
         guard !prompt.isEmpty else { return }
-        let hasOpenAI = APIKeyStore.load(for: .openai).map { !$0.isEmpty } ?? false
-        let hasAnthropic = APIKeyStore.load(for: .anthropic).map { !$0.isEmpty } ?? false
-        guard hasOpenAI || hasAnthropic else {
+        guard appViewModel.hasAvailableAIProvider() else {
             errorMessage = "API キーが設定されていません（設定 ⌘, から登録）"
             return
         }

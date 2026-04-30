@@ -367,6 +367,20 @@ final class AppViewModel {
 
     private static let aiPlaceholder = "<!-- kobaamd-ai-generating -->"
 
+    // MARK: - AI Provider Helpers
+
+    /// 利用可能なAIプロバイダーが存在するか確認する
+    func hasAvailableAIProvider() -> Bool {
+        return resolveAIProvider() != nil
+    }
+
+    /// 優先順位に従いプロバイダーを解決する（OpenAI優先）
+    func resolveAIProvider() -> APIKeyStore.Provider? {
+        if let k = APIKeyStore.load(for: .openai), !k.isEmpty { return .openai }
+        if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { return .anthropic }
+        return nil
+    }
+
     // MARK: - AI Inline Space Trigger
 
     /// スペースキーから呼ばれる: ポップオーバーを表示する
@@ -382,11 +396,8 @@ final class AppViewModel {
         guard !prompt.isEmpty else { return }
         isAIInlinePromptVisible = false
 
-        // プロバイダー選択（既存ロジックと同じ）
-        let provider: APIKeyStore.Provider
-        if let k = APIKeyStore.load(for: .openai), !k.isEmpty { provider = .openai }
-        else if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { provider = .anthropic }
-        else {
+        // プロバイダー選択
+        guard let provider = resolveAIProvider() else {
             pendingAIText = "API キーが設定されていません（設定 ⌘, から登録）"
             isAIPendingConfirmation = true
             return
@@ -399,6 +410,7 @@ final class AppViewModel {
         isAIGenerating = true
         pendingAIText = ""
 
+        aiTask?.cancel()
         aiTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.aiTask = nil }
