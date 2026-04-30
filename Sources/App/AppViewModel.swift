@@ -394,6 +394,13 @@ final class AppViewModel {
         isAIInlinePromptVisible = true
     }
 
+    /// ポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）
+    func dismissAIInlinePrompt() {
+        isAIInlinePromptVisible = false
+        pendingAIText = ""
+        isAIPendingConfirmation = false
+    }
+
     /// ポップオーバーからプロンプトが送信された: AI ストリーミング開始
     func startAIInlineFromSpace(prompt: String) {
         guard !prompt.isEmpty else { return }
@@ -412,7 +419,13 @@ final class AppViewModel {
         let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
         let endIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
         let textBefore = String(editorText[editorText.startIndex..<endIndex])
-        let context = String(textBefore.suffix(2000))
+        let contextSnippet = String(textBefore.suffix(2000))
+        let context = """
+        [Document context before cursor]:
+        \(contextSnippet)
+
+        [Instruction]: Continue writing from this point. Append new content naturally following the existing text. Do NOT summarize or rewrite existing content. Only generate the NEW text to be inserted at the cursor position.
+        """
 
         isAIGenerating = true
         pendingAIText = ""

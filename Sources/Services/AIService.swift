@@ -340,6 +340,9 @@ final class AIService: AIServiceProtocol {
     - Reply ONLY with Markdown text (no preamble, no explanation)
     - Preserve the original language of the user's text
     - Keep formatting clean and consistent
+    - Your primary role is to APPEND new content at the cursor position
+    - Do NOT summarize or rewrite existing document content
+    - Generate only the new text that should be inserted, continuing naturally from the context
     """
 }
 

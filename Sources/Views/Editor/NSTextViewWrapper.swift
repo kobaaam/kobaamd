@@ -159,12 +159,13 @@ private struct EditorObserver: NSViewRepresentable {
                     let lineContent = nsStr.substring(with: lineRange).trimmingCharacters(in: .newlines)
                     // 空行（ホワイトスペースのみも含む）の場合
                     if lineContent.trimmingCharacters(in: .whitespaces).isEmpty {
+                        // スペースは通常通り入力させ、入力後の位置を通知
                         NotificationCenter.default.post(
                             name: .aiInlineSpaceRequested,
                             object: nil,
-                            userInfo: ["cursorLocation": loc]
+                            userInfo: ["cursorLocation": loc + 1]
                         )
-                        return nil // スペース文字を挿入しない
+                        return event // スペース文字を入力する
                     }
                     return event
                 }

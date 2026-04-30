@@ -20,6 +20,13 @@ struct AIInlinePopover: View {
                     .onSubmit {
                         submitPrompt()
                     }
+                    .onKeyPress(.delete) {
+                        if prompt.isEmpty {
+                            appViewModel.dismissAIInlinePrompt()
+                            return .handled
+                        }
+                        return .ignored
+                    }
 
                 Button {
                     submitPrompt()
@@ -50,7 +57,7 @@ struct AIInlinePopover: View {
             }
 
             Rectangle().fill(Color.kobaLine).frame(height: 1)
-            Text("Enter: 送信  Esc: キャンセル")
+            Text("Enter: 送信  Esc/⌫: キャンセル")
                 .font(.caption2)
                 .foregroundStyle(Color.kobaMute2)
                 .padding(.horizontal, 14)
@@ -65,14 +72,13 @@ struct AIInlinePopover: View {
         )
         .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
         .onAppear {
-            // API キーチェックは ViewModel 経由で行う
             if !appViewModel.hasAvailableAIProvider() {
                 errorMessage = "API キーが設定されていません（設定 ⌘, から登録）"
             }
             isPromptFocused = true
         }
         .onExitCommand {
-            appViewModel.isAIInlinePromptVisible = false
+            appViewModel.dismissAIInlinePrompt()
         }
     }
 
