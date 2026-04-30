@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WebKit
 import UniformTypeIdentifiers
 
 struct DiffSheetView: View {
@@ -142,24 +143,64 @@ struct DiffSheetView: View {
 
             Rectangle().fill(Color.kobaLine).frame(height: 1)
 
-            // 下段: Diff結果
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if vm.lines.isEmpty && (!vm.textA.isEmpty || !vm.textB.isEmpty) {
-                        Text("差分なし")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(Color.kobaMute)
-                            .padding(16)
-                    } else {
-                        ForEach(vm.lines) { line in
-                            DiffLineView(line: line)
+            // Mode toggle: Raw / Rendered
+            HStack {
+                Spacer()
+                Picker("", selection: Binding(
+                    get: { vm.isRenderedMode },
+                    set: { newValue in
+                        if newValue != vm.isRenderedMode {
+                            vm.toggleRenderedMode()
                         }
                     }
+                )) {
+                    Text("Raw").tag(false)
+                    Text("Rendered").tag(true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .frame(width: 200)
+                .accessibilityLabel("差分表示モード切替")
+                Spacer()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.kobaPaper)
+            .padding(.vertical, 6)
+            .background(Color.kobaSurface)
+            .overlay(Rectangle().fill(Color.kobaLine).frame(height: 1), alignment: .bottom)
+
+            // 下段: Diff結果
+            if vm.isRenderedMode {
+                // Rendered モード: 左右サイドバイサイド WebView
+                HStack(spacing: 0) {
+                    RenderedDiffWebView(html: vm.renderedHTMLForA)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Rectangle().fill(Color.kobaLine).frame(width: 1)
+
+                    RenderedDiffWebView(html: vm.renderedHTMLForB)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.kobaPaper)
+            } else {
+                // Raw モード: 既存の差分行表示
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        if vm.lines.isEmpty && (!vm.textA.isEmpty || !vm.textB.isEmpty) {
+                            Text("差分なし")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(Color.kobaMute)
+                                .padding(16)
+                        } else {
+                            ForEach(vm.lines) { line in
+                                DiffLineView(line: line)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.kobaPaper)
+            }
         }
         .frame(minWidth: 700, minHeight: 520)
         .background(Color.kobaPaper)
@@ -310,5 +351,33 @@ private struct DiffLineView: View {
         case .header:  return Color.kobaMute
         case .context: return Color.kobaInk
         }
+    }
+}
+
+// MARK: - Rendered diff WebView (lightweight WKWebView wrapper)
+
+private struct RenderedDiffWebView: NSViewRepresentable {
+    let html: String
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        // セキュリティ: HTML コンテンツ表示のみ。JavaScript 実行を無効化
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
+        let wv = WKWebView(frame: .zero, configuration: config)
+        return wv
+    }
+
+    func updateNSView(_ wv: WKWebView, context: Context) {
+        let coord = context.coordinator
+        if coord.lastHTML != html && !html.isEmpty {
+            coord.lastHTML = html
+            wv.loadHTMLString(html, baseURL: nil)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    class Coordinator {
+        var lastHTML: String = ""
     }
 }
