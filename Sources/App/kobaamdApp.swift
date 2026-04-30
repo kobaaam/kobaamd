@@ -5,6 +5,7 @@ import Sparkle
 @main
 struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var appViewModel = AppViewModel()
     @State private var updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
@@ -86,6 +87,12 @@ struct kobaamdApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
+            CommandGroup(replacing: .help) {
+                Button("kobaamd ヘルプ") {
+                    openWindow(id: "help")
+                }
+                .keyboardShortcut("?", modifiers: .command)
+            }
         }
 
         // Settings window (⌘,)
@@ -93,6 +100,12 @@ struct kobaamdApp: App {
             SettingsView(updater: updaterController.updater)
                 .environment(appViewModel)
         }
+
+        // Help window
+        Window("kobaamd ヘルプ", id: "help") {
+            HelpWindowView()
+        }
+        .defaultSize(width: 640, height: 480)
     }
 }
 
