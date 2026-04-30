@@ -160,6 +160,7 @@ struct DiffSheetView: View {
                 .pickerStyle(.segmented)
                 .controlSize(.small)
                 .frame(width: 200)
+                .accessibilityLabel("差分表示モード切替")
                 Spacer()
             }
             .padding(.vertical, 6)
@@ -360,6 +361,8 @@ private struct RenderedDiffWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        // セキュリティ: HTML コンテンツ表示のみ。JavaScript 実行を無効化
+        config.defaultWebpagePreferences.allowsContentJavaScript = false
         let wv = WKWebView(frame: .zero, configuration: config)
         return wv
     }
