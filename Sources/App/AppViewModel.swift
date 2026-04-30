@@ -63,8 +63,10 @@ final class AppViewModel {
     private var aiTask: Task<Void, Never>? = nil
     /// AIService の注入ポイント（テスト時はモックを渡す）。
     private let aiService: AIServiceProtocol
+    #if DEBUG
     /// テスト用: nil でない場合は APIKeyStore の代わりに使用する
     var _testProvider: APIKeyStore.Provider? = nil
+    #endif
 
     init(aiService: AIServiceProtocol = AIService()) {
         self.aiService = aiService
@@ -378,7 +380,9 @@ final class AppViewModel {
 
     /// 優先順位に従いプロバイダーを解決する（OpenAI優先）
     func resolveAIProvider() -> APIKeyStore.Provider? {
+        #if DEBUG
         if let testProvider = _testProvider { return testProvider }
+        #endif
         if let k = APIKeyStore.load(for: .openai), !k.isEmpty { return .openai }
         if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { return .anthropic }
         return nil

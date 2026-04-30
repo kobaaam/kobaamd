@@ -57,10 +57,10 @@ author: claude-opus
 - [x] ポップオーバーでプロンプト入力 → Enter で AI にストリーミング送信
 - [x] AI 生成結果をプレビュー表示 → Enter で確定（editorText に挿入）/ Esc で破棄
 - [x] Esc キーでポップオーバーを閉じて通常入力モードに戻る
-- [ ] **backspace キーでポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）**
+- [x] **backspace キーでポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）**
 - [x] IME 変換中はスペースキートリガーを無視
 - [x] API キー未設定時はエラーメッセージ表示
-- [ ] **AI プロンプトは「追記ベース」で設計（全文要約ではなく、カーソル位置以降に続きを追記する指示をシステムプロンプトに含む）**
+- [x] **AI プロンプトは「追記ベース」で設計（全文要約ではなく、カーソル位置以降に続きを追記する指示をシステムプロンプトに含む）**
 
 ## 7. テスト戦略
 
@@ -73,16 +73,25 @@ author: claude-opus
 
 | ファイル / モジュール | 変更種別 | 備考 |
 |---|---|---|
-| `Sources/Views/Editor/NSTextViewWrapper.swift` | 変更 | backspace インターセプト追加 |
-| `Sources/App/AppViewModel.swift` | 変更 | dismissAIInlinePrompt 追加、AI プロンプト追記ベース化 |
-| `Sources/Views/AI/AIInlinePopover.swift` | 変更 | backspace 対応、ヒントテキスト更新 |
+| `Sources/Views/Editor/NSTextViewWrapper.swift` | 変更 | backspace インターセプト追加、スペースキーフック |
+| `Sources/App/AppViewModel.swift` | 変更 | AI インライン関連プロパティ・メソッド追加、dismissAIInlinePrompt 追加 |
+| `Sources/Views/AI/AIInlinePopover.swift` | 新規/変更 | backspace 対応、ヒントテキスト更新 |
+| `Sources/Views/AI/AIInlinePendingOverlay.swift` | 新規 | ストリーミング結果プレビューオーバーレイ |
+| `Sources/Views/Editor/EditorView.swift` | 変更 | overlay / onReceive 追加（共有コンテナ） |
+| `Sources/App/kobaamdApp.swift` | 変更 | Notification.Name 追加（共有コンテナ） |
+| `Sources/Services/AIService.swift` | 変更 | systemPrompt に追記ベース指示追加（**既存 `{{}}` フローにも適用**） |
+| `Tests/kobaamdTests/AppViewModelTests.swift` | 変更 | AI インライン関連ユニットテスト追加 |
 
 **共有コンテナへの注意**:
-- NSTextViewWrapper.swift: スクロール比率・ライン ハイライト・箇条書き自動継続に影響しないこと
-- AppViewModel.swift: 他の AI 機能（チャット・{{}} トリガー）に影響しないこと
+- `NSTextViewWrapper.swift`: スクロール比率・ラインハイライト・箇条書き自動継続に影響しないこと
+- `AppViewModel.swift`: 他の AI 機能（チャット・`{{}}` トリガー）に影響しないこと
+- `EditorView.swift`: 既存の Mermaid オーバーレイ・スプリットビューとの重複描画がないこと
+- `kobaamdApp.swift`: Notification.Name の追加は既存通知と名前衝突しないこと
+- `AIService.swift`: systemPrompt 変更は既存の `{{}}` + `Cmd+Return` フローにも適用される（意図的—追記ベース化は両フローで一貫した動作を提供するため）
 
 ### その他リスク
 - 既存コードへの影響: backspace インターセプトが通常入力時に誤発火しないよう `isAIInlinePromptVisible` ガードが必須
+- **AIService systemPrompt の副作用**: 追記ベース指示（"APPEND new content at the cursor position"）は全 AI フロー共通。既存の `{{}}` フローもテキスト追記挙動に変わる。ユーザーには一貫した追記体験として提供し、将来的に `{{}}` フローを非推奨化する前段として位置づける。
 
 ## 9. 計測・成果指標
 
