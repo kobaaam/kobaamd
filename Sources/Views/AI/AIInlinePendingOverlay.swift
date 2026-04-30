@@ -30,6 +30,15 @@ struct AIInlinePendingOverlay: View {
                     Text("AI 生成中...")
                         .font(.caption)
                         .foregroundStyle(Color.kobaMute)
+                    Spacer()
+                    Button {
+                        appViewModel.rejectPendingAIText()
+                    } label: {
+                        Label("キャンセル", systemImage: "xmark")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.escape, modifiers: [])
                 }
                 .padding(.top, 6)
                 .padding(.horizontal, 4)

@@ -172,12 +172,69 @@ struct AppViewModelTests {
         let mock = MockAIService()
         mock.tokensToEmit = ["こんにちは", "、", "世界"]
         let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+        vm.editorText = "Hello"
+        vm.aiInlineCursorLocation = 5
+
+        vm.startAIInlineFromSpace(prompt: "続きを書いて")
+
+        // ストリーミング完了を待機
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(vm.pendingAIText == "こんにちは、世界")
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("startAIInlineFromSpace でエラー発生時に pendingAIText にエラーメッセージが入ること")
+    func startAIInlineFromSpaceHandlesError() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["部分"]
+        mock.errorToThrow = AIError.invalidResponse
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
         vm.editorText = ""
         vm.aiInlineCursorLocation = 0
 
-        // APIキー未設定時はエラーになるため、テスト用にモック経由で直接呼ぶ
-        // resolveAIProvider() が nil を返す場合のエラーハンドリングを検証
-        vm.startAIInlineFromSpace(prompt: "")  // 空プロンプトはガードで即return
-        #expect(vm.isAIInlinePromptVisible == false)
+        vm.startAIInlineFromSpace(prompt: "テスト")
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(vm.pendingAIText.contains("AI エラー"))
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("rejectPendingAIText で生成中タスクがキャンセルされること")
+    func rejectPendingAITextCancelsGeneratingTask() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["Token1", "Token2"]
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+
+        vm.startAIInlineFromSpace(prompt: "テスト")
+        // 即座にキャンセル
+        vm.rejectPendingAIText()
+
+        try await Task.sleep(for: .milliseconds(200))
+
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIPendingConfirmation == false)
+        #expect(vm.isAIGenerating == false)
+    }
+
+    @Test("acceptPendingAIText で絵文字を含むテキストでも正しい位置に挿入されること")
+    func acceptPendingAITextWithEmojiText() {
+        let vm = AppViewModel()
+        // 🇯🇵 は Character では 1 だが UTF-16 では 4 code units
+        vm.editorText = "🇯🇵Hello"
+        // UTF-16 offset 8 は "🇯🇵Hell" の直後
+        vm.aiInlineCursorLocation = 8
+        vm.pendingAIText = "!"
+
+        vm.acceptPendingAIText()
+
+        // "🇯🇵Hell" + "!" + "o" = "🇯🇵Hell!o"
+        #expect(vm.editorText == "🇯🇵Hell!o")
     }
 }

@@ -63,6 +63,8 @@ final class AppViewModel {
     private var aiTask: Task<Void, Never>? = nil
     /// AIService の注入ポイント（テスト時はモックを渡す）。
     private let aiService: AIServiceProtocol
+    /// テスト用: nil でない場合は APIKeyStore の代わりに使用する
+    var _testProvider: APIKeyStore.Provider? = nil
 
     init(aiService: AIServiceProtocol = AIService()) {
         self.aiService = aiService
@@ -376,6 +378,7 @@ final class AppViewModel {
 
     /// 優先順位に従いプロバイダーを解決する（OpenAI優先）
     func resolveAIProvider() -> APIKeyStore.Provider? {
+        if let testProvider = _testProvider { return testProvider }
         if let k = APIKeyStore.load(for: .openai), !k.isEmpty { return .openai }
         if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { return .anthropic }
         return nil
@@ -403,8 +406,12 @@ final class AppViewModel {
             return
         }
 
-        // コンテキスト（カーソル位置より前の最大2000文字）
-        let textBefore = String(editorText.prefix(aiInlineCursorLocation))
+        // UTF-16 offset を正しい String.Index に変換してコンテキストを取得
+        let utf16 = editorText.utf16
+        let clampedOffset = min(aiInlineCursorLocation, utf16.count)
+        let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
+        let endIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
+        let textBefore = String(editorText[editorText.startIndex..<endIndex])
         let context = String(textBefore.suffix(2000))
 
         isAIGenerating = true
@@ -450,7 +457,11 @@ final class AppViewModel {
             dismissPendingAI()
             return
         }
-        let insertionIndex = editorText.index(editorText.startIndex, offsetBy: min(aiInlineCursorLocation, editorText.count))
+        // UTF-16 offset を正しい String.Index に変換する
+        let utf16 = editorText.utf16
+        let clampedOffset = min(aiInlineCursorLocation, utf16.count)
+        let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
+        let insertionIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
         editorText.insert(contentsOf: pendingAIText, at: insertionIndex)
         markEdited()
         dismissPendingAI()

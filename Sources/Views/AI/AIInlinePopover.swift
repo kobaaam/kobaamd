@@ -30,6 +30,7 @@ struct AIInlinePopover: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(prompt.isEmpty)
+                .accessibilityLabel("プロンプトを送信")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
