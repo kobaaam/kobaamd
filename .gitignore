@@ -29,6 +29,9 @@ CLAUDE.md
 test-*.md
 Untitled*.md
 
+# Snapshot test failure artifacts
+Tests/kobaamdTests/__Snapshots__/_failures/
+
 # Pipeline logs / state cache
 .logs/
 

@@ -1,0 +1,9 @@
+{
+  "description": "Maps snapshot names to PRD IDs for targeted compliance checking",
+  "mappings": {
+    "TemplatePickerView": ["KMD-20-file-template-system"],
+    "HelpContentView_gettingStarted": ["KMD-24"],
+    "HelpContentView_shortcuts": ["KMD-24"],
+    "FindReplaceBar": []
+  }
+}
