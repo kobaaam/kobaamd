@@ -143,12 +143,35 @@ private struct EditorObserver: NSViewRepresentable {
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self,
                       let tv = self.textViewRef,
-                      event.keyCode == 36, // Return
-                      tv.window?.firstResponder === tv,
-                      !tv.hasMarkedText() // IME 変換中は無視
+                      tv.window?.firstResponder === tv
                 else { return event }
 
                 let mods = event.modifierFlags.intersection([.shift, .option, .command, .control])
+
+                // Space キー → 空行で AI インラインポップオーバー起動
+                if event.keyCode == 49, // Space
+                   mods.isEmpty,        // 修飾キーなし
+                   !tv.hasMarkedText()  // IME変換中は無視
+                {
+                    let nsStr = tv.string as NSString
+                    let loc = min(tv.selectedRange().location, nsStr.length)
+                    let lineRange = nsStr.lineRange(for: NSRange(location: loc, length: 0))
+                    let lineContent = nsStr.substring(with: lineRange).trimmingCharacters(in: .newlines)
+                    // 空行（ホワイトスペースのみも含む）の場合
+                    if lineContent.trimmingCharacters(in: .whitespaces).isEmpty {
+                        NotificationCenter.default.post(
+                            name: .aiInlineSpaceRequested,
+                            object: nil,
+                            userInfo: ["cursorLocation": loc]
+                        )
+                        return nil // スペース文字を挿入しない
+                    }
+                    return event
+                }
+
+                guard event.keyCode == 36, // Return
+                      !tv.hasMarkedText()  // IME 変換中は無視
+                else { return event }
 
                 // ⌘Return → AI インライン補完（カーソル行を通知で送るだけ）
                 if mods == .command {
