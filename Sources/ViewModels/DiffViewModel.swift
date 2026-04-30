@@ -10,7 +10,14 @@ final class DiffViewModel {
     var fileNameB: String = ""
     var lines: [DiffLine] = []
 
+    // MARK: - Rendered diff mode
+
+    var isRenderedMode: Bool = false
+    var renderedHTMLForA: String = ""
+    var renderedHTMLForB: String = ""
+
     private var debounceTask: Task<Void, Never>?
+    private let markdownService = MarkdownService()
 
     struct DiffLine: Identifiable {
         let id = UUID()
@@ -31,7 +38,103 @@ final class DiffViewModel {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled, let self else { return }
             self.lines = await Self.computeDiff(a: self.textA, b: self.textB)
+            if self.isRenderedMode {
+                self.updateRenderedHTML()
+            }
         }
+    }
+
+    func toggleRenderedMode() {
+        isRenderedMode.toggle()
+        if isRenderedMode {
+            updateRenderedHTML()
+        }
+    }
+
+    private func updateRenderedHTML() {
+        let bodyA = markdownService.toBodyHTML(textA)
+        let bodyB = markdownService.toBodyHTML(textB)
+
+        let addedCount = lines.filter { $0.kind == .added }.count
+        let removedCount = lines.filter { $0.kind == .removed }.count
+
+        let labelA = fileNameA.isEmpty ? "A (Old)" : fileNameA
+        let labelB = fileNameB.isEmpty ? "B (New)" : fileNameB
+
+        let statsA = removedCount > 0 ? "<div class=\"diff-stats\">\(removedCount) line\(removedCount == 1 ? "" : "s") removed</div>" : ""
+        let statsB = addedCount > 0 ? "<div class=\"diff-stats\">\(addedCount) line\(addedCount == 1 ? "" : "s") added</div>" : ""
+
+        renderedHTMLForA = Self.buildRenderedHTML(
+            bodyHTML: bodyA,
+            bannerClass: "diff-banner-old",
+            sideLabel: "Old",
+            fileName: labelA,
+            statsHTML: statsA
+        )
+        renderedHTMLForB = Self.buildRenderedHTML(
+            bodyHTML: bodyB,
+            bannerClass: "diff-banner-new",
+            sideLabel: "New",
+            fileName: labelB,
+            statsHTML: statsB
+        )
+    }
+
+    private static func buildRenderedHTML(
+        bodyHTML: String,
+        bannerClass: String,
+        sideLabel: String,
+        fileName: String,
+        statsHTML: String
+    ) -> String {
+        let themeCSS = AppState.shared.selectedTheme.previewCSS
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <style>
+            \(themeCSS)
+            </style>
+            <style>
+            body { margin: 0; padding: 16px; }
+            .diff-banner {
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: 600;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                border-radius: 6px;
+                margin-bottom: 16px;
+            }
+            .diff-banner-old {
+                background: rgba(255,59,48,0.12);
+                color: #ff3b30;
+            }
+            .diff-banner-new {
+                background: rgba(52,199,89,0.12);
+                color: #34c759;
+            }
+            .diff-stats {
+                font-size: 12px;
+                color: #8e8e93;
+                margin-top: 4px;
+            }
+            </style>
+        </head>
+        <body>
+        <div class="diff-banner \(bannerClass)">\(sideLabel): \(Self.escapeHTML(fileName))\(statsHTML)</div>
+        \(bodyHTML)
+        </body>
+        </html>
+        """
+    }
+
+    private static func escapeHTML(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 
     private static func computeDiff(a: String, b: String) async -> [DiffLine] {
