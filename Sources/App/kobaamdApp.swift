@@ -126,6 +126,7 @@ extension Notification.Name {
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
+    static let aiInlineSpaceRequested = Notification.Name("kobaamd.aiInlineSpaceRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")

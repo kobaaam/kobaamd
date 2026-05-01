@@ -1,0 +1,103 @@
+---
+linear: KMD-25
+status: in-review
+created_at: 2026-04-30
+author: claude-opus
+---
+
+# AI Inline Space Trigger (Notion風スペースキー起動)
+
+## 1. 背景・目的
+
+空行でスペースキーを押すと AI インラインプロンプトがポップアップし、指示に基づいてカーソル位置にテキストを追記する機能。Notion の `/` コマンドに近い UX を提供する。
+
+## 2. ターゲットユーザーとユースケース
+
+- Markdown を書いているユーザーが、文脈に沿った続きの文章を AI に生成させたい場合
+- 箇条書きや段落の途中で AI に追記を依頼したい場合
+
+## 3. 機能要件
+
+- 必須要件:
+  - 空行でスペースキーを押すと AI インラインプロンプトポップオーバーが表示される
+  - プロンプト送信後、AI がカーソル位置以降にテキストを追記する（全文要約ではなく追記ベース）
+  - Esc キーでポップオーバーを閉じて通常入力モードに戻る
+  - **backspace キー（delete キー）でポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）**
+  - AI 生成結果は確定（Enter）/ 破棄（Esc）で操作可能
+- オプション要件:
+  - プロンプト履歴の保持
+
+## 4. 非機能要件
+
+- パフォーマンス: ストリーミングで 33ms バッファリング（30fps 相当）
+- アクセシビリティ: ポップオーバーに VoiceOver ラベル
+- macOS との整合性: NSEvent ローカルモニタで keyDown をインターセプト
+
+## 5. UI/UX
+
+```
+空行でスペース → ポップオーバー表示
+  ┌─────────────────────────────────────┐
+  │ [sparkle] AI に指示... [send]       │
+  ├─────────────────────────────────────┤
+  │ Enter: 送信  Esc/⌫: キャンセル     │
+  └─────────────────────────────────────┘
+
+送信後 → 生成結果オーバーレイ
+  ┌─────────────────────────────────────┐
+  │ │ 生成されたテキスト...             │
+  ├─────────────────────────────────────┤
+  │ [確定]  [破棄]                      │
+  └─────────────────────────────────────┘
+```
+
+## 6. 受け入れ条件 (Acceptance Criteria)
+
+- [x] 空行でスペースキー押下 → AI インラインポップオーバー表示
+- [x] ポップオーバーでプロンプト入力 → Enter で AI にストリーミング送信
+- [x] AI 生成結果をプレビュー表示 → Enter で確定（editorText に挿入）/ Esc で破棄
+- [x] Esc キーでポップオーバーを閉じて通常入力モードに戻る
+- [x] **backspace キーでポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）**
+- [x] IME 変換中はスペースキートリガーを無視
+- [x] API キー未設定時はエラーメッセージ表示
+- [x] **AI プロンプトは「追記ベース」で設計（全文要約ではなく、カーソル位置以降に続きを追記する指示をシステムプロンプトに含む）**
+
+## 7. テスト戦略
+
+- 単体テスト: AppViewModel の showAIInlinePrompt / dismissAIInlinePrompt / startAIInlineFromSpace
+- 手動確認: 空行スペース → ポップオーバー → Esc/backspace で閉じる → スペース残存確認
+
+## 8. 想定リスク・依存
+
+### 影響範囲マップ
+
+| ファイル / モジュール | 変更種別 | 備考 |
+|---|---|---|
+| `Sources/Views/Editor/NSTextViewWrapper.swift` | 変更 | backspace インターセプト追加、スペースキーフック |
+| `Sources/App/AppViewModel.swift` | 変更 | AI インライン関連プロパティ・メソッド追加、dismissAIInlinePrompt 追加 |
+| `Sources/Views/AI/AIInlinePopover.swift` | 新規/変更 | backspace 対応、ヒントテキスト更新 |
+| `Sources/Views/AI/AIInlinePendingOverlay.swift` | 新規 | ストリーミング結果プレビューオーバーレイ |
+| `Sources/Views/Editor/EditorView.swift` | 変更 | overlay / onReceive 追加（共有コンテナ） |
+| `Sources/App/kobaamdApp.swift` | 変更 | Notification.Name 追加（共有コンテナ） |
+| `Sources/Services/AIService.swift` | 変更 | systemPrompt に追記ベース指示追加（**既存 `{{}}` フローにも適用**） |
+| `Tests/kobaamdTests/AppViewModelTests.swift` | 変更 | AI インライン関連ユニットテスト追加 |
+
+**共有コンテナへの注意**:
+- `NSTextViewWrapper.swift`: スクロール比率・ラインハイライト・箇条書き自動継続に影響しないこと
+- `AppViewModel.swift`: 他の AI 機能（チャット・`{{}}` トリガー）に影響しないこと
+- `EditorView.swift`: 既存の Mermaid オーバーレイ・スプリットビューとの重複描画がないこと
+- `kobaamdApp.swift`: Notification.Name の追加は既存通知と名前衝突しないこと
+- `AIService.swift`: systemPrompt 変更は既存の `{{}}` + `Cmd+Return` フローにも適用される（意図的—追記ベース化は両フローで一貫した動作を提供するため）
+
+### その他リスク
+- 既存コードへの影響: backspace インターセプトが通常入力時に誤発火しないよう `isAIInlinePromptVisible` ガードが必須
+- **AIService systemPrompt の副作用**: 追記ベース指示（"APPEND new content at the cursor position"）は全 AI フロー共通。既存の `{{}}` フローもテキスト追記挙動に変わる。ユーザーには一貫した追記体験として提供し、将来的に `{{}}` フローを非推奨化する前段として位置づける。
+
+## 9. 計測・成果指標
+
+- AI インラインプロンプトの利用頻度（将来的にテレメトリ追加時）
+
+## 10. 参考資料
+
+- Notion の `/` コマンド UX
+- 既存 `{{prompt}}` + `⌘Return` トリガーとの共存

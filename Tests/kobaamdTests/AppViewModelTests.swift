@@ -113,4 +113,128 @@ struct AppViewModelTests {
         await vm.openDroppedFile(url: dirURL)
         #expect(vm.fileTreeViewModel.folders.contains(where: { $0.url == dirURL }))
     }
+
+    // MARK: - AI Inline Space Trigger Tests
+
+    @Test("showAIInlinePrompt で isAIInlinePromptVisible が true になること")
+    func showAIInlinePromptSetsVisible() {
+        let vm = AppViewModel()
+        vm.showAIInlinePrompt(cursorLocation: 5)
+        #expect(vm.isAIInlinePromptVisible == true)
+        #expect(vm.aiInlineCursorLocation == 5)
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIPendingConfirmation == false)
+    }
+
+    @Test("rejectPendingAIText で状態がリセットされること")
+    func rejectPendingAITextResetsState() {
+        let vm = AppViewModel()
+        // 事前に状態をセット
+        vm.pendingAIText = "生成済みテキスト"
+        vm.isAIPendingConfirmation = true
+        vm.isAIGenerating = false
+
+        vm.rejectPendingAIText()
+
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIPendingConfirmation == false)
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIInlinePromptVisible == false)
+    }
+
+    @Test("acceptPendingAIText で pendingAIText が editorText の正しい位置に挿入されること")
+    func acceptPendingAITextInsertsAtCursorLocation() {
+        let vm = AppViewModel()
+        vm.editorText = "Hello World"
+        vm.aiInlineCursorLocation = 5  // "Hello" の直後
+        vm.pendingAIText = " Beautiful"
+
+        vm.acceptPendingAIText()
+
+        #expect(vm.editorText == "Hello Beautiful World")
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIPendingConfirmation == false)
+    }
+
+    @Test("acceptPendingAIText で pendingAIText が空のとき何も挿入しないこと")
+    func acceptPendingAITextWithEmptyPendingDoesNothing() {
+        let vm = AppViewModel()
+        vm.editorText = "Hello"
+        vm.pendingAIText = ""
+
+        vm.acceptPendingAIText()
+
+        #expect(vm.editorText == "Hello")
+    }
+
+    @Test("startAIInlineFromSpace でストリーミング完了後に pendingAIText にトークンが蓄積されること")
+    func startAIInlineFromSpaceAccumulatesPendingText() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["こんにちは", "、", "世界"]
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+        vm.editorText = "Hello"
+        vm.aiInlineCursorLocation = 5
+
+        vm.startAIInlineFromSpace(prompt: "続きを書いて")
+
+        // ストリーミング完了を待機
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(vm.pendingAIText == "こんにちは、世界")
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("startAIInlineFromSpace でエラー発生時に pendingAIText にエラーメッセージが入ること")
+    func startAIInlineFromSpaceHandlesError() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["部分"]
+        mock.errorToThrow = AIError.invalidResponse
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+        vm.editorText = ""
+        vm.aiInlineCursorLocation = 0
+
+        vm.startAIInlineFromSpace(prompt: "テスト")
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(vm.pendingAIText.contains("AI エラー"))
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("rejectPendingAIText で生成中タスクがキャンセルされること")
+    func rejectPendingAITextCancelsGeneratingTask() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["Token1", "Token2"]
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+
+        vm.startAIInlineFromSpace(prompt: "テスト")
+        // 即座にキャンセル
+        vm.rejectPendingAIText()
+
+        try await Task.sleep(for: .milliseconds(200))
+
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIPendingConfirmation == false)
+        #expect(vm.isAIGenerating == false)
+    }
+
+    @Test("acceptPendingAIText で絵文字を含むテキストでも正しい位置に挿入されること")
+    func acceptPendingAITextWithEmojiText() {
+        let vm = AppViewModel()
+        // 🇯🇵 は Character では 1 だが UTF-16 では 4 code units
+        vm.editorText = "🇯🇵Hello"
+        // UTF-16 offset 8 は "🇯🇵Hell" の直後
+        vm.aiInlineCursorLocation = 8
+        vm.pendingAIText = "!"
+
+        vm.acceptPendingAIText()
+
+        // "🇯🇵Hell" + "!" + "o" = "🇯🇵Hell!o"
+        #expect(vm.editorText == "🇯🇵Hell!o")
+    }
 }

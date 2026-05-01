@@ -71,6 +71,20 @@ struct EditorView: View {
                 .padding(.top, 40)
             }
         }
+        .overlay {
+            if appViewModel.isAIInlinePromptVisible {
+                AIInlinePopover()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.top, 60)
+            }
+        }
+        .overlay {
+            if !appViewModel.pendingAIText.isEmpty || appViewModel.isAIGenerating {
+                AIInlinePendingOverlay()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.top, 60)
+            }
+        }
         .onChange(of: scrollRatio) { _, r in
             appViewModel.previewScrollRatio = r
         }
@@ -97,6 +111,10 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for: .aiInlineRequested)) { note in
             guard let lineContent = note.userInfo?["lineContent"] as? String else { return }
             appViewModel.startAIInlineCompletion(lineContent: lineContent)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiInlineSpaceRequested)) { note in
+            guard let loc = note.userInfo?["cursorLocation"] as? Int else { return }
+            appViewModel.showAIInlinePrompt(cursorLocation: loc)
         }
     }
 

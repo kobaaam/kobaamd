@@ -35,6 +35,14 @@ final class AppViewModel {
     var showFormatToast: Bool = false
     /// AI インライン補完のストリーミング中を示すフラグ。ステータスバー表示に使用。
     var isAIGenerating: Bool = false
+    /// スペース起動の AI インラインプロンプトが表示中かどうか
+    var isAIInlinePromptVisible: Bool = false
+    /// AI 生成結果の未確定テキスト
+    var pendingAIText: String = ""
+    /// AI 生成が完了して確定待ちの状態
+    var isAIPendingConfirmation: Bool = false
+    /// スペース起動時のカーソル位置（editorText 上のインデックス）
+    var aiInlineCursorLocation: Int = 0
 
     // MARK: - Quick Insert
     let snippetStore = SnippetStore()
@@ -55,6 +63,10 @@ final class AppViewModel {
     private var aiTask: Task<Void, Never>? = nil
     /// AIService の注入ポイント（テスト時はモックを渡す）。
     private let aiService: AIServiceProtocol
+    #if DEBUG
+    /// テスト用: nil でない場合は APIKeyStore の代わりに使用する
+    var _testProvider: APIKeyStore.Provider? = nil
+    #endif
 
     init(aiService: AIServiceProtocol = AIService()) {
         self.aiService = aiService
@@ -358,6 +370,132 @@ final class AppViewModel {
     // MARK: - AI Inline Completion
 
     private static let aiPlaceholder = "<!-- kobaamd-ai-generating -->"
+
+    // MARK: - AI Provider Helpers
+
+    /// 利用可能なAIプロバイダーが存在するか確認する
+    func hasAvailableAIProvider() -> Bool {
+        return resolveAIProvider() != nil
+    }
+
+    /// 優先順位に従いプロバイダーを解決する（OpenAI優先）
+    func resolveAIProvider() -> APIKeyStore.Provider? {
+        #if DEBUG
+        if let testProvider = _testProvider { return testProvider }
+        #endif
+        if let k = APIKeyStore.load(for: .openai), !k.isEmpty { return .openai }
+        if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { return .anthropic }
+        return nil
+    }
+
+    // MARK: - AI Inline Space Trigger
+
+    /// スペースキーから呼ばれる: ポップオーバーを表示する
+    func showAIInlinePrompt(cursorLocation: Int) {
+        aiInlineCursorLocation = cursorLocation
+        pendingAIText = ""
+        isAIPendingConfirmation = false
+        isAIInlinePromptVisible = true
+    }
+
+    /// ポップオーバーを閉じて通常入力モードに戻る（スペースは入力された状態を維持）
+    func dismissAIInlinePrompt() {
+        isAIInlinePromptVisible = false
+        pendingAIText = ""
+        isAIPendingConfirmation = false
+    }
+
+    /// ポップオーバーからプロンプトが送信された: AI ストリーミング開始
+    func startAIInlineFromSpace(prompt: String) {
+        guard !prompt.isEmpty else { return }
+        isAIInlinePromptVisible = false
+
+        // プロバイダー選択
+        guard let provider = resolveAIProvider() else {
+            pendingAIText = "API キーが設定されていません（設定 ⌘, から登録）"
+            isAIPendingConfirmation = true
+            return
+        }
+
+        // UTF-16 offset を正しい String.Index に変換してコンテキストを取得
+        let utf16 = editorText.utf16
+        let clampedOffset = min(aiInlineCursorLocation, utf16.count)
+        let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
+        let endIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
+        let textBefore = String(editorText[editorText.startIndex..<endIndex])
+        let contextSnippet = String(textBefore.suffix(2000))
+        let context = """
+        [Document context before cursor]:
+        \(contextSnippet)
+
+        [Instruction]: Continue writing from this point. Append new content naturally following the existing text. Do NOT summarize or rewrite existing content. Only generate the NEW text to be inserted at the cursor position.
+        """
+
+        isAIGenerating = true
+        pendingAIText = ""
+
+        aiTask?.cancel()
+        aiTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.aiTask = nil }
+            do {
+                var buffer = ""
+                var lastFlush = ContinuousClock.now
+                let stream = self.aiService.stream(prompt: prompt, context: context, provider: provider)
+                for try await token in stream {
+                    if Task.isCancelled { throw CancellationError() }
+                    buffer += token
+                    let now = ContinuousClock.now
+                    if now - lastFlush >= .milliseconds(33) {
+                        self.pendingAIText += buffer
+                        buffer = ""
+                        lastFlush = now
+                    }
+                }
+                if !buffer.isEmpty {
+                    self.pendingAIText += buffer
+                }
+                self.isAIGenerating = false
+                self.isAIPendingConfirmation = true
+            } catch is CancellationError {
+                self.isAIGenerating = false
+                self.isAIPendingConfirmation = !self.pendingAIText.isEmpty
+            } catch {
+                self.pendingAIText = "> **AI エラー:** \(error.localizedDescription)"
+                self.isAIGenerating = false
+                self.isAIPendingConfirmation = true
+            }
+        }
+    }
+
+    /// 未確定テキストを確定: editorText に挿入
+    func acceptPendingAIText() {
+        guard !pendingAIText.isEmpty else {
+            dismissPendingAI()
+            return
+        }
+        // UTF-16 offset を正しい String.Index に変換する
+        let utf16 = editorText.utf16
+        let clampedOffset = min(aiInlineCursorLocation, utf16.count)
+        let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
+        let insertionIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
+        editorText.insert(contentsOf: pendingAIText, at: insertionIndex)
+        markEdited()
+        dismissPendingAI()
+    }
+
+    /// 未確定テキストを破棄
+    func rejectPendingAIText() {
+        cancelAIGeneration()
+        dismissPendingAI()
+    }
+
+    private func dismissPendingAI() {
+        pendingAIText = ""
+        isAIPendingConfirmation = false
+        isAIGenerating = false
+        isAIInlinePromptVisible = false
+    }
 
     /// `{{プロンプト}}` を含む行をプレースホルダーに差し替えて AI を呼び出す。
     /// すべて @MainActor の editorText 操作で完結するため textView への直接アクセス不要。
