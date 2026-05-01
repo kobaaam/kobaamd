@@ -26,7 +26,10 @@
 	<string>NSApplication</string>
 
 	<!-- Sparkle 自動アップデート設定 -->
-	<!-- SUPublicEDKey は実キー確定後に追加する -->
+	<!-- SUPublicEDKey はソース管理上は空のままにし、ビルド時に scripts/post-build.sh が
+	     環境変数 KOBAAMD_SU_PUBLIC_ED_KEY から .app/Contents/Info.plist に注入する。
+	     秘密鍵は Sparkle の generate_keys が macOS Keychain に保存する。
+	     詳細: docs/wiki/articles/practices/sparkle-release.md -->
 	<key>SUPublicEDKey</key>
 	<string></string>
 	<key>SUFeedURL</key>

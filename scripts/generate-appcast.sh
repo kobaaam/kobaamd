@@ -27,7 +27,20 @@ if [[ -z "$VERSION" || -z "$DMG_URL" || -z "$SIGNATURE" || -z "$LENGTH" ]]; then
     exit 1
 fi
 
+# 署名のサニティチェック（空白だけ・プレースホルダーを弾く）
+TRIMMED_SIGNATURE="$(echo -n "$SIGNATURE" | tr -d '[:space:]')"
+if [[ -z "$TRIMMED_SIGNATURE" || "$TRIMMED_SIGNATURE" == "PLACEHOLDER" || "$TRIMMED_SIGNATURE" == "TODO" ]]; then
+  echo "Error: <eddsa_signature> is empty or a placeholder. Refusing to generate appcast.xml without a valid Sparkle signature." >&2
+  echo "Hint: run \`./bin/sign_update <path-to-dmg>\` (Sparkle xcframework) to obtain the signature." >&2
+  exit 1
+fi
+
 PUBDATE=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
+# XML 特殊文字エスケープ（& < > をそれぞれ &amp; &lt; &gt; に置換）
+# SIGNATURE・DMG_URL に不正文字が含まれても XML が壊れないようにする
+xml_escape() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+SIGNATURE_ESCAPED=$(xml_escape "$SIGNATURE")
+DMG_URL_ESCAPED=$(xml_escape "$DMG_URL")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT="${SCRIPT_DIR}/../appcast.xml"
 
@@ -46,8 +59,8 @@ cat > "$OUTPUT" << XMLEOF
             <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
             <sparkle:releaseNotesLink>https://github.com/kobaaam/kobaamd/releases/tag/v${VERSION}</sparkle:releaseNotesLink>
             <enclosure
-                url="${DMG_URL}"
-                sparkle:edSignature="${SIGNATURE}"
+                url="${DMG_URL_ESCAPED}"
+                sparkle:edSignature="${SIGNATURE_ESCAPED}"
                 length="${LENGTH}"
                 type="application/octet-stream"/>
         </item>
