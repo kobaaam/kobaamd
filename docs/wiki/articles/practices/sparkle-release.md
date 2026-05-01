@@ -28,10 +28,17 @@ Sparkle の鍵ペアは `generate_keys` で生成する。秘密鍵は標準で 
 例:
 
 ```bash
-./.build/checkouts/Sparkle/bin/generate_keys
+# Sparkle ツールは Swift Package Manager のビルドキャッシュ配下に展開される。
+# パスはバージョン・ビルド環境によって異なるため find で特定する。
+GENERATE_KEYS=$(find .build -name "generate_keys" -type f | head -1)
+if [ -z "$GENERATE_KEYS" ]; then
+  echo "generate_keys が見つかりません。swift package resolve を実行してください"
+  exit 1
+fi
+"$GENERATE_KEYS"
 ```
 
-このパスにバイナリがない場合は、Sparkle の配布物に含まれる `bin/generate_keys` を使う。実行後に表示された公開鍵を控え、シェル設定に登録する。
+実行後に表示された公開鍵を控え、シェル設定に登録する。なお `.build/checkouts/Sparkle/bin/` のようなパスは Sparkle のビルド方式・バージョンによって変わるため、`find .build -name generate_keys -type f` で都度特定するか、上記コマンドを使うこと。
 
 ```bash
 export KOBAAMD_SU_PUBLIC_ED_KEY="YOUR_PUBLIC_KEY"
@@ -44,11 +51,13 @@ export KOBAAMD_SU_PUBLIC_ED_KEY="YOUR_PUBLIC_KEY"
 1. `swift build -c release`
 2. `./scripts/post-build.sh release`
 3. DMG を作成する
-4. `./.build/checkouts/Sparkle/bin/sign_update <dmg>` で署名を取得する
+4. `$(find .build -name sign_update -type f | head -1) <dmg>` で署名を取得する
 5. `./scripts/generate-appcast.sh <version> <dmg_url> <signature> <length>` で `appcast.xml` を生成する
 6. GitHub Releases に成果物をアップロードし、`appcast.xml` を `main` にコミットする
 
 手順 2 では `KOBAAMD_SU_PUBLIC_ED_KEY` が未設定だと `exit 1` で停止する。これは `SUPublicEDKey` なしのリリースを防ぐための安全装置である。手順 3 の DMG 作成は別ドキュメントの手順に従う。
+
+**注意**: デバッグビルドでは公開鍵が注入されないため自動アップデートは動かない（リリースビルド `./scripts/post-build.sh release` でのみ有効）。
 
 ### Keychain エクスポート
 
@@ -60,7 +69,7 @@ export KOBAAMD_SU_PUBLIC_ED_KEY="YOUR_PUBLIC_KEY"
 - 環境変数 `KOBAAMD_SU_PUBLIC_ED_KEY` を設定してから、`./scripts/post-build.sh release` を再実行する。
 
 `Refusing to generate appcast.xml without a valid Sparkle signature`
-- `generate-appcast.sh` に渡した署名引数が空文字、空白のみ、`PLACEHOLDER`、`TODO` になっていないか確認する。`./.build/checkouts/Sparkle/bin/sign_update <dmg>` を再実行して取得し直す。
+- `generate-appcast.sh` に渡した署名引数が空文字、空白のみ、`PLACEHOLDER`、`TODO` になっていないか確認する。`$(find .build -name sign_update -type f | head -1) <dmg>` を再実行して取得し直す。
 
 Sparkle が「アップデートのインストールに失敗しました」を表示する
 - `.app/Contents/Info.plist` に注入された `SUPublicEDKey` が誤っている可能性がある。設定値と `generate_keys` の出力を照合する。

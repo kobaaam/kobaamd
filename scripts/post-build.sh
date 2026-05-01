@@ -39,8 +39,26 @@ echo "[post-build] Info.plist updated → $PLIST"
 # - release ビルド: 未設定ならエラー終了（安全装置）
 PUBLIC_ED_KEY="${KOBAAMD_SU_PUBLIC_ED_KEY:-}"
 if [ -n "$PUBLIC_ED_KEY" ]; then
-  /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $PUBLIC_ED_KEY" "$PLIST"
-  echo "[post-build] SUPublicEDKey injected from KOBAAMD_SU_PUBLIC_ED_KEY (${#PUBLIC_ED_KEY} chars)"
+  # Base64 形式バリデーション: Ed25519 公開鍵は 32 バイト → Base64 で 44 文字 (末尾 = 1 個)
+  # 空白・PLACEHOLDER・短すぎる文字列・不正文字を拒否して PlistBuddy 引数注入を防ぐ
+  if [[ ! "$PUBLIC_ED_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+    echo "[post-build] ERROR: KOBAAMD_SU_PUBLIC_ED_KEY does not match Ed25519 Base64 format (43 base64 chars + '=')."
+    echo "[post-build]        Received ${#PUBLIC_ED_KEY} chars: '${PUBLIC_ED_KEY:0:20}...'"
+    echo "[post-build]        Refusing to inject invalid key. Re-run generate_keys to obtain the correct public key."
+    exit 1
+  fi
+  # Info.plist コピー → 公開鍵注入 → codesign の順序を維持すること。
+  # この順序を変えると codesign の署名対象から SUPublicEDKey が落ちる（KMD-26 Hardened Runtime 導入時も要注意）
+  /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey \"$PUBLIC_ED_KEY\"" "$PLIST"
+  # 書き込み後の読み戻し検証 — 値が一致しなければ abort
+  WRITTEN_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$PLIST" 2>/dev/null || echo "")
+  if [ "$WRITTEN_KEY" != "$PUBLIC_ED_KEY" ]; then
+    echo "[post-build] ERROR: SUPublicEDKey write verification failed."
+    echo "[post-build]        Expected: '$PUBLIC_ED_KEY'"
+    echo "[post-build]        Got:      '$WRITTEN_KEY'"
+    exit 1
+  fi
+  echo "[post-build] SUPublicEDKey injected and verified from KOBAAMD_SU_PUBLIC_ED_KEY (${#PUBLIC_ED_KEY} chars)"
 else
   if [ "$CONFIG" = "release" ]; then
     echo "[post-build] ERROR: KOBAAMD_SU_PUBLIC_ED_KEY is not set for release build."
