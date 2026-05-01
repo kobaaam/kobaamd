@@ -27,6 +27,14 @@ if [[ -z "$VERSION" || -z "$DMG_URL" || -z "$SIGNATURE" || -z "$LENGTH" ]]; then
     exit 1
 fi
 
+# 署名のサニティチェック（空白だけ・プレースホルダーを弾く）
+TRIMMED_SIGNATURE="$(echo -n "$SIGNATURE" | tr -d '[:space:]')"
+if [[ -z "$TRIMMED_SIGNATURE" || "$TRIMMED_SIGNATURE" == "PLACEHOLDER" || "$TRIMMED_SIGNATURE" == "TODO" ]]; then
+  echo "Error: <eddsa_signature> is empty or a placeholder. Refusing to generate appcast.xml without a valid Sparkle signature." >&2
+  echo "Hint: run \`./bin/sign_update <path-to-dmg>\` (Sparkle xcframework) to obtain the signature." >&2
+  exit 1
+fi
+
 PUBDATE=$(date -u "+%a, %d %b %Y %H:%M:%S +0000")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT="${SCRIPT_DIR}/../appcast.xml"

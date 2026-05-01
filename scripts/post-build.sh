@@ -33,6 +33,25 @@ fi
 cp Info.plist "$PLIST"
 echo "[post-build] Info.plist updated → $PLIST"
 
+# Sparkle EdDSA 公開鍵を環境変数から注入
+# 秘密鍵は Keychain（Sparkle generate_keys が登録）。リポジトリには公開鍵すら直書きしない。
+# - debug ビルド: 未設定なら警告のみ（開発を妨げない）
+# - release ビルド: 未設定ならエラー終了（安全装置）
+PUBLIC_ED_KEY="${KOBAAMD_SU_PUBLIC_ED_KEY:-}"
+if [ -n "$PUBLIC_ED_KEY" ]; then
+  /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $PUBLIC_ED_KEY" "$PLIST"
+  echo "[post-build] SUPublicEDKey injected from KOBAAMD_SU_PUBLIC_ED_KEY (${#PUBLIC_ED_KEY} chars)"
+else
+  if [ "$CONFIG" = "release" ]; then
+    echo "[post-build] ERROR: KOBAAMD_SU_PUBLIC_ED_KEY is not set for release build."
+    echo "[post-build]        Sparkle update signature verification will be DISABLED — refusing to ship."
+    echo "[post-build]        See docs/wiki/articles/practices/sparkle-release.md for setup."
+    exit 1
+  else
+    echo "[post-build] warning: KOBAAMD_SU_PUBLIC_ED_KEY not set; SUPublicEDKey left empty (debug build OK, but releases require it)"
+  fi
+fi
+
 # Launch Services に再登録して .md のデフォルトアプリとして認識させる
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$APP" 2>/dev/null && echo "[post-build] Launch Services registered"

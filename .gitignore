@@ -39,3 +39,8 @@ dist/
 .vscode/
 *.swp
 *~
+
+# Sparkle EdDSA 秘密鍵 (Keychain 保管が原則だが、誤って書き出した場合の防御)
+eddsa_priv*
+*_priv_key*
+*.pem

@@ -28,3 +28,4 @@ kobaamd の設計思考・技術知見の知識ベース。
 - [PRD 品質基準と改善サイクル](articles/practices/prd-quality-cycle.md) — 10セクション PRD の品質バー、レビュー↔修正ループ、学んだ教訓
 - [ポストモーテムから学ぶ実装パターン](articles/practices/postmortem-patterns.md) — KMD-4/6/20/22 の振り返りから抽出した再発防止パターン
 - [セキュリティ・ハードニング](articles/practices/security-hardening.md) — AI パイプライン固有リスクへの多層防御（pre-commit + review_security + 将来 CI）
+- [Sparkle 署名付きリリース手順](articles/practices/sparkle-release.md) — EdDSA 鍵ペア生成、公開鍵の環境変数注入、DMG 署名と appcast 生成までのリリースフロー
