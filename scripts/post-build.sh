@@ -108,8 +108,9 @@ else
   echo "[post-build] LC_RPATH already present; skipping"
 fi
 
-codesign --force --deep --sign - "$APP"
-echo "[post-build] codesign applied (ad-hoc) → $APP"
+codesign --force --deep --sign - --options runtime "$APP"
+echo "[post-build] codesign applied (Hardened Runtime, ad-hoc) → $APP"
+codesign --display --verbose=4 "$APP" 2>&1 | grep -E '^(Identifier|Format|Signature|TeamIdentifier|flags|CodeDirectory)' | sed 's/^/[post-build]   /'
 
 # Touch the app so Dock / Finder picks up the new icon
 touch "$APP"
