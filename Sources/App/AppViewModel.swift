@@ -92,12 +92,14 @@ final class AppViewModel {
         let tab = EditorTab(url: url, content: content)
         tabs.append(tab)
         activate(tab: tab)
+        todoViewModel.updateFolderRoot(url.deletingLastPathComponent())
     }
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
     func refreshQuickOpenIndex() {
         quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
         quickOpenViewModel.filter()
+        todoViewModel.updateWorkspaceRoots(fileTreeViewModel.folders.map(\.url))
     }
 
     @MainActor
@@ -171,6 +173,7 @@ final class AppViewModel {
             isDirty = false
             savedText = ""
             outlineViewModel.update(text: "")
+            todoViewModel.updateFolderRoot(nil)
             return
         }
         activeTabID = tab.id
@@ -179,6 +182,11 @@ final class AppViewModel {
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
         outlineViewModel.update(text: tab.content)
+        if let url = tab.url {
+            todoViewModel.updateFolderRoot(url.deletingLastPathComponent())
+        } else {
+            todoViewModel.updateFolderRoot(nil)
+        }
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新
@@ -224,6 +232,9 @@ final class AppViewModel {
         isDirty = false
         scheduleStatsUpdate()
         todoViewModel.update(text: editorText)
+        if todoViewModel.scope != .file {
+            todoViewModel.refresh()
+        }
     }
 
     func markEdited() {
