@@ -42,17 +42,46 @@ struct MainWindowView: View {
         // Center: preview mode selector (only when a file is open)
         ToolbarItem(placement: .principal) {
             if vm.selectedFileURL != nil {
-                Picker("", selection: $vm.previewMode) {
-                    Image(systemName: "pencil").tag(PreviewMode.off)
-                    Image(systemName: "rectangle.split.2x1").tag(PreviewMode.split)
-                    if isMDFile {
-                        Image(systemName: "eye").tag(PreviewMode.wysiwyg)
+                Menu {
+                    Section("Edit Mode") {
+                        Button {
+                            vm.previewMode = .off
+                        } label: {
+                            Label("Source", systemImage: vm.previewMode == .off ? "checkmark" : "")
+                        }
+                        Button {
+                            vm.previewMode = .split
+                        } label: {
+                            Label("Split", systemImage: vm.previewMode == .split ? "checkmark" : "")
+                        }
+                        if isMDFile {
+                            Button {
+                                vm.previewMode = .wysiwyg
+                            } label: {
+                                Label("WYSIWYG", systemImage: vm.previewMode == .wysiwyg ? "checkmark" : "")
+                            }
+                        }
                     }
+                    if isMDFile {
+                        Section("Reading") {
+                            Button {
+                                if vm.previewMode != .viewer {
+                                    vm.previousPreviewMode = vm.previewMode
+                                }
+                                vm.previewMode = .viewer
+                            } label: {
+                                Label("Viewer Only", systemImage: vm.previewMode == .viewer ? "checkmark" : "")
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "eye")
                 }
-                .pickerStyle(.segmented)
+                .menuStyle(.borderlessButton)
                 .controlSize(.small)
-                .labelsHidden()
-                .help("プレビューモード切り替え")
+                .fixedSize()
+                .help("ビューモード")
+                .accessibilityLabel("ビューモード")
             }
         }
 
@@ -63,6 +92,7 @@ struct MainWindowView: View {
                 Image(systemName: "doc.badge.plus")
             }
             .help("New File (⌘N)")
+            .disabled(vm.previewMode == .viewer)
 
             // Save button doubles as autosave indicator
             Button {
@@ -72,6 +102,7 @@ struct MainWindowView: View {
                     .foregroundStyle(vm.isDirty ? Color.kobaAccent : .secondary)
             }
             .help("Save (⌘S)")
+            .disabled(vm.previewMode == .viewer)
 
             Divider()
 
@@ -81,6 +112,7 @@ struct MainWindowView: View {
                 Image(systemName: "magnifyingglass")
             }
             .help("Find & Replace (⌘F)")
+            .disabled(vm.previewMode == .viewer)
 
             Button {
                 NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
@@ -88,6 +120,7 @@ struct MainWindowView: View {
                 Image(systemName: "sparkles")
             }
             .help("AI アシスト (⌘E)")
+            .disabled(vm.previewMode == .viewer)
 
             Button {
                 NotificationCenter.default.post(name: .aiChatRequested, object: nil)
@@ -95,6 +128,7 @@ struct MainWindowView: View {
                 Image(systemName: "bubble.left.and.bubble.right")
             }
             .help("AI チャット (⌘⇧E)")
+            .disabled(vm.previewMode == .viewer)
 
             Button {
                 diffInitialText = appViewModel.activeTab?.content ?? ""
@@ -104,6 +138,7 @@ struct MainWindowView: View {
                 Image(systemName: "arrow.left.arrow.right")
             }
             .help("Diff ビュー (⌘D)")
+            .disabled(vm.previewMode == .viewer)
         }
     }
 
@@ -128,6 +163,10 @@ struct MainWindowView: View {
                             DiffInlineView(preloadText: appViewModel.activeTab?.content ?? "",
                                            preloadFileName: appViewModel.activeTab?.title ?? "")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if appViewModel.previewMode == .viewer {
+                            PreviewView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.kobaSurface)
                         } else if appViewModel.previewMode == .wysiwyg {
                             @Bindable var vm = appViewModel
                             WYSIWYGEditorView(text: $vm.editorText)
@@ -286,7 +325,7 @@ extension MainWindowView {
                 .onChange(of: appViewModel.selectedFileURL) { _, url in
                     let ext = url?.pathExtension.lowercased() ?? ""
                     let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
-                    if !isMD && appViewModel.previewMode == .wysiwyg {
+                    if !isMD && (appViewModel.previewMode == .wysiwyg || appViewModel.previewMode == .viewer) {
                         appViewModel.previewMode = .split
                     }
                 }
@@ -317,6 +356,9 @@ extension MainWindowView {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .newFileFromTemplateRequested)) { _ in
                     appViewModel.showTemplatePicker = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .toggleReadingModeRequested)) { _ in
+                    appViewModel.toggleViewerMode()
                 }
                 .modifier(MainWindowCommandReceiverPart2(
                     appViewModel: appViewModel,
@@ -478,7 +520,9 @@ struct StatusCommandBar: View {
                 kobaLineSep()
                 // Preview toggle
                 HStack(spacing: 0) {
-                    ForEach(PreviewMode.allCases.filter { isMDFile || $0 != .wysiwyg }, id: \.self) { mode in
+                    ForEach(PreviewMode.allCases.filter { mode in
+                        mode != .viewer && (isMDFile || mode != .wysiwyg)
+                    }, id: \.self) { mode in
                         Button {
                             previewMode = mode
                         } label: {
@@ -523,6 +567,7 @@ struct StatusCommandBar: View {
         case .off:     return "エディタのみ表示"
         case .split:   return "エディタ + プレビューを並べて表示"
         case .wysiwyg: return "リアルタイムプレビュー（WYSIWYG）"
+        case .viewer:  return "読書専用モード（編集 UI 非表示）"
         }
     }
 }
