@@ -43,6 +43,19 @@ struct EditorView: View {
                         .foregroundStyle(Color.kobaMute)
                         .allowsHitTesting(false)
                 }
+
+                if !appViewModel.pendingAIText.isEmpty || appViewModel.isAIGenerating {
+                    GeometryReader { geo in
+                        AIInlineSectionView()
+                            .frame(maxWidth: 520)
+                            .position(
+                                x: min(max(appViewModel.aiInlineOverlayPosition.x, 260), geo.size.width - 260),
+                                y: min(max(appViewModel.aiInlineOverlayPosition.y + 80, 80), geo.size.height - 40)
+                            )
+                            .allowsHitTesting(true)
+                            .transition(.opacity)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onDrop(of: [.fileURL], isTargeted: $isDragTargeted, perform: handleDrop(providers:))
@@ -74,13 +87,6 @@ struct EditorView: View {
         .overlay {
             if appViewModel.isAIInlinePromptVisible {
                 AIInlinePopover()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding(.top, 60)
-            }
-        }
-        .overlay {
-            if !appViewModel.pendingAIText.isEmpty || appViewModel.isAIGenerating {
-                AIInlinePendingOverlay()
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .padding(.top, 60)
             }

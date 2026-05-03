@@ -10,6 +10,7 @@ import AppKit
 // Markdown auto-completion is deferred to Phase 3 (requires working NSTextView).
 
 struct NSTextViewWrapper: View {
+    @Environment(AppViewModel.self) private var appViewModel
     @Binding var text: String
     @Binding var scrollRatio: Double
 
@@ -30,7 +31,7 @@ struct NSTextViewWrapper: View {
             .background(
                 ZStack {
                     Self.paperColor
-                    EditorObserver(scrollRatio: $scrollRatio)
+                    EditorObserver(scrollRatio: $scrollRatio, appViewModel: appViewModel)
                 }
             )
             .padding(.horizontal, 4)
@@ -44,17 +45,26 @@ struct NSTextViewWrapper: View {
 /// ② カーソル行を temporaryAttribute でハイライト（ドキュメント非破壊）
 private struct EditorObserver: NSViewRepresentable {
     @Binding var scrollRatio: Double
+    let appViewModel: AppViewModel
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         view.frame = .zero
+        context.coordinator.appViewModel = appViewModel
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             context.coordinator.attach(to: view, scrollRatio: $scrollRatio)
         }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.appViewModel = appViewModel
+        if let tv = context.coordinator.textViewRef {
+            MainActor.assumeIsolated {
+                context.coordinator.updateAIOverlayPosition(in: tv)
+            }
+        }
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -63,7 +73,8 @@ private struct EditorObserver: NSViewRepresentable {
         private var selectionObserver: Any?
         private var insertSnippetObserver: Any?
         private var eventMonitor: Any?
-        private weak var textViewRef: NSTextView?
+        weak var textViewRef: NSTextView?
+        weak var appViewModel: AppViewModel?
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
 
         /// テーマに応じたカーソル行ハイライト色
@@ -115,13 +126,18 @@ private struct EditorObserver: NSViewRepresentable {
                 forName: NSView.boundsDidChangeNotification,
                 object: sv.contentView,
                 queue: .main
-            ) { [weak sv] _ in
+            ) { [weak self, weak sv] _ in
                 guard let sv else { return }
                 let docHeight = sv.documentView?.frame.height ?? 1
                 let visHeight = sv.contentView.bounds.height
                 let maxScroll = max(docHeight - visHeight, 1)
                 let r = sv.contentView.bounds.origin.y / maxScroll
                 ratio.wrappedValue = max(0, min(1, r))
+                if let self, let textView = self.textViewRef {
+                    MainActor.assumeIsolated {
+                        self.updateAIOverlayPosition(in: textView)
+                    }
+                }
             }
         }
 
@@ -136,8 +152,14 @@ private struct EditorObserver: NSViewRepresentable {
             ) { [weak self, weak tv] _ in
                 guard let self, let tv else { return }
                 self.highlightCurrentLine(in: tv)
+                MainActor.assumeIsolated {
+                    self.updateAIOverlayPosition(in: tv)
+                }
             }
             highlightCurrentLine(in: tv)
+            MainActor.assumeIsolated {
+                updateAIOverlayPosition(in: tv)
+            }
 
             // Return キーで箇条書き自動継続 / ⌘Return で AI インライン補完
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -147,6 +169,24 @@ private struct EditorObserver: NSViewRepresentable {
                 else { return event }
 
                 let mods = event.modifierFlags.intersection([.shift, .option, .command, .control])
+
+                // Cmd+Z: ストリーミング中なら AI キャンセルを優先
+                if event.keyCode == 6,
+                   mods == .command,
+                   !tv.hasMarkedText()
+                {
+                    if let appViewModel = self.appViewModel {
+                        let cancelled = MainActor.assumeIsolated { () -> Bool in
+                            if appViewModel.isAIGenerating {
+                                appViewModel.rejectPendingAIText()
+                                return true
+                            }
+                            return false
+                        }
+                        if cancelled { return nil }
+                    }
+                    return event
+                }
 
                 // Space キー → 空行で AI インラインポップオーバー起動
                 if event.keyCode == 49, // Space
@@ -258,6 +298,34 @@ private struct EditorObserver: NSViewRepresentable {
             }
 
             return false
+        }
+
+        @MainActor
+        func updateAIOverlayPosition(in tv: NSTextView) {
+            guard let appViewModel,
+                  let scrollView = tv.enclosingScrollView,
+                  let window = tv.window
+            else { return }
+
+            let length = (tv.string as NSString).length
+            let clampedLocation = min(max(appViewModel.aiInlineCursorLocation, 0), length)
+            let caretRectOnScreen = tv.firstRect(
+                forCharacterRange: NSRange(location: clampedLocation, length: 0),
+                actualRange: nil
+            )
+            guard !caretRectOnScreen.isEmpty else { return }
+
+            let caretRectInWindow = window.convertFromScreen(caretRectOnScreen)
+            let caretRectInClipView = scrollView.contentView.convert(caretRectInWindow, from: nil)
+            let clipBounds = scrollView.contentView.bounds
+
+            appViewModel.aiInlineOverlayPosition = CGPoint(
+                x: clipBounds.midX,
+                y: max(24, caretRectInClipView.minY - clipBounds.minY)
+            )
+
+            // TODO(KMD-42-followup): TextEditor 内部の text storage delegate 連携で
+            // Undo 層の補正も検討する。現状は Cmd+Z の第1層防御のみ実装。
         }
 
         private func highlightCurrentLine(in tv: NSTextView) {
