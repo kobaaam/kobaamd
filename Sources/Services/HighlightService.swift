@@ -1,6 +1,6 @@
 import AppKit
 
-final class HighlightService {
+final class HighlightService: HighlightServiceProtocol {
 
     private var theme: ColorTheme { AppState.shared.selectedTheme }
 

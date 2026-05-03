@@ -14,14 +14,18 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-markdown.git", .upToNextMajor(from: "0.4.0")),
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1")
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1"),
+        .package(url: "https://github.com/tree-sitter/swift-tree-sitter", branch: "main"),
+        .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown", branch: "split_parser")
     ],
     targets: [
         .executableTarget(
             name: "kobaamd",
             dependencies: [
                 .product(name: "Markdown", package: "swift-markdown"),
-                .product(name: "Sparkle", package: "Sparkle")
+                .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
+                .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown")
             ],
             path: "Sources",
             resources: [
