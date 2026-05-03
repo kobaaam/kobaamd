@@ -43,6 +43,8 @@ final class AppViewModel {
     var isAIPendingConfirmation: Bool = false
     /// スペース起動時のカーソル位置（editorText 上のインデックス）
     var aiInlineCursorLocation: Int = 0
+    /// ファイルオープン完了後にエディタへ伝えるジャンプ先行番号
+    var pendingJumpLine: Int? = nil
 
     // MARK: - Quick Insert
     let snippetStore = SnippetStore()
@@ -92,12 +94,14 @@ final class AppViewModel {
         let tab = EditorTab(url: url, content: content)
         tabs.append(tab)
         activate(tab: tab)
+        todoViewModel.updateFolderRoot(url.deletingLastPathComponent())
     }
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
     func refreshQuickOpenIndex() {
         quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
         quickOpenViewModel.filter()
+        todoViewModel.updateWorkspaceRoots(fileTreeViewModel.folders.map(\.url))
     }
 
     @MainActor
@@ -111,6 +115,14 @@ final class AppViewModel {
         } catch {
             showAppError(.fileReadFailed(url: url, underlying: error))
         }
+    }
+
+    /// ファイルを開き、エディタの準備完了後に指定行にジャンプする。
+    /// エディタ側が .onChange(of: pendingJumpLine) で通知を受け取りジャンプする。
+    @MainActor
+    func openFileAndJump(url: URL, line: Int) async {
+        await openFile(url: url)
+        pendingJumpLine = line
     }
 
     /// 新しい空タブを追加する。
@@ -171,6 +183,7 @@ final class AppViewModel {
             isDirty = false
             savedText = ""
             outlineViewModel.update(text: "")
+            todoViewModel.updateFolderRoot(nil)
             return
         }
         activeTabID = tab.id
@@ -179,6 +192,11 @@ final class AppViewModel {
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
         outlineViewModel.update(text: tab.content)
+        if let url = tab.url {
+            todoViewModel.updateFolderRoot(url.deletingLastPathComponent())
+        } else {
+            todoViewModel.updateFolderRoot(nil)
+        }
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新
@@ -224,6 +242,9 @@ final class AppViewModel {
         isDirty = false
         scheduleStatsUpdate()
         todoViewModel.update(text: editorText)
+        if todoViewModel.scope != .file, let url = selectedFileURL {
+            todoViewModel.updateFile(url, text: editorText)
+        }
     }
 
     func markEdited() {
