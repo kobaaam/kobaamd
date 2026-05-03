@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Testing
 @testable import kobaamd
 
@@ -250,6 +251,35 @@ struct AppViewModelTests {
         #expect(vm.pendingAIText.isEmpty)
         #expect(vm.isAIGenerating == false)
         #expect(vm.isAIPendingConfirmation == false)
+    }
+
+    @Test("Cmd+Z during streaming cancels AI generation and does not propagate to Undo（KMD-42 AC7b）")
+    func cmdZDuringStreaming_cancelsAIGeneration_doesNotPropagateToUndo() {
+        let vm = AppViewModel()
+        let coord = EditorObserver.Coordinator()
+
+        coord.appViewModel = vm
+        vm.pendingAIText = "途中まで生成"
+        vm.isAIGenerating = true
+        vm.isAIPendingConfirmation = true
+
+        let consumedDuringStreaming = coord.handleCmdZ(isStreaming: true)
+
+        #expect(consumedDuringStreaming == true)
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == false)
+
+        vm.pendingAIText = "そのまま残る"
+        vm.isAIGenerating = false
+        vm.isAIPendingConfirmation = true
+
+        let consumedOutsideStreaming = coord.handleCmdZ(isStreaming: false)
+
+        #expect(consumedOutsideStreaming == false)
+        #expect(vm.pendingAIText == "そのまま残る")
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
     }
 
     @Test("startAIInlineCompletion で editorText にプレースホルダーが書き込まれないこと（KMD-42）")

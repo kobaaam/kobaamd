@@ -43,7 +43,7 @@ struct NSTextViewWrapper: View {
 /// TextEditor 配下の NSScrollView / NSTextView を検出して
 /// ① スクロール比率を binding に流す
 /// ② カーソル行を temporaryAttribute でハイライト（ドキュメント非破壊）
-private struct EditorObserver: NSViewRepresentable {
+struct EditorObserver: NSViewRepresentable {
     @Binding var scrollRatio: Double
     let appViewModel: AppViewModel
 
@@ -175,17 +175,11 @@ private struct EditorObserver: NSViewRepresentable {
                    mods == .command,
                    !tv.hasMarkedText()
                 {
-                    if let appViewModel = self.appViewModel {
-                        let cancelled = MainActor.assumeIsolated { () -> Bool in
-                            if appViewModel.isAIGenerating {
-                                appViewModel.rejectPendingAIText()
-                                return true
-                            }
-                            return false
-                        }
-                        if cancelled { return nil }
+                    guard let appViewModel = self.appViewModel else { return event }
+                    let consumed = MainActor.assumeIsolated {
+                        self.handleCmdZ(isStreaming: appViewModel.isAIGenerating)
                     }
-                    return event
+                    return consumed ? nil : event
                 }
 
                 // Space キー → 空行で AI インラインポップオーバー起動
@@ -242,6 +236,19 @@ private struct EditorObserver: NSViewRepresentable {
         }
 
         // MARK: - Auto list continuation
+
+        /// Cmd+Z を処理する。ストリーミング中なら AI 生成をキャンセルして true を返す。
+        /// それ以外は false を返し通常 Undo に委譲する。
+        /// `isStreaming` を引数として受け取るのは、`AppViewModel` への依存を最小化し
+        /// XCTest から呼び出せるようにするため。
+        @MainActor
+        func handleCmdZ(isStreaming: Bool) -> Bool {
+            guard let appViewModel else { return false }
+            guard isStreaming else { return false }
+
+            appViewModel.rejectPendingAIText()
+            return true
+        }
 
         /// 現在行のリストプレフィックスを検出して自動継続。
         /// 処理した場合は true を返す（イベントを消費）。
