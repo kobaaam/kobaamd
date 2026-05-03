@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Testing
 @testable import kobaamd
 
@@ -236,5 +237,79 @@ struct AppViewModelTests {
 
         // "🇯🇵Hell" + "!" + "o" = "🇯🇵Hell!o"
         #expect(vm.editorText == "🇯🇵Hell!o")
+    }
+
+    @Test("cancelAIGeneration で pendingAIText が常に破棄されること（KMD-42 仕様変更）")
+    func cancelAIGenerationAlwaysClearsPendingText() {
+        let vm = AppViewModel()
+        vm.pendingAIText = "途中まで生成"
+        vm.isAIGenerating = true
+        vm.isAIPendingConfirmation = false
+
+        vm.cancelAIGeneration()
+
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == false)
+    }
+
+    @Test("Cmd+Z during streaming cancels AI generation and does not propagate to Undo（KMD-42 AC7b）")
+    func cmdZDuringStreaming_cancelsAIGeneration_doesNotPropagateToUndo() {
+        let vm = AppViewModel()
+        let coord = EditorObserver.Coordinator()
+
+        coord.appViewModel = vm
+        vm.pendingAIText = "途中まで生成"
+        vm.isAIGenerating = true
+        vm.isAIPendingConfirmation = true
+
+        let consumedDuringStreaming = coord.handleCmdZ(isStreaming: true)
+
+        #expect(consumedDuringStreaming == true)
+        #expect(vm.pendingAIText.isEmpty)
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == false)
+
+        vm.pendingAIText = "そのまま残る"
+        vm.isAIGenerating = false
+        vm.isAIPendingConfirmation = true
+
+        let consumedOutsideStreaming = coord.handleCmdZ(isStreaming: false)
+
+        #expect(consumedOutsideStreaming == false)
+        #expect(vm.pendingAIText == "そのまま残る")
+        #expect(vm.isAIGenerating == false)
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("startAIInlineCompletion で editorText にプレースホルダーが書き込まれないこと（KMD-42）")
+    func startAIInlineCompletionDoesNotWritePlaceholder() async throws {
+        let mock = MockAIService()
+        mock.tokensToEmit = ["生成"]
+        let vm = AppViewModel(aiService: mock)
+        vm._testProvider = .openai
+        vm.editorText = "Before\n{{prompt text}}\nAfter"
+
+        vm.startAIInlineCompletion(lineContent: "{{prompt text}}\n")
+
+        #expect(!vm.editorText.contains("kobaamd-ai-generating"))
+        #expect(!vm.editorText.contains("{{prompt text}}"))
+
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(vm.pendingAIText == "生成")
+        #expect(vm.isAIPendingConfirmation == true)
+    }
+
+    @Test("startAIInlineCompletion でプロバイダー未設定時に pendingAIText にエラーが入ること")
+    func startAIInlineCompletionWithoutProviderShowsError() {
+        let vm = AppViewModel()
+        vm._testProvider = nil
+        vm.editorText = "{{prompt}}"
+
+        vm.startAIInlineCompletion(lineContent: "{{prompt}}")
+
+        #expect(vm.pendingAIText.contains("API キーが設定されていません"))
+        #expect(vm.isAIPendingConfirmation == true)
     }
 }
