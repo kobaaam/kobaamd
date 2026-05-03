@@ -29,3 +29,4 @@ kobaamd の設計思考・技術知見の知識ベース。
 - [ポストモーテムから学ぶ実装パターン](articles/practices/postmortem-patterns.md) — KMD-4/6/20/22 の振り返りから抽出した再発防止パターン
 - [セキュリティ・ハードニング](articles/practices/security-hardening.md) — AI パイプライン固有リスクへの多層防御（pre-commit + review_security + 将来 CI）
 - [Sparkle 署名付きリリース手順](articles/practices/sparkle-release.md) — EdDSA 鍵ペア生成、公開鍵の環境変数注入、DMG 署名と appcast 生成までのリリースフロー
+- [Wiki 参照ポリシー（Prompt Caching 標準運用）](articles/practices/wiki-reference-policy.md) — wiki 全件 Prompt Caching 投入を Phase 1 標準とし、検索層は 20 万トークン超過まで導入しない。Opus/Sonnet/Haiku の使い分け方針も収録
