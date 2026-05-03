@@ -12,11 +12,25 @@ if [ ! -d "$APP" ]; then
   exit 1
 fi
 
+FRAMEWORKS="$APP/Contents/Frameworks"
 mkdir -p "$RESOURCES"
+mkdir -p "$FRAMEWORKS"
 
 # 最新バイナリを .app に反映（最重要）
 cp ".build/arm64-apple-macosx/$CONFIG/kobaamd" "$APP/Contents/MacOS/kobaamd"
 echo "[post-build] binary updated → $APP/Contents/MacOS/kobaamd"
+
+# Sparkle.framework をバンドルにコピー（シンボリックリンク保持）
+SPARKLE_SRC=".build/arm64-apple-macosx/$CONFIG/Sparkle.framework"
+if [ -d "$SPARKLE_SRC" ]; then
+  rm -rf "$FRAMEWORKS/Sparkle.framework"
+  cp -a "$SPARKLE_SRC" "$FRAMEWORKS/"
+  # @loader_path/../Frameworks を rpath に追加（未登録時のみ）
+  if ! otool -l "$APP/Contents/MacOS/kobaamd" | grep -q '@loader_path/../Frameworks'; then
+    install_name_tool -add_rpath '@loader_path/../Frameworks' "$APP/Contents/MacOS/kobaamd" 2>/dev/null
+  fi
+  echo "[post-build] Sparkle.framework copied → $FRAMEWORKS/Sparkle.framework"
+fi
 
 # Copy app icon
 cp Sources/Resources/AppIcon.icns "$RESOURCES/AppIcon.icns"

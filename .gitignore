@@ -29,6 +29,9 @@ CLAUDE.md
 test-*.md
 Untitled*.md
 
+# E2E tests (xcodeproj is generated in VM, not committed)
+E2ETests/kobaamdE2E.xcodeproj/
+
 # Pipeline logs / state cache
 .logs/
 
