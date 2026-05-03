@@ -11,6 +11,15 @@ struct TodoView: View {
             scopePicker
             content
         }
+        .onChange(of: appViewModel.pendingJumpLine) { _, newLine in
+            guard let line = newLine else { return }
+            appViewModel.pendingJumpLine = nil
+            NotificationCenter.default.post(
+                name: .jumpToLine,
+                object: nil,
+                userInfo: ["line": line]
+            )
+        }
         .background(Color.kobaSidebar)
     }
 
@@ -164,13 +173,7 @@ struct TodoView: View {
     private func handleTap(_ item: TodoItem) {
         if let url = item.fileURL {
             Task { @MainActor in
-                await appViewModel.openFile(url: url)
-                try? await Task.sleep(for: .milliseconds(200))
-                NotificationCenter.default.post(
-                    name: .jumpToLine,
-                    object: nil,
-                    userInfo: ["line": item.line]
-                )
+                await appViewModel.openFileAndJump(url: url, line: item.line)
             }
         } else {
             NotificationCenter.default.post(

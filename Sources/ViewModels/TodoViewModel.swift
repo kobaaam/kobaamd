@@ -79,6 +79,13 @@ final class TodoViewModel {
         }.value
     }
 
+    /// Folder / Workspace スコープで単一ファイル分だけ TODO を差分更新する。
+    func updateFile(_ url: URL, text: String) {
+        guard scope != .file else { return }
+        items.removeAll { $0.fileURL == url }
+        items.append(contentsOf: Self.parseTodos(from: text, fileURL: url))
+    }
+
     // MARK: - Scope switching
 
     func setScope(_ newScope: TodoScope) {
@@ -146,25 +153,34 @@ final class TodoViewModel {
     /// 指定ディレクトリ配下の `.md` ファイルから TODO を収集する。
     /// maxDepth=5 (FileService.loadNodes と同一)
     nonisolated static func scanDirectory(at root: URL, maxDepth: Int = 5) async -> [TodoItem] {
-        await Task.detached(priority: .userInitiated) {
-            collectTodos(in: root, maxDepth: maxDepth)
+        await Task.detached(priority: .userInitiated) { () async -> [TodoItem] in
+            do {
+                return try collectTodos(in: root, maxDepth: maxDepth)
+            } catch {
+                return []
+            }
         }.value
     }
 
     /// 複数フォルダを横断して TODO を収集する。
     nonisolated static func scanWorkspace(folders: [URL], maxDepth: Int = 5) async -> [TodoItem] {
-        await Task.detached(priority: .userInitiated) {
-            var results: [TodoItem] = []
-            for folder in folders {
-                results.append(contentsOf: collectTodos(in: folder, maxDepth: maxDepth))
+        await Task.detached(priority: .userInitiated) { () async -> [TodoItem] in
+            do {
+                var results: [TodoItem] = []
+                for folder in folders {
+                    results.append(contentsOf: try collectTodos(in: folder, maxDepth: maxDepth))
+                }
+                return results
+            } catch {
+                return []
             }
-            return results
         }.value
     }
 
-    nonisolated private static func collectTodos(in root: URL, maxDepth: Int) -> [TodoItem] {
+    nonisolated private static func collectTodos(in root: URL, maxDepth: Int) throws -> [TodoItem] {
         let fm = FileManager.default
         var results: [TodoItem] = []
+        var processedCount = 0
         let rootDepth = root.pathComponents.count
         guard let enumerator = fm.enumerator(
             at: root,
@@ -175,6 +191,11 @@ final class TodoViewModel {
         }
 
         for case let url as URL in enumerator {
+            processedCount += 1
+            if processedCount % 50 == 0 {
+                try Task.checkCancellation()
+            }
+
             let depth = url.pathComponents.count - rootDepth
             if depth > maxDepth {
                 enumerator.skipDescendants()
