@@ -26,10 +26,6 @@ let package = Package(
             path: "Sources",
             resources: [
                 .process("Resources")
-            ],
-            swiftSettings: [
-                // Allow @testable import kobaamd in test targets
-                .unsafeFlags(["-enable-testing"])
             ]
         ),
         .testTarget(
@@ -40,6 +36,7 @@ let package = Package(
             ],
             path: "Tests",
             swiftSettings: [
+                .unsafeFlags(["-enable-testing"]),
                 .unsafeFlags([
                     "-F", "/Library/Developer/CommandLineTools/Library/Developer/Frameworks"
                 ])

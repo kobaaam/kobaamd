@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import kobaamd
 
@@ -80,5 +81,45 @@ struct DiffViewModelTests {
         // updateRenderedHTML の Task.detached 完了を待つ
         try await Task.sleep(nanoseconds: 600_000_000)
         #expect(vm.renderedHTMLForA.contains("<!DOCTYPE html>"))
+    }
+
+    // MARK: - 一時ファイルの並列安全性
+
+    @Test("並列で scheduleUpdate を複数回呼び出しても干渉せず lines が更新されること")
+    func parallelDiffComputationDoesNotInterfere() async throws {
+        let vm1 = DiffViewModel()
+        let vm2 = DiffViewModel()
+
+        vm1.textA = "alpha\nbeta"
+        vm1.textB = "alpha\nbravo"
+        vm2.textA = "x\ny"
+        vm2.textB = "x\nz"
+
+        vm1.scheduleUpdate()
+        vm2.scheduleUpdate()
+
+        // debounce 300ms + diff 処理を待つ
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        // 両方とも diff 結果が更新されていること
+        // （細かい lines の中身は環境依存なので、isEmpty でないことだけを確認）
+        #expect(vm1.lines.isEmpty == false)
+        #expect(vm2.lines.isEmpty == false)
+    }
+
+    @Test("一時ファイルが処理後に NSTemporaryDirectory に残らないこと")
+    func temporaryFilesAreCleanedUp() async throws {
+        let vm = DiffViewModel()
+        vm.textA = "hello"
+        vm.textB = "world"
+        vm.scheduleUpdate()
+
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        // NSTemporaryDirectory 内に kobaamd_diff_ で始まるファイルが残っていないこと
+        let tmpDir = NSTemporaryDirectory()
+        let contents = (try? FileManager.default.contentsOfDirectory(atPath: tmpDir)) ?? []
+        let leftover = contents.filter { $0.hasPrefix("kobaamd_diff_") }
+        #expect(leftover.isEmpty, "Leftover diff temp files: \(leftover)")
     }
 }
