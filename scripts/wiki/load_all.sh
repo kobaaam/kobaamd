@@ -48,11 +48,17 @@ while [ "$#" -gt 0 ]; do
 done
 
 if ! ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
+  printf 'ERROR: not in a git repository (run from kobaamd repo)\n' >&2
   exit 1
 fi
 
 articles_dir="$ROOT/docs/wiki/articles"
 raw_dir="$ROOT/docs/wiki/raw"
+
+if [ ! -d "$articles_dir" ]; then
+  printf 'ERROR: docs/wiki/articles not found — run this script from inside the kobaamd repository\n' >&2
+  exit 1
+fi
 
 tmp_list=$(mktemp)
 tmp_sorted=$(mktemp)
