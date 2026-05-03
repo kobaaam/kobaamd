@@ -61,9 +61,27 @@ updated: YYYY-MM-DD
 6. log.md に操作を記録
 
 ### Query（照会）
-1. index.md から関連記事を検索
-2. 記事を読み込んで合成回答
-3. 有用な分析は新規記事として wiki に追加
+
+kobaamd では **wiki 全件を Anthropic Prompt Caching でプロンプトに投入する方式** を Phase 1 標準運用とする（`CLAUDE.md` の「Wiki 参照ポリシー」を参照）。検索層（embedding / BM25）は wiki 総量が 20 万トークンを超えるまで導入しない。
+
+**標準手順（Phase 1: Prompt Caching）**:
+
+1. `scripts/wiki/load_all.sh` で `docs/wiki/articles/**/*.md` を frontmatter 付きで連結し、1 つの static block を作る（KMD-46 で整備）
+2. `scripts/wiki/ask.sh "<query>"` で wiki 全件 + クエリを Claude API に投げる（KMD-47 で整備）。文書部分には `cache_control: { type: "ephemeral" }` を付与し、5 分以内の再呼び出しで Cache Hit にする
+3. 応答を取得し、必要なら有用な分析を新規記事として wiki に追加する
+4. 実行ログから Cache Hit / Miss を確認し、cache miss が多い場合は呼び出し間隔の見直しを行う
+
+**フォールバック手順（ヘルパー未整備時 / ad-hoc 用途）**:
+
+1. `index.md` から関連記事を絞り込む
+2. 関連記事を Read で読み込み、subagent プロンプトに埋め込んで合成回答する
+3. この経路は **手動 ad-hoc 用**であり、subagent の自動処理では使わない（ヘルパー経由を必須とする）
+
+**Phase 移行のトリガー**:
+
+- wiki 総量 **15 万トークン** 超過: Phase 2（カテゴリ単位投入）へ移行検討
+- wiki 総量 **20 万トークン** 超過: Phase 3（embedding ベース検索層 + 必要記事のみ投入）へ移行
+- wiki 総量は `scripts/wiki/load_all.sh` の出力末尾サマリ（`# Total: ~XXkB / ~XX,XXX tokens` を stderr 出力）で観測する
 
 ### Lint（メンテナンス）
 1. 矛盾する記述の検出
