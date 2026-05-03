@@ -52,6 +52,9 @@ Swift Package Manager を使用します。Xcode プロジェクト不要。
 git clone https://github.com/kobaaam/kobaamd.git
 cd kobaamd
 
+# Set up git hooks (one-time) / git hooks の初期設定（初回のみ）
+./scripts/hooks/install.sh
+
 # Build / ビルド
 swift build
 

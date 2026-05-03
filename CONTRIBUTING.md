@@ -7,6 +7,7 @@ Thank you for your interest in contributing!
 ```bash
 git clone https://github.com/kobaaam/kobaamd.git
 cd kobaamd
+./scripts/hooks/install.sh
 swift build
 ./scripts/post-build.sh
 open .build/kobaamd.app

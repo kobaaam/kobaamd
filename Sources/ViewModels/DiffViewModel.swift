@@ -258,12 +258,18 @@ final class DiffViewModel {
     }
 
     private static func computeDiff(a: String, b: String) async -> [DiffLine] {
-        let tmpA = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_a.txt")
-        let tmpB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_b.txt")
+        let uuid = UUID().uuidString
+        let tmpA = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_a_\(uuid).txt")
+        let tmpB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_b_\(uuid).txt")
         try? a.write(to: tmpA, atomically: true, encoding: .utf8)
         try? b.write(to: tmpB, atomically: true, encoding: .utf8)
 
         return await Task.detached(priority: .userInitiated) {
+            defer {
+                try? FileManager.default.removeItem(at: tmpA)
+                try? FileManager.default.removeItem(at: tmpB)
+            }
+
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/git")
             proc.arguments = ["diff", "--no-index", "--color=never", tmpA.path, tmpB.path]
