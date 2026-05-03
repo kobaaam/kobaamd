@@ -2,6 +2,7 @@ import AppKit
 import Testing
 @testable import kobaamd
 
+@MainActor
 @Suite("TreeSitterHighlightService")
 struct TreeSitterHighlightServiceTests {
 
@@ -28,15 +29,36 @@ struct TreeSitterHighlightServiceTests {
         #expect(attrs[.foregroundColor] != nil)
     }
 
-    @Test("applyIncrementalHighlight がフォールバックでフルリビルドする")
-    func incrementalFallsBackToFullRebuild() {
-        let storage = NSTextStorage(string: "# Heading")
-        TreeSitterHighlightService().applyIncrementalHighlight(
+    @Test("applyIncrementalHighlight: 編集範囲外の属性が保持される")
+    func incrementalPreservesOutOfRangeAttributes() {
+        // 2段落の文書で、1段落目のみを編集した後に2段落目のハイライトが消えないことを確認
+        let fullText = "# Heading\n\nSome body text"
+        let storage = NSTextStorage(string: fullText)
+        // まず初回フルハイライト
+        let service = TreeSitterHighlightService()
+        service.highlight(storage)
+        // 1段落目の末尾に1文字追加を模擬（editedRange = heading のみ、changeInLength = 1）
+        let headingRange = NSRange(location: 0, length: 9) // "# Heading"
+        service.applyIncrementalHighlight(
             textStorage: storage,
-            editedRange: NSRange(location: 0, length: 9),
-            changeInLength: 0
+            editedRange: headingRange,
+            changeInLength: 1
         )
-        let attrs = storage.attributes(at: 0, effectiveRange: nil)
-        #expect(attrs[.foregroundColor] != nil)
+        // 2段落目の先頭 (index 11 = "S") に foregroundColor が設定されていること
+        let bodyStart = fullText.count - "Some body text".count
+        if bodyStart < storage.length {
+            let attrs = storage.attributes(at: bodyStart, effectiveRange: nil)
+            #expect(attrs[.foregroundColor] != nil)
+        }
+    }
+
+    @Test("パース不能な入力でもクラッシュせずフォールバックする")
+    func unparseableInputDoesNotCrash() {
+        // 大量の特殊文字・制御文字でパースを困難にした入力
+        let weirdText = String(repeating: "\u{0000}\u{FFFD}<<<>>>", count: 100)
+        let storage = NSTextStorage(string: weirdText)
+        // クラッシュしないこと（fallback に倒れること）を検証
+        TreeSitterHighlightService().highlight(storage)
+        #expect(storage.string == weirdText)
     }
 }

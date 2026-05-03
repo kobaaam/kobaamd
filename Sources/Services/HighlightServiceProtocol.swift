@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 protocol HighlightServiceProtocol: AnyObject {
     /// テキスト全体に対してハイライトを適用する（初回 / フルリビルド用）
     func highlight(_ textStorage: NSTextStorage)

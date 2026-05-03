@@ -1,8 +1,9 @@
 import AppKit
+import os
 import SwiftTreeSitter
 import TreeSitterMarkdown
 
-final class TreeSitterHighlightService: HighlightServiceProtocol {
+@MainActor final class TreeSitterHighlightService: HighlightServiceProtocol {
 
     private let fallback = HighlightService()
     private let parser: Parser?
@@ -26,6 +27,7 @@ final class TreeSitterHighlightService: HighlightServiceProtocol {
             self.parser = parser
             self.language = language
         } catch {
+            os_log(.error, "TreeSitter: parser init failed: %@", error.localizedDescription)
             self.parser = nil
             self.language = nil
         }
@@ -42,11 +44,13 @@ final class TreeSitterHighlightService: HighlightServiceProtocol {
         guard !source.isEmpty else { return }
 
         guard let tree = parser.parse(source) else {
+            os_log(.default, "TreeSitter: parse() returned nil, falling back to regex")
             fallback.highlight(textStorage)
             return
         }
 
         guard let rootNode = tree.rootNode, rootNode.range.length > 0 else {
+            os_log(.default, "TreeSitter: rootNode empty, falling back to regex")
             fallback.highlight(textStorage)
             return
         }
@@ -89,7 +93,12 @@ final class TreeSitterHighlightService: HighlightServiceProtocol {
 
         if range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= textStorage.length {
             if let attributes = attributes(for: node, source: source, theme: theme) {
-                textStorage.addAttributes(attributes, range: range)
+                // Merge onto existing attributes so child nodes override parents without additive buildup.
+                var merged = textStorage.attributes(at: range.location, effectiveRange: nil)
+                for (key, value) in attributes {
+                    merged[key] = value
+                }
+                textStorage.setAttributes(merged, range: range)
             }
         }
 
