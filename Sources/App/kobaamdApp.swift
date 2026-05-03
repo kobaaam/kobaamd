@@ -82,6 +82,8 @@ struct kobaamdApp: App {
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
+                Button("Reading Mode") { AppCommand.toggleReadingMode.post() }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
             }
             CommandGroup(after: .appInfo) {
@@ -120,6 +122,7 @@ extension Notification.Name {
     static let aiChatRequested        = AppCommand.aiChat.notificationName
     static let quickInsertRequested   = AppCommand.quickInsert.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
+    static let toggleReadingModeRequested = AppCommand.toggleReadingMode.notificationName
     static let newTabRequested          = AppCommand.newTab.notificationName
     static let formatDocumentRequested = AppCommand.formatDocument.notificationName
     static let openRecentNotification  = Notification.Name("kobaamd.openRecentRequested")

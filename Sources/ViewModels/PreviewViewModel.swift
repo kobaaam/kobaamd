@@ -16,7 +16,7 @@ final class PreviewViewModel {
 
     init() {}
 
-    func update(text: String) {
+    func update(text: String, viewerMode: Bool = false) {
         debounceTask?.cancel()
         debounceTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -37,7 +37,12 @@ final class PreviewViewModel {
             }.value
 
             guard !Task.isCancelled else { return }
-            self.bodyHTML = body
+            let viewerStyle = """
+            <style>
+            body { max-width: 720px; margin: 0 auto; padding: 24px 48px; }
+            </style>
+            """
+            self.bodyHTML = viewerMode ? viewerStyle + body : body
             if !shell.isEmpty { self.shellHTML = shell }
             self.isRendering = false
         }
