@@ -43,10 +43,16 @@ final class TodoViewModel {
     var scope: TodoScope = .file
     /// Folder/Workspace スキャン進行中フラグ（プログレス UI 用）
     var isScanning: Bool = false
+    /// Folder スコープで対象ディレクトリが未設定（ワークスペース未開設）かどうか
+    var folderScopeIsEmpty: Bool {
+        scope == .folder && folderRoot == nil
+    }
 
     // File スコープ用 — 現状の編集中テキスト
     private var lastEditorText: String = ""
-    // Folder スコープ用 — 選択中のディレクトリ（ファイル選択時はその親ディレクトリを使う）
+    // Folder スコープ用 — ユーザーが最初に開いたワークスペースフォルダ（PRD KMD-32 §2）。
+    // 編集中ファイル切替やサイドバー選択ノード変更には追従しない。
+    // AppViewModel.refreshQuickOpenIndex() から fileTreeViewModel.folders.first?.url が伝達される。
     private var folderRoot: URL? = nil
     // Workspace スコープ用 — 開いているワークスペースフォルダ群
     private var workspaceRoots: [URL] = []
@@ -94,7 +100,9 @@ final class TodoViewModel {
         refresh()
     }
 
-    /// 外部から呼ばれる: 選択中ディレクトリ更新（Folder スコープに反映）
+    /// 外部から呼ばれる: Folder スコープの対象ディレクトリを更新する。
+    /// PRD KMD-32 §2 に従い「最初のワークスペースフォルダ（fileTreeViewModel.folders.first?.url）」を渡すこと。
+    /// nil を渡すとワークスペース未開設として扱われる。
     func updateFolderRoot(_ url: URL?) {
         folderRoot = url
         if scope == .folder { refresh() }

@@ -111,4 +111,47 @@ struct TodoViewModelTests {
         #expect(items.contains { $0.text == "shallow" })
         #expect(!items.contains { $0.text == "too-deep" })
     }
+
+    @Test("Folder scope root is decoupled from active file")
+    func folderScopeDecoupledFromActiveFile() async throws {
+        let dirA = tmpDir.appendingPathComponent("A", isDirectory: true)
+        let dirB = tmpDir.appendingPathComponent("B", isDirectory: true)
+        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dirB, withIntermediateDirectories: true)
+        _ = try write("TODO: A1", name: "a.md", in: dirA)
+        _ = try write("TODO: B1", name: "b.md", in: dirB)
+
+        let vm = TodoViewModel()
+        vm.setScope(.folder)
+        vm.updateFolderRoot(dirA)
+        try await Task.sleep(for: .milliseconds(900))
+
+        let items = vm.items
+        #expect(items.allSatisfy { $0.fileURL?.path.hasPrefix(dirA.path) == true })
+        #expect(items.contains { $0.text == "A1" })
+        #expect(!items.contains { $0.text == "B1" })
+    }
+
+    @Test("Folder root follows the head of workspace folders")
+    func folderRootFollowsWorkspaceHead() async throws {
+        let dirA = tmpDir.appendingPathComponent("A", isDirectory: true)
+        let dirC = tmpDir.appendingPathComponent("C", isDirectory: true)
+        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dirC, withIntermediateDirectories: true)
+        _ = try write("TODO: A1", name: "a.md", in: dirA)
+        _ = try write("TODO: C1", name: "c.md", in: dirC)
+
+        let vm = TodoViewModel()
+        vm.setScope(.folder)
+        vm.updateFolderRoot(dirA)
+        try await Task.sleep(for: .milliseconds(900))
+        let initialItems = vm.items
+        #expect(initialItems.contains { $0.text == "A1" })
+
+        vm.updateFolderRoot(dirC)
+        try await Task.sleep(for: .milliseconds(900))
+        let nextItems = vm.items
+        #expect(nextItems.contains { $0.text == "C1" })
+        #expect(!nextItems.contains { $0.text == "A1" })
+    }
 }

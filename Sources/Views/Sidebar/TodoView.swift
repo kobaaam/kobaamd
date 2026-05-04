@@ -37,6 +37,7 @@ struct TodoView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .accessibilityLabel("TODO 表示スコープ")
+        .accessibilityHint("Folder は最初に開いたワークスペースフォルダ配下、Workspace は全フォルダ横断で TODO を表示します")
     }
 
     @ViewBuilder
@@ -56,7 +57,7 @@ struct TodoView: View {
         } else if todoViewModel.items.isEmpty {
             VStack {
                 Spacer()
-                Text("TODO が見つかりません")
+                Text(todoViewModel.folderScopeIsEmpty ? "ワークスペースを開いてください" : "TODO が見つかりません")
                     .font(.system(size: 12))
                     .foregroundStyle(Color.kobaMute)
                 Spacer()
