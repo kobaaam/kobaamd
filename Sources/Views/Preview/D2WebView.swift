@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import WebKit
 
@@ -28,8 +29,32 @@ struct D2WebView: NSViewRepresentable {
         )
     }
 
+    func sanitizeSVG(_ svg: String) -> String {
+        let patterns = [
+            #"<script\b[^>]*>[\s\S]*?</script\s*>"#,
+            #"<script\b[^>]*/\s*>"#
+        ]
+        let eventHandlerPatterns = [
+            "\\son\\w+\\s*=\\s*\"[^\"]*\"",
+            "\\son\\w+\\s*=\\s*'[^']*'"
+        ]
+
+        var sanitized = svg
+        for pattern in patterns {
+            sanitized = sanitized.replacingMatches(
+                of: pattern,
+                options: [.caseInsensitive, .dotMatchesLineSeparators]
+            )
+        }
+        for pattern in eventHandlerPatterns {
+            sanitized = sanitized.replacingMatches(of: pattern, options: [.caseInsensitive])
+        }
+        return sanitized
+    }
+
     private func htmlShell(for svg: String) -> String {
-        """
+        let sanitizedSVG = sanitizeSVG(svg)
+        return """
         <!DOCTYPE html>
         <html>
         <head>
@@ -53,7 +78,7 @@ struct D2WebView: NSViewRepresentable {
         <script>\(BundledJS.svgPanZoom)</script>
         </head>
         <body>
-        \(svg)
+        \(sanitizedSVG)
         <script>
         window.addEventListener('load', function () {
             const svg = document.querySelector('svg');
@@ -106,5 +131,18 @@ struct D2WebView: NSViewRepresentable {
 
     final class Coordinator {
         var lastSVG: String?
+    }
+}
+
+private extension String {
+    func replacingMatches(
+        of pattern: String,
+        options: NSRegularExpression.Options = []
+    ) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+            return self
+        }
+        let range = NSRange(startIndex..., in: self)
+        return regex.stringByReplacingMatches(in: self, range: range, withTemplate: "")
     }
 }

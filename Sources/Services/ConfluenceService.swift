@@ -198,15 +198,23 @@ private struct StorageFormatWalker: MarkupWalker {
     }
 
     mutating func visitLink(_ link: Link) {
-        let dest = link.destination ?? ""
-        result += "<a href=\"\(dest)\">"
+        let dest = sanitizeURL(link.destination ?? "")
+        if dest.isEmpty {
+            result += "<a>"
+        } else {
+            result += "<a href=\"\(escapeXMLAttribute(dest))\">"
+        }
         descendInto(link)
         result += "</a>"
     }
 
     mutating func visitImage(_ image: Image) {
-        let src = image.source ?? ""
-        result += "<ac:image><ri:url ri:value=\"\(src)\"/></ac:image>"
+        let src = sanitizeURL(image.source ?? "")
+        if src.isEmpty {
+            result += "<ac:image></ac:image>"
+        } else {
+            result += "<ac:image><ri:url ri:value=\"\(escapeXMLAttribute(src))\"/></ac:image>"
+        }
     }
 
     mutating func visitUnorderedList(_ unorderedList: UnorderedList) {
@@ -257,6 +265,26 @@ private struct StorageFormatWalker: MarkupWalker {
         s.replacingOccurrences(of: "&", with: "&amp;")
          .replacingOccurrences(of: "<", with: "&lt;")
          .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    private func escapeXMLAttribute(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+         .replacingOccurrences(of: "\"", with: "&quot;")
+         .replacingOccurrences(of: "'", with: "&#39;")
+         .replacingOccurrences(of: "<", with: "&lt;")
+         .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    private func sanitizeURL(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let blockedSchemes = ["javascript:", "data:", "vbscript:"]
+        for scheme in blockedSchemes where trimmed.range(
+            of: scheme,
+            options: [.caseInsensitive, .anchored]
+        ) != nil {
+            return ""
+        }
+        return trimmed
     }
 }
 

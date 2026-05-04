@@ -44,32 +44,33 @@ struct MarkdownWebView: NSViewRepresentable {
     // MARK: - Helpers
 
     private func injectBody(_ body: String, into webView: WKWebView, scrollRatio: Double) {
-        // body を JS 文字列として安全にエスケープ
-        let escaped = body
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-            .replacingOccurrences(of: "$", with: "\\$")
+        // body は callAsyncJavaScript の引数として安全に渡される（手動エスケープ不要）
+        // functionBody は async 関数の本体として実行されるため IIFE は不要
         let js = """
-        (function() {
-          var oldScrollY = window.scrollY;
-          var oldHeight = document.body.scrollHeight;
-          document.body.innerHTML = `\(escaped)`;
-          // mermaid ダイアグラムを再変換・再描画
-          document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
-            var div = document.createElement('div');
-            div.className = 'mermaid';
-            div.textContent = el.textContent;
-            el.parentNode.replaceWith(div);
-          });
-          if (typeof mermaid !== 'undefined') {
-            mermaid.run({ querySelector: '.mermaid' });
-          }
-          if (oldHeight > 0) {
-            window.scrollTo(0, oldScrollY * document.body.scrollHeight / oldHeight);
-          }
-        })();
+        var oldScrollY = window.scrollY;
+        var oldHeight = document.body.scrollHeight;
+        document.body.innerHTML = body;
+        // mermaid ダイアグラムを再変換・再描画
+        document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
+          var div = document.createElement('div');
+          div.className = 'mermaid';
+          div.textContent = el.textContent;
+          el.parentNode.replaceWith(div);
+        });
+        if (typeof mermaid !== 'undefined') {
+          mermaid.run({ querySelector: '.mermaid' });
+        }
+        if (oldHeight > 0) {
+          window.scrollTo(0, oldScrollY * document.body.scrollHeight / oldHeight);
+        }
+        return null;
         """
-        webView.evaluateJavaScript(js, completionHandler: nil)
+        webView.callAsyncJavaScript(
+            js,
+            arguments: ["body": body],
+            in: nil,
+            in: .page
+        ) { _ in }
     }
 
     private func syncScroll(webView: WKWebView, ratio: Double) {
