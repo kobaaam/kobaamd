@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable var appState = AppState.shared
     @State private var showFindReplace: Bool = false
     @State private var showAIPanel:    Bool = false
     @State private var scrollRatio: Double = 0
@@ -16,10 +17,10 @@ struct EditorView: View {
         VStack(spacing: 0) {
             ZStack {
                 NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
-                    .background(Color(AppState.shared.selectedTheme.editorBackground))
+                    .background(Color(appState.selectedTheme.editorBackground))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if appViewModel.isFileLoading {
-                    Color(AppState.shared.selectedTheme.editorBackground).opacity(0.6)
+                    Color(appState.selectedTheme.editorBackground).opacity(0.6)
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(0.8)

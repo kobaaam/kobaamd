@@ -16,17 +16,18 @@ import Observation
     private static let recentFilesKey     = "recentFiles"
     private static let workspaceBookmarks = "workspaceFolderBookmarks"
     private static let maxRecentFiles     = 10
+    private static let selectedThemeKey   = "selectedColorTheme"
+
+    var selectedTheme: ColorTheme {
+        didSet {
+            defaults.set(selectedTheme.rawValue, forKey: Self.selectedThemeKey)
+        }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-    }
-
-    var selectedTheme: ColorTheme {
-        get {
-            let raw = defaults.string(forKey: "selectedColorTheme") ?? ColorTheme.light.rawValue
-            return ColorTheme(rawValue: raw) ?? .light
-        }
-        set { defaults.set(newValue.rawValue, forKey: "selectedColorTheme") }
+        let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.light.rawValue
+        self.selectedTheme = ColorTheme(rawValue: raw) ?? .light
     }
 
     var autoFormatOnSave: Bool {

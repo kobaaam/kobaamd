@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PreviewView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable var appState = AppState.shared
     @State private var previewViewModel = PreviewViewModel()
     // Delay WKWebView creation until there's actual content — saves ~50MB at cold start
     @State private var isReady = false
@@ -43,6 +44,10 @@ struct PreviewView: View {
             previewViewModel.update(text: newValue, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: appViewModel.previewMode) { _, _ in
+            guard !isD2File else { return }
+            previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+        }
+        .onChange(of: appState.selectedTheme) { _, _ in
             guard !isD2File else { return }
             previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
         }

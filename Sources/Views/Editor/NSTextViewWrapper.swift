@@ -11,11 +11,12 @@ import AppKit
 
 struct NSTextViewWrapper: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable var appState = AppState.shared
     @Binding var text: String
     @Binding var scrollRatio: Double
 
-    private static var paperColor: Color { Color(AppState.shared.selectedTheme.editorBackground) }
-    private static var inkColor: Color   { Color(AppState.shared.selectedTheme.editorText) }
+    private var paperColor: Color { Color(appState.selectedTheme.editorBackground) }
+    private var inkColor: Color   { Color(appState.selectedTheme.editorText) }
     private static let editorFont = Font.system(size: 14, design: .monospaced)
 
     init(binding: Binding<String>, scrollRatio: Binding<Double>) {
@@ -26,11 +27,11 @@ struct NSTextViewWrapper: View {
     var body: some View {
         TextEditor(text: $text)
             .font(Self.editorFont)
-            .foregroundStyle(Self.inkColor)
+            .foregroundStyle(inkColor)
             .scrollContentBackground(.hidden)
             .background(
                 ZStack {
-                    Self.paperColor
+                    paperColor
                     EditorObserver(scrollRatio: $scrollRatio, appViewModel: appViewModel)
                 }
             )
@@ -46,11 +47,13 @@ struct NSTextViewWrapper: View {
 struct EditorObserver: NSViewRepresentable {
     @Binding var scrollRatio: Double
     let appViewModel: AppViewModel
+    @Bindable var appState = AppState.shared
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         view.frame = .zero
         context.coordinator.appViewModel = appViewModel
+        context.coordinator.currentTheme = appState.selectedTheme
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             context.coordinator.attach(to: view, scrollRatio: $scrollRatio)
         }
@@ -59,6 +62,15 @@ struct EditorObserver: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.appViewModel = appViewModel
+        let newTheme = appState.selectedTheme
+        if context.coordinator.currentTheme != newTheme {
+            context.coordinator.currentTheme = newTheme
+            if let tv = context.coordinator.textViewRef {
+                MainActor.assumeIsolated {
+                    context.coordinator.refreshHighlightForThemeChange(in: tv)
+                }
+            }
+        }
         if let tv = context.coordinator.textViewRef {
             MainActor.assumeIsolated {
                 context.coordinator.updateAIOverlayPosition(in: tv)
@@ -75,10 +87,9 @@ struct EditorObserver: NSViewRepresentable {
         private var eventMonitor: Any?
         weak var textViewRef: NSTextView?
         weak var appViewModel: AppViewModel?
+        var currentTheme: ColorTheme = AppState.shared.selectedTheme
+        var highlightColor: NSColor { currentTheme.editorCurrentLineHighlight }
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
-
-        /// テーマに応じたカーソル行ハイライト色
-        private static var highlightColor: NSColor { AppState.shared.selectedTheme.editorCurrentLineHighlight }
 
         func attach(to view: NSView, scrollRatio: Binding<Double>) {
             var current: NSView? = view
@@ -335,6 +346,15 @@ struct EditorObserver: NSViewRepresentable {
             // Undo 層の補正も検討する。現状は Cmd+Z の第1層防御のみ実装。
         }
 
+        @MainActor
+        func refreshHighlightForThemeChange(in tv: NSTextView) {
+            if let lm = tv.layoutManager, lastHighlightedRange.location != NSNotFound {
+                lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lastHighlightedRange)
+            }
+            lastHighlightedRange = NSRange(location: NSNotFound, length: 0)
+            highlightCurrentLine(in: tv)
+        }
+
         private func highlightCurrentLine(in tv: NSTextView) {
             guard let lm = tv.layoutManager else { return }
             let nsString = tv.string as NSString
@@ -349,7 +369,7 @@ struct EditorObserver: NSViewRepresentable {
                 lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lastHighlightedRange)
             }
 
-            lm.addTemporaryAttribute(.backgroundColor, value: Self.highlightColor, forCharacterRange: lineRange)
+            lm.addTemporaryAttribute(.backgroundColor, value: highlightColor, forCharacterRange: lineRange)
             lastHighlightedRange = lineRange
 
             // プレビュー側にカーソルのブロックインデックスを通知

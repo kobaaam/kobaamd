@@ -8,6 +8,7 @@ struct DiffSheetView: View {
     let preloadFileName: String
     var isInline: Bool = false
 
+    @Bindable var appState = AppState.shared
     @State private var vm = DiffViewModel()
     @Environment(\.dismiss) private var dismiss
 
@@ -209,6 +210,11 @@ struct DiffSheetView: View {
                 vm.textA = preloadText
                 vm.fileNameA = preloadFileName
                 vm.scheduleUpdate()
+            }
+        }
+        .onChange(of: appState.selectedTheme) { _, _ in
+            if vm.isRenderedMode {
+                vm.updateRenderedHTML()
             }
         }
     }

@@ -50,7 +50,7 @@ final class DiffViewModel {
         }
     }
 
-    private func updateRenderedHTML() {
+    func updateRenderedHTML() {
         let themeCSS = AppState.shared.selectedTheme.previewCSS
         let textA = self.textA
         let textB = self.textB
