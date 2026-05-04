@@ -232,6 +232,16 @@ final class AppViewModel {
             previousPreviewMode = previewMode
             previewMode = .viewer
         }
+
+        let announcement = previewMode == .viewer ? "Reading mode active" : "Edit mode active"
+        NSAccessibility.post(
+            element: NSApp.mainWindow ?? NSApp,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: announcement,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue
+            ]
+        )
     }
 
     func markSaved() {

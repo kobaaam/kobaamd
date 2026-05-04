@@ -82,7 +82,7 @@ struct kobaamdApp: App {
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
                     .keyboardShortcut("b", modifiers: .command)
-                Button("Reading Mode") { AppCommand.toggleReadingMode.post() }
+                Button("読書モード") { AppCommand.toggleReadingMode.post() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
             }

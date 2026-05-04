@@ -20,6 +20,15 @@ struct MainWindowView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         @Bindable var vm = appViewModel
+        let previewModeBinding = Binding<PreviewMode>(
+            get: { vm.previewMode },
+            set: { newMode in
+                if newMode == .viewer && vm.previewMode != .viewer {
+                    vm.previousPreviewMode = vm.previewMode
+                }
+                vm.previewMode = newMode
+            }
+        )
 
         ToolbarItemGroup(placement: .navigation) {
             Button {
@@ -43,37 +52,23 @@ struct MainWindowView: View {
         ToolbarItem(placement: .principal) {
             if vm.selectedFileURL != nil {
                 Menu {
-                    Section("Edit Mode") {
-                        Button {
-                            vm.previewMode = .off
-                        } label: {
-                            Label("Source", systemImage: vm.previewMode == .off ? "checkmark" : "")
+                    Picker("ビューモード", selection: previewModeBinding) {
+                        Section("編集モード") {
+                            Text("Source")
+                                .tag(PreviewMode.off)
+                            Text("Split")
+                                .tag(PreviewMode.split)
+                            Text("WYSIWYG")
+                                .tag(PreviewMode.wysiwyg)
+                                .disabled(!isMDFile)
                         }
-                        Button {
-                            vm.previewMode = .split
-                        } label: {
-                            Label("Split", systemImage: vm.previewMode == .split ? "checkmark" : "")
-                        }
-                        if isMDFile {
-                            Button {
-                                vm.previewMode = .wysiwyg
-                            } label: {
-                                Label("WYSIWYG", systemImage: vm.previewMode == .wysiwyg ? "checkmark" : "")
-                            }
+                        Section("読書") {
+                            Text("Viewer のみ")
+                                .tag(PreviewMode.viewer)
+                                .disabled(!isMDFile)
                         }
                     }
-                    if isMDFile {
-                        Section("Reading") {
-                            Button {
-                                if vm.previewMode != .viewer {
-                                    vm.previousPreviewMode = vm.previewMode
-                                }
-                                vm.previewMode = .viewer
-                            } label: {
-                                Label("Viewer Only", systemImage: vm.previewMode == .viewer ? "checkmark" : "")
-                            }
-                        }
-                    }
+                    .pickerStyle(.inline)
                 } label: {
                     Image(systemName: "eye")
                 }
@@ -82,6 +77,7 @@ struct MainWindowView: View {
                 .fixedSize()
                 .help("ビューモード")
                 .accessibilityLabel("ビューモード")
+                .accessibilityHint("読書モードに切り替えます")
             }
         }
 
