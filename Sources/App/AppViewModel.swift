@@ -43,6 +43,8 @@ final class AppViewModel {
     var isAIPendingConfirmation: Bool = false
     /// スペース起動時のカーソル位置（editorText 上のインデックス）
     var aiInlineCursorLocation: Int = 0
+    /// AI インラインセクションの表示位置
+    var aiInlineOverlayPosition: CGPoint = .zero
 
     // MARK: - Quick Insert
     let snippetStore = SnippetStore()
@@ -367,10 +369,6 @@ final class AppViewModel {
         }
     }
 
-    // MARK: - AI Inline Completion
-
-    private static let aiPlaceholder = "<!-- kobaamd-ai-generating -->"
-
     // MARK: - AI Provider Helpers
 
     /// 利用可能なAIプロバイダーが存在するか確認する
@@ -459,7 +457,7 @@ final class AppViewModel {
                 self.isAIPendingConfirmation = true
             } catch is CancellationError {
                 self.isAIGenerating = false
-                self.isAIPendingConfirmation = !self.pendingAIText.isEmpty
+                // KMD-42: キャンセル時は部分テキストを残さない（cancelAIGeneration 経由で消える）
             } catch {
                 self.pendingAIText = "> **AI エラー:** \(error.localizedDescription)"
                 self.isAIGenerating = false
@@ -497,98 +495,95 @@ final class AppViewModel {
         isAIInlinePromptVisible = false
     }
 
-    /// `{{プロンプト}}` を含む行をプレースホルダーに差し替えて AI を呼び出す。
-    /// すべて @MainActor の editorText 操作で完結するため textView への直接アクセス不要。
+    /// `{{プロンプト}}` 形式の行を AI に投げる。
+    /// KMD-42 で、editorText へのプレースホルダー書き込みを廃止し、
+    /// pendingAIText 経由のフローに統合した。
     func startAIInlineCompletion(lineContent: String) {
         let trimmed = lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{{"), trimmed.hasSuffix("}}"), trimmed.count > 4 else { return }
         let prompt = String(trimmed.dropFirst(2).dropLast(2)).trimmingCharacters(in: .whitespaces)
         guard !prompt.isEmpty else { return }
 
+        // {{...}} 行の位置を特定し、その行を消してから pendingAIText 経由で表示する
+        guard let lineRange = inlinePromptLineRange(for: lineContent) else { return }
+        let utf16StartOffset = editorText.utf16.distance(
+            from: editorText.utf16.startIndex,
+            to: lineRange.lowerBound.samePosition(in: editorText.utf16) ?? editorText.utf16.startIndex
+        )
+        editorText.replaceSubrange(lineRange, with: "")
+        aiInlineCursorLocation = utf16StartOffset
+        markEdited()
+
         // プロバイダー選択
-        let provider: APIKeyStore.Provider
-        if let k = APIKeyStore.load(for: .openai), !k.isEmpty      { provider = .openai }
-        else if let k = APIKeyStore.load(for: .anthropic), !k.isEmpty { provider = .anthropic }
-        else {
-            // キー未設定: {{...}} 行の後ろにエラーを挿入
-            editorText = editorText.replacingOccurrences(
-                of: lineContent,
-                with: lineContent + "\n> **AI エラー:** API キーが設定されていません（設定 ⌘, から登録）\n",
-                range: editorText.range(of: lineContent)
-            )
-            markEdited()
+        guard let provider = resolveAIProvider() else {
+            pendingAIText = "API キーが設定されていません（設定 ⌘, から登録）"
+            isAIPendingConfirmation = true
             return
         }
 
-        // コンテキスト（{{...}} 行より前の最大2000文字）
-        let context: String
-        if let range = editorText.range(of: lineContent) {
-            context = String(editorText[..<range.lowerBound].suffix(2000))
-        } else {
-            context = ""
-        }
+        // コンテキスト
+        let utf16 = editorText.utf16
+        let clampedOffset = min(aiInlineCursorLocation, utf16.count)
+        let utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedOffset)
+        let endIndex = String.Index(utf16Index, within: editorText) ?? editorText.endIndex
+        let textBefore = String(editorText[editorText.startIndex..<endIndex])
+        let context = String(textBefore.suffix(2000))
 
-        // {{...}} 行 → プレースホルダーへ差し替え
-        let ph = Self.aiPlaceholder
-        guard let lineRange = editorText.range(of: lineContent) else { return }
-        editorText.replaceSubrange(lineRange, with: "\(ph)\n")
         isAIGenerating = true
-        markEdited()
+        pendingAIText = ""
 
+        aiTask?.cancel()
         aiTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.aiTask = nil }
             do {
-                // 30fps（33ms）バッファリング: トークンを溜めてまとめて editorText に反映する
                 var buffer = ""
                 var lastFlush = ContinuousClock.now
                 let stream = self.aiService.stream(prompt: prompt, context: context, provider: provider)
                 for try await token in stream {
-                    if Task.isCancelled {
-                        throw CancellationError()
-                    }
+                    if Task.isCancelled { throw CancellationError() }
                     buffer += token
                     let now = ContinuousClock.now
-                    // 33ms 以上経過していたらバッファをフラッシュ
                     if now - lastFlush >= .milliseconds(33) {
-                        if let r = self.editorText.range(of: ph) {
-                            self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
-                        }
+                        self.pendingAIText += buffer
                         buffer = ""
                         lastFlush = now
                     }
                 }
-                // 残りバッファをフラッシュ
-                if !buffer.isEmpty, let r = self.editorText.range(of: ph) {
-                    self.editorText.replaceSubrange(r.lowerBound..<r.lowerBound, with: buffer)
-                }
-                // ストリーミング完了後にプレースホルダーを削除
-                if let r = self.editorText.range(of: ph) {
-                    self.editorText.removeSubrange(r)
-                }
+                if !buffer.isEmpty { self.pendingAIText += buffer }
                 self.isAIGenerating = false
-                self.markEdited()
+                self.isAIPendingConfirmation = true
             } catch is CancellationError {
-                // キャンセル時: プレースホルダーを削除し、それまでのテキストは残す
-                if let r = self.editorText.range(of: ph) {
-                    self.editorText.removeSubrange(r)
-                }
                 self.isAIGenerating = false
-                self.markEdited()
+                // KMD-42: キャンセル時は部分テキストを残さない（cancelAIGeneration 経由で消える）
             } catch {
-                if let r = self.editorText.range(of: ph) {
-                    self.editorText.replaceSubrange(r, with: "> **AI エラー:** \(error.localizedDescription)")
-                    self.markEdited()
-                }
+                self.pendingAIText = "> **AI エラー:** \(error.localizedDescription)"
                 self.isAIGenerating = false
+                self.isAIPendingConfirmation = true
             }
         }
     }
 
-    /// AI インライン補完をキャンセルする。生成済みテキストはエディタに残る。
+    /// AI インライン補完をキャンセルし、未確定テキストも破棄する（KMD-42 仕様変更）。
+    /// KMD-25 では部分テキストを残していたが、本変更で常に破棄する。
     func cancelAIGeneration() {
         aiTask?.cancel()
         aiTask = nil
+        pendingAIText = ""
+        isAIPendingConfirmation = false
+        isAIGenerating = false
+    }
+
+    private func inlinePromptLineRange(for lineContent: String) -> Range<String.Index>? {
+        if let directRange = editorText.range(of: lineContent) {
+            return directRange
+        }
+        let trimmed = lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmedRange = editorText.range(of: trimmed) else { return nil }
+        let nsText = editorText as NSString
+        let nsRange = NSRange(trimmedRange, in: editorText)
+        let lineRange = nsText.lineRange(for: nsRange)
+        return Range(lineRange, in: editorText)
     }
 
     // MARK: - Confluence Sync

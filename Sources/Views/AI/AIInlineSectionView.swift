@@ -1,22 +1,34 @@
 import SwiftUI
 
-struct AIInlinePendingOverlay: View {
+struct AIInlineSectionView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @State private var isCaretVisible = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 0) {
                 Rectangle()
                     .fill(Color.kobaAccent)
                     .frame(width: 2)
 
                 ScrollView {
-                    Text(appViewModel.pendingAIText)
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(Color.kobaInk)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(appViewModel.pendingAIText)
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(Color.kobaInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if appViewModel.isAIGenerating {
+                            Text("▍")
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(Color.kobaAccent)
+                                .opacity(isCaretVisible ? 1.0 : 0.3)
+                                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isCaretVisible)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                 }
                 .frame(maxHeight: 300)
             }
@@ -27,7 +39,7 @@ struct AIInlinePendingOverlay: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .scaleEffect(0.6)
-                    Text("AI 生成中...")
+                    Text("AI 生成中... ⌘. でキャンセル")
                         .font(.caption)
                         .foregroundStyle(Color.kobaMute)
                     Spacer()
@@ -40,7 +52,6 @@ struct AIInlinePendingOverlay: View {
                     .buttonStyle(.bordered)
                     .keyboardShortcut(.escape, modifiers: [])
                 }
-                .padding(.top, 6)
                 .padding(.horizontal, 4)
             }
 
@@ -71,18 +82,22 @@ struct AIInlinePendingOverlay: View {
                         .font(.caption2)
                         .foregroundStyle(Color.kobaMute2)
                 }
-                .padding(.top, 8)
                 .padding(.horizontal, 4)
             }
         }
-        .padding(12)
-        .frame(maxWidth: 500)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(8)
+        .frame(maxWidth: 520)
+        .background(Color.kobaPaper.opacity(0.96))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.kobaLine.opacity(0.7), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
+        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("AI 生成テキスト 確定または破棄")
+        .onAppear {
+            isCaretVisible = true
+        }
     }
 }
