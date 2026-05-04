@@ -239,6 +239,46 @@ struct AppViewModelTests {
         #expect(vm.editorText == "🇯🇵Hell!o")
     }
 
+    // MARK: - Viewer Mode Tests
+
+    @Test("PreviewMode に viewer ケースが存在し、allCases に含まれること")
+    func previewModeIncludesViewerCase() {
+        #expect(PreviewMode.allCases.contains(.viewer))
+        #expect(PreviewMode.allCases.count == 4)
+    }
+
+    @Test("toggleViewerMode で .viewer に切り替わり、もう一度呼ぶと前のモードに戻ること")
+    func toggleViewerModeSwitchesBetweenViewerAndPrevious() {
+        let vm = AppViewModel()
+        vm.selectedFileURL = URL(fileURLWithPath: "/tmp/doc.md")
+        vm.previewMode = .split
+
+        vm.toggleViewerMode()
+        #expect(vm.previewMode == .viewer)
+        #expect(vm.previousPreviewMode == .split)
+
+        vm.toggleViewerMode()
+        #expect(vm.previewMode == .split)
+    }
+
+    @Test("toggleViewerMode は非Markdownファイルでは動作しないこと")
+    func toggleViewerModeIgnoresNonMarkdownFiles() {
+        let vm = AppViewModel()
+        vm.selectedFileURL = URL(fileURLWithPath: "/tmp/diagram.d2")
+        vm.previewMode = .split
+
+        vm.toggleViewerMode()
+        #expect(vm.previewMode == .split)
+    }
+
+    @Test("PreviewMode の rawValue が安定していること（永続化フォールバック確認）")
+    func previewModeRawValuesAreStable() {
+        #expect(PreviewMode(rawValue: "Viewer") == .viewer)
+        #expect(PreviewMode(rawValue: "UnknownMode") == nil)
+    }
+
+    // MARK: - KMD-42 AI Inline Append Tests
+
     @Test("cancelAIGeneration で pendingAIText が常に破棄されること（KMD-42 仕様変更）")
     func cancelAIGenerationAlwaysClearsPendingText() {
         let vm = AppViewModel()

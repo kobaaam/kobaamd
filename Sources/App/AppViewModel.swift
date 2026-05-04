@@ -7,6 +7,7 @@ enum PreviewMode: String, CaseIterable {
     case split   = "Split"
     case wysiwyg = "WYSIWYG"
     case off     = "Off"
+    case viewer  = "Viewer"
 }
 
 @Observable
@@ -28,6 +29,7 @@ final class AppViewModel {
     var errorMessage: String? = nil
     var showError: Bool = false
     var previewMode: PreviewMode = .split
+    var previousPreviewMode: PreviewMode = .split
     var isSidebarVisible: Bool = true
     var isFileLoading: Bool = false
     var isDiffMode: Bool = false
@@ -219,6 +221,29 @@ final class AppViewModel {
         } catch {
             showAppError(.fileWriteFailed(url: url, underlying: error))
         }
+    }
+
+    func toggleViewerMode() {
+        let ext = selectedFileURL?.pathExtension.lowercased() ?? ""
+        let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
+        guard isMD else { return }
+
+        if previewMode == .viewer {
+            previewMode = previousPreviewMode
+        } else {
+            previousPreviewMode = previewMode
+            previewMode = .viewer
+        }
+
+        let announcement = previewMode == .viewer ? "Reading mode active" : "Edit mode active"
+        NSAccessibility.post(
+            element: NSApp.mainWindow ?? NSApp,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: announcement,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue
+            ]
+        )
     }
 
     func markSaved() {
