@@ -37,6 +37,23 @@ struct ConfluenceServiceXSSTests {
         #expect(html.contains("<ac:image></ac:image>"))
     }
 
+    @Test("data: スキーム画像はそのまま通過すること（MR-4 スコープ外）")
+    func passesDataSchemeImage() {
+        let dataURI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        let html = svc.convertToStorageFormat("![alt](\(dataURI))")
+
+        #expect(html.contains("<ac:image><ri:url ri:value=\""))
+        #expect(html.contains("data:image/png;base64,"))
+        #expect(!html.contains("<ac:image></ac:image>"))
+    }
+
+    @Test("vbscript: スキームはブロックせずそのまま通過すること（MR-4 スコープ外）")
+    func passesVbscriptScheme() {
+        let html = svc.convertToStorageFormat("[label](vbscript:msgbox(1))")
+
+        #expect(html.contains(#"<a href="vbscript:msgbox(1)">label</a>"#))
+    }
+
     @Test("画像属性内のダブルクォートがエスケープされること")
     func escapesQuotesInImageURL() {
         let markdown = #"![alt](<"onerror="alert(1)>)"#

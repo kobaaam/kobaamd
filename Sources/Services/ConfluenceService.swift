@@ -277,9 +277,10 @@ private struct StorageFormatWalker: MarkupWalker {
 
     private func sanitizeURL(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let blockedSchemes = ["javascript:", "data:", "vbscript:"]
-        for scheme in blockedSchemes where trimmed.range(
-            of: scheme,
+        // PRD MR-4 のスコープ: `javascript:` スキームのみブロックする。
+        // `data:` や `vbscript:` はスコープ外のため、そのまま通過させる。
+        if trimmed.range(
+            of: "javascript:",
             options: [.caseInsensitive, .anchored]
         ) != nil {
             return ""
