@@ -45,6 +45,8 @@ final class AppViewModel {
     var isAIPendingConfirmation: Bool = false
     /// スペース起動時のカーソル位置（editorText 上のインデックス）
     var aiInlineCursorLocation: Int = 0
+    /// ファイルオープン完了後にエディタへ伝えるジャンプ先行番号
+    var pendingJumpLine: Int? = nil
     /// AI インラインセクションの表示位置
     var aiInlineOverlayPosition: CGPoint = .zero
 
@@ -102,6 +104,10 @@ final class AppViewModel {
     func refreshQuickOpenIndex() {
         quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
         quickOpenViewModel.filter()
+        let folderURLs = fileTreeViewModel.folders.map(\.url)
+        todoViewModel.updateWorkspaceRoots(folderURLs)
+        // Folder スコープの対象は「最初に開いたワークスペースフォルダ」（PRD §2）
+        todoViewModel.updateFolderRoot(folderURLs.first)
     }
 
     @MainActor
@@ -115,6 +121,14 @@ final class AppViewModel {
         } catch {
             showAppError(.fileReadFailed(url: url, underlying: error))
         }
+    }
+
+    /// ファイルを開き、エディタの準備完了後に指定行にジャンプする。
+    /// エディタ側が .onChange(of: pendingJumpLine) で通知を受け取りジャンプする。
+    @MainActor
+    func openFileAndJump(url: URL, line: Int) async {
+        await openFile(url: url)
+        pendingJumpLine = line
     }
 
     /// 新しい空タブを追加する。
@@ -251,6 +265,9 @@ final class AppViewModel {
         isDirty = false
         scheduleStatsUpdate()
         todoViewModel.update(text: editorText)
+        if todoViewModel.scope != .file, let url = selectedFileURL {
+            todoViewModel.updateFile(url, text: editorText)
+        }
     }
 
     func markEdited() {
