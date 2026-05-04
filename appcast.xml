@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+    <channel>
+        <title>kobaamd</title>
+        <link>https://github.com/kobaaam/kobaamd</link>
+        <description>kobaamd — AI-friendly Markdown editor for macOS</description>
+        <language>ja</language>
+        <!-- リリース時に generate-appcast.sh が上書きする。
+             item ゼロのときは Sparkle が「最新版」と判定する。 -->
+    </channel>
+</rss>

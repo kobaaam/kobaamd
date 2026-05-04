@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import Combine
 import Sparkle
 
 // MARK: - CheckForUpdatesView
@@ -7,15 +9,28 @@ import Sparkle
 struct CheckForUpdatesView: View {
     let updater: SPUUpdater
 
-    @State private var canCheckForUpdates = false
+    @StateObject private var state = UpdateCheckState()
 
     var body: some View {
         Button("アップデートを確認...") {
-            updater.checkForUpdates()
+            NSApp.activate()
+            DispatchQueue.main.async {
+                updater.checkForUpdates()
+            }
         }
-        .disabled(!canCheckForUpdates)
+        .disabled(!state.canCheckForUpdates)
         .onAppear {
-            canCheckForUpdates = !updater.sessionInProgress
+            state.canCheckForUpdates = updater.canCheckForUpdates
+            if state.cancellable == nil {
+                state.cancellable = updater.publisher(for: \.canCheckForUpdates)
+                    .receive(on: DispatchQueue.main)
+                    .assign(to: \.canCheckForUpdates, on: state)
+            }
         }
     }
+}
+
+private final class UpdateCheckState: ObservableObject {
+    @Published var canCheckForUpdates = false
+    var cancellable: AnyCancellable?
 }
