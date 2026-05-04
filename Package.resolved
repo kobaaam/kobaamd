@@ -32,7 +32,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tree-sitter/swift-tree-sitter",
       "state" : {
-        "branch" : "main",
         "revision" : "f97df585296977d8fcaf644cbde567151d1367b8"
       }
     },
@@ -50,7 +49,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
       "state" : {
-        "branch" : "split_parser",
         "revision" : "f969cd3ae3f9fbd4e43205431d0ae286014c05b5"
       }
     }
