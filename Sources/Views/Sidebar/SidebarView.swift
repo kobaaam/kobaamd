@@ -21,7 +21,7 @@ struct SidebarView: View {
             // MARK: File tree + resize handle + outline (flex area)
             GeometryReader { geo in
                 let todoHeaderHeight: CGFloat = 28
-                let todoBodyHeight: CGFloat = isTodoExpanded ? min(200, geo.size.height * 0.3) : 0
+                let todoBodyHeight: CGFloat = isTodoExpanded ? min(240, geo.size.height * 0.35) : 0
                 let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight
                 let isOutlineEmpty = appViewModel.outlineViewModel.items.isEmpty
                 let outlineHeight: CGFloat = isOutlineEmpty ? 60 : max(60, availableHeight * outlinePanelRatio)
@@ -175,7 +175,7 @@ struct SidebarView: View {
             // Body (expanded)
             if isTodoExpanded {
                 TodoView(todoViewModel: appViewModel.todoViewModel)
-                    .frame(maxHeight: 200)
+                    .frame(maxHeight: 240)
             }
         }
     }

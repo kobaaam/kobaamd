@@ -2,6 +2,7 @@ import AppKit
 import Testing
 @testable import kobaamd
 
+@MainActor
 @Suite("HighlightService")
 struct HighlightServiceTests {
 

@@ -40,13 +40,17 @@ struct PreviewView: View {
         .onChange(of: appViewModel.editorText) { _, newValue in
             guard !isD2File else { return }
             if !isReady && !newValue.isEmpty { isReady = true }
-            previewViewModel.update(text: newValue)
+            previewViewModel.update(text: newValue, viewerMode: appViewModel.previewMode == .viewer)
+        }
+        .onChange(of: appViewModel.previewMode) { _, _ in
+            guard !isD2File else { return }
+            previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onAppear {
             guard !isD2File else { return }
             if !appViewModel.editorText.isEmpty {
                 isReady = true
-                previewViewModel.update(text: appViewModel.editorText)
+                previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
             }
         }
     }
