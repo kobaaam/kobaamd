@@ -1,6 +1,7 @@
 import Testing
 @testable import kobaamd
 import Foundation
+import Observation
 
 // Uses injected UserDefaults (suiteName) for proper test isolation.
 // No shared state between tests — .serialized is no longer required.
@@ -101,6 +102,47 @@ struct AppStateTests {
         state.clearRecentFiles()
         let paths = defaults.stringArray(forKey: "recentFiles") ?? []
         #expect(paths.isEmpty)
+    }
+
+    // MARK: - Color theme
+
+    @Test("selectedTheme assignment persists raw value to UserDefaults")
+    func selectedThemePersists() {
+        state.selectedTheme = .dark
+        #expect(defaults.string(forKey: "selectedColorTheme") == "dark")
+        state.selectedTheme = .solarizedDark
+        #expect(defaults.string(forKey: "selectedColorTheme") == "solarizedDark")
+    }
+
+    @Test("selectedTheme initializes from UserDefaults raw value")
+    func selectedThemeReadsFromDefaultsOnInit() throws {
+        let suiteName = "kobaamd.test.\(UUID().uuidString)"
+        let suite = try #require(UserDefaults(suiteName: suiteName))
+        suite.set("dark", forKey: "selectedColorTheme")
+        let preset = AppState(defaults: suite)
+        #expect(preset.selectedTheme == .dark)
+    }
+
+    @Test("selectedTheme falls back to .light on invalid raw value")
+    func selectedThemeFallbackOnInvalid() throws {
+        let suiteName = "kobaamd.test.\(UUID().uuidString)"
+        let suite = try #require(UserDefaults(suiteName: suiteName))
+        suite.set("not-a-real-theme", forKey: "selectedColorTheme")
+        let preset = AppState(defaults: suite)
+        #expect(preset.selectedTheme == .light)
+    }
+
+    @Test("selectedTheme assignment fires @Observable change notification")
+    func selectedThemeFiresObservation() async {
+        var notified = false
+        withObservationTracking {
+            _ = state.selectedTheme
+        } onChange: {
+            notified = true
+        }
+        state.selectedTheme = .dark
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        #expect(notified == true)
     }
 
     // MARK: - loadRecentFiles filtering
