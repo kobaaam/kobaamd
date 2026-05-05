@@ -54,3 +54,6 @@ eddsa_priv*
 *.pem
 # テストリソースの .pem は追跡対象 (e.g. Tests/Resources/*.pem)
 !Tests/Resources/*.pem
+
+# Wiki lint キャッシュ（ローカル生成ファイル、コミット対象外）
+.cache/

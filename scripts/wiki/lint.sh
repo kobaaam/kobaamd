@@ -509,7 +509,9 @@ for i, line in enumerate(lines, 1):
     if re.match(r"^\s*```", line):
         in_code = not in_code; continue
     if in_code: continue
-    for m in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", line):
+    # Remove inline-code spans before searching for [[...]]
+    stripped = re.sub(r"`[^`]*`", "", line)
+    for m in re.finditer(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]", stripped):
         slug = m.group(1).strip()
         # Skip things that look like URLs or paths
         if "/" in slug or slug.startswith("http"):
