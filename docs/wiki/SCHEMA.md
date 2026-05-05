@@ -210,6 +210,46 @@ tags: [swiftui, nstextview, prompt-caching, swift-code, pr-review]
 - [[editor-view]]
 ```
 
+### 6. wikilink の解決ルール
+
+`[[name]]` 形式の wikilink は、以下の優先順位で解決する。
+
+1. **slug 一致を最優先**: `articles/**/<name>.md`（ファイル名から拡張子を除いたもの = slug）に完全一致する記事があれば、その記事を参照先とする
+2. **`frontmatter.title` 一致（フォールバック）**: slug で見つからない場合、各記事の frontmatter `title` が `name` と完全一致する記事を参照先とする
+3. どちらにも一致しない場合は **broken-link** として `kobaamd_lint_wiki`（rule: `broken-link`）が検出する
+4. 同一 `name` に対して slug 一致と title 一致が両方成立する場合は **slug を優先**する
+
+#### 新規生成・更新時の規則（重要）
+
+`kobaamd_update_wiki` をはじめとする wiki 編集系 subagent は、新規 wikilink を生成・追記するとき **必ず slug 形式（lowercase-kebab）を使う**。`frontmatter.title` 形式（日本語タイトル等）での新規生成は禁止。
+
+理由:
+
+- title はリネームや表記揺れ（半角スペース有無、約物の差異）の影響を受けやすく、broken-link を増やす要因になる
+- slug はファイル名と一意に対応するため、リファクタ耐性が高い
+- title 揺れが起きても lint で検出できるよう、生成は slug に固定して入口を絞る
+
+既存の wiki に存在する `frontmatter.title` 形式の wikilink（例: `[[エディタコア (NSTextViewWrapper)]]`、`[[AppKit-SwiftUI ブリッジ]]` など）は、移行コスト・既存資産温存の観点で **温存**する。lint はこれらを broken-link 判定しない（上記ルール 2 のフォールバック解決により有効リンクとして扱う）。
+
+#### 違反例 / 適合例
+
+**違反例**（新規生成で title alias 形式を使う、SCHEMA 違反）:
+
+```markdown
+<!-- 新規追記する Related に title 形式を使うのは禁止 -->
+## Related
+- [[エディタコア (NSTextViewWrapper)]]   ← 新規生成では NG
+```
+
+**適合例**（新規生成は slug 形式に固定）:
+
+```markdown
+## Related
+- [[editor-core]]   ← slug 形式 OK
+```
+
+ただし**既に書かれている `[[エディタコア (NSTextViewWrapper)]]` を slug 形式に置き換える義務はない**。ルール 2 のフォールバックで解決される。
+
 ## ワークフロー
 
 ### Ingest（取り込み）

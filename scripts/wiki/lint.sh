@@ -157,8 +157,28 @@ for f in "${all_articles[@]}"; do
   printf '%s\t%s\n' "$slug" "$rel" >>"$slug_index_tmp"
 done
 
+# Title index is built lazily after parse_cached() is defined (see below).
+# slug_lookup() resolves a wikilink target name with B-plan rules:
+#   1) slug match (preferred)
+#   2) frontmatter.title exact match (fallback)
+# Per docs/wiki/SCHEMA.md "### 6. wikilink の解決ルール" (B 案 / KMD-52 cycle 2).
+title_index_tmp=$(mktemp)
+title_index_built=0
+
 slug_lookup() {
-  awk -v s="$1" -F'\t' '$1==s{print $2; exit}' "$slug_index_tmp"
+  local name="$1"
+  local hit
+  # 1) slug match (preferred)
+  hit=$(awk -v s="$name" -F'\t' '$1==s{print $2; exit}' "$slug_index_tmp")
+  if [ -n "$hit" ]; then
+    printf '%s' "$hit"
+    return 0
+  fi
+  # 2) title fallback
+  if [ "$title_index_built" -eq 0 ]; then
+    build_title_index
+  fi
+  awk -v s="$name" -F'\t' '$1==s{print $2; exit}' "$title_index_tmp"
 }
 
 # --- Frontmatter parsing helper (python) ------------------------------------
@@ -312,6 +332,25 @@ parse_cached() {
     parse_frontmatter "$f" >"$cache_file"
   fi
   cat "$cache_file"
+}
+
+# --- Title index (B-plan wikilink resolution / SCHEMA §6) -------------------
+#
+# Build a `frontmatter.title<TAB>relpath` map by parsing each article's
+# frontmatter. Used as the fallback resolver inside slug_lookup() when a
+# `[[name]]` does not match any slug. Built lazily on first miss.
+
+build_title_index() {
+  local f rel parsed title
+  for f in "${all_articles[@]}"; do
+    rel=${f#"$ROOT"/}
+    parsed=$(parse_cached "$f")
+    title=$(printf '%s' "$parsed" | jq -r '.title // empty')
+    if [ -n "$title" ]; then
+      printf '%s\t%s\n' "$title" "$rel" >>"$title_index_tmp"
+    fi
+  done
+  title_index_built=1
 }
 
 # --- Pre-compute: all incoming references (slug → list of referrers) --------

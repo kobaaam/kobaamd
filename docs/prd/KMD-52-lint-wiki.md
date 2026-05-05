@@ -1,7 +1,8 @@
 ---
 linear: KMD-52
-status: in-progress
+status: in-review (rework cycle 2 - human B案 reflected)
 created_at: 2026-05-06
+updated_at: 2026-05-06
 author: kobaamd_implement_code (Claude Opus 4.7)
 ---
 
@@ -28,7 +29,7 @@ python フォールバックのみで判定する。
 1. `.claude/commands/kobaamd_lint_wiki.md` を新規作成、引数で対象パスを受け取れる
 2. `scripts/wiki/lint.sh` を新規作成、5 観点のチェックを実装：
    1. 孤立記事（index.md / 他記事 Related からリンクされていない）— shell + grep のみ
-   2. リンク切れ（`[[wikilink]]` の参照先未存在）— shell + grep のみ
+   2. リンク切れ（`[[wikilink]]` の参照先未存在）— shell + grep のみ。**B 案（KMD-52 rework cycle 2 にて確定）**: 解決は `slug 一致 OR frontmatter.title 一致` の両形式を許容（後述 §11 参照）
    3. stale 記事（`updated` から 60 日以上、かつ `sources` 最終更新と乖離）— shell + date のみ
    4. セクション単独文脈不備 — Haiku で判定（必須）。Prompt Caching、リトライ 3 回、最終失敗は警告 + スキップ、content_hash キャッシュ
    5. frontmatter 整合違反（必須フィールド欠落、タグ命名規約違反、Related 双方向性違反）— shell + yq、yq 不在時は python フォールバック
@@ -82,6 +83,8 @@ CLI のみ。利用例:
 | AC4 | `--fix` でタグ正規化と frontmatter 補完ができる |
 | AC5 | Haiku 呼び出しは Prompt Caching、リトライ 3 回、失敗時警告 + スキップ |
 | AC6 | content_hash キャッシュで再実行が高速化される |
+| AC7 | broken-link 解決は slug 一致 OR frontmatter.title 一致の両形式を許容（B 案） |
+| AC8 | `docs/wiki/SCHEMA.md` に wikilink 解決ルールが明文化されている（B 案：両形式許容、推奨は slug） |
 
 ## 7. リスク・トレードオフ
 
@@ -110,13 +113,14 @@ CLI のみ。利用例:
 ### 既存ファイル（変更）
 
 - `.gitignore` — `.cache/wiki-lint.json` を ignore に追加（必要なら）
+- `docs/wiki/SCHEMA.md` — wikilink 解決ルールを記載する新セクションを追加（B 案 / rework cycle 2 にて追加。既存の §1〜§5 は触らない）
 
 ### 変更してはいけない箇所（明示）
 
 - `scripts/wiki/ask.sh`：本 PR では一切触らない（lint は独自に Haiku を呼ぶ）
 - `scripts/wiki/load_all.sh`：触らない
 - `docs/wiki/articles/**/*.md`：`--fix` を明示的に指定したときだけ書き換える
-- `docs/wiki/SCHEMA.md`：規約は KMD-51 の責務、本 PR では変更しない
+- `docs/wiki/SCHEMA.md` の既存セクション（記事フォーマット、記載規約 1〜5、ワークフロー、パイプライン統合）：本 PR では**追記のみ**。既存規約の改変はしない
 - 他の `.claude/commands/*.md`：触らない（pipeline_weekly 統合は KMD-54）
 - `Package.swift` / Swift コード：触らない（Swift 変更なし）
 
@@ -131,3 +135,44 @@ CLI のみ。利用例:
 
 - merge 後、`./scripts/wiki/lint.sh` をオペレータが手動実行
 - KMD-54 で pipeline_weekly に組み込み、KMD-55 で ingest ゲート化（後続）
+
+## 11. wikilink 解決ルール（B 案決定 / rework cycle 2）
+
+### 背景
+
+cycle 1 のレビューで、`scripts/wiki/lint.sh` の broken-link 検出ロジックが日本語タイトル形 wikilink（例: `[[エディタコア (NSTextViewWrapper)]]`、`[[AppKit-SwiftUI ブリッジ]]`、`[[MVVM と Observable パターン]]`、`[[ポストモーテムから学ぶ実装パターン]]` 等）をすべて broken-link 判定する問題が human-judgment として残された。`docs/wiki/SCHEMA.md` の wikilink 構文に slug 限定 / title alias 許容のどちらかが明記されていなかったため、3 案（A: slug-only、B: title alias 許容、C: 両形式許容 + 明文化）が提示された。
+
+### 決定（人間判断 / 2026-05-05T23:25 by es57ster@gmail.com）
+
+**B 案を採用**: title alias を許容する。broken-link 検出は「slug 一致 OR `frontmatter.title` 一致」の両形式を許容するロジックに拡張する。既存資産（日本語タイトル wikilink 計 6 件 / 4 記事）を温存する。
+
+### 仕様（lint.sh 実装）
+
+`slug_lookup` ヘルパーを以下のロジックに拡張する。
+
+1. `[[wikilink]]` の inner text を `name` とする
+2. **slug 一致（優先）**: `articles/**/<name>.md` のファイルが存在すれば、その相対パスを返す
+3. **title 一致（フォールバック）**: 全 articles をスキャンし、`frontmatter.title` が `name` と完全一致する記事があれば、その相対パスを返す
+4. どちらにも一致しない場合のみ broken-link として `emit`
+
+両形式に同時に一致するケース（slug = "foo"、別記事が `title: foo`）は slug 優先とする。title 一致は線形スキャンになるため、起動時に `articles/**` を 1 度だけ走査して `title → relpath` の連想配列をビルドし、ルックアップは O(1) にする（既存の `slug_index_tmp` と並列の `title_index_tmp` を持つ）。
+
+### 仕様（SCHEMA.md 明文化）
+
+`docs/wiki/SCHEMA.md` の「記載規約」末尾に新セクション「### 6. wikilink の解決ルール」を追加し、以下を明記する。
+
+1. wikilink `[[name]]` は **slug 一致を最優先**、見つからなければ `frontmatter.title` 完全一致でフォールバック解決する
+2. 新規記事を生成・更新する subagent（`kobaamd_update_wiki` 等）は **slug 形式（lowercase-kebab）を必ず使用**する。title alias 形式での新規生成は禁止
+3. 既存の日本語タイトル形 wikilink は移行コストの観点で温存する（B 案の意図）。lint は両形式を broken-link 判定しない
+4. 同一 name に対して slug 一致と title 一致が両方成立する場合は slug 優先
+
+### 影響範囲
+
+- `scripts/wiki/lint.sh`: `slug_lookup` 拡張、`title_index_tmp` 追加（30〜50 行程度）
+- `docs/wiki/SCHEMA.md`: 新セクション「### 6. wikilink の解決ルール」追加（30 行程度）
+- 動作検証: `./scripts/wiki/lint.sh --no-llm` 実行で broken-link が 7 件 → 1 件（`[[PRD 品質サイクル]]` のみ。これは記事自体が未作成のため真の broken-link）に減ることを確認
+
+### A 案・C 案を選ばなかった理由（記録）
+
+- A 案（slug-only 強制）: 既存の日本語タイトル wikilink 6 件を slug 形式に書き換える別 PR が必要。本サイクルのスコープが広がる
+- C 案（両形式許容するが新規も両形式 OK）: SCHEMA としての一貫性が下がる。生成側を slug に統一しないと将来的に title 揺れによる broken-link が増える
