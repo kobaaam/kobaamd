@@ -97,7 +97,21 @@ auto_commit_push_pr() {
   # uncommitted があるか
   if [[ -n "$(git status --porcelain)" ]]; then
     log "  staged/unstaged changes detected, committing"
-    git add -A
+    # fail-2 対策: ホワイトリスト方式でステージング（.env / pem / priv 等は除外）
+    local EXCLUDE_PATTERNS='.env|\.pem$|_priv|eddsa_priv|^dist/|^\.build/|^\.logs/'
+    local staged_and_modified
+    staged_and_modified=$(git status --porcelain=v1 -uall \
+      | awk '{print $2}' \
+      | grep -E '\.(swift|md|sh|json|yml|yaml)$' \
+      | grep -Ev "$EXCLUDE_PATTERNS" \
+      || true)
+    if [[ -z "$staged_and_modified" ]]; then
+      log "  no eligible files to stage (ホワイトリスト後ゼロ件)"
+      return 0
+    fi
+    while IFS= read -r f; do
+      [[ -e "$f" ]] && git add -- "$f"
+    done <<< "$staged_and_modified"
 
     # pre-commit hook を必ず通す（--no-verify 禁止）
     if ! git commit -m "${id}: WIP commit by halted recovery (auto)"; then
@@ -135,7 +149,12 @@ EOF
     log "  PR already exists, skipping gh pr create"
   else
     log "  creating PR via gh"
-    local title="[HALTED-RECOVERED] ${id}: $(git log -1 --pretty=%s | head -c 100)"
+    local raw_subject
+    raw_subject=$(git log -1 --pretty=%s | head -c 100)
+    # W1 対策: バッククォート・$() をサニタイズしてコマンドインジェクションを防ぐ
+    local sanitized_subject
+    sanitized_subject=$(echo "$raw_subject" | sed 's/`//g; s/\$([^)]*)/\$/g')
+    local title="[HALTED-RECOVERED] ${id}: ${sanitized_subject}"
     local body=$(mktemp)
     cat > "$body" <<EOF
 ## Auto-recovered from halted state
@@ -196,6 +215,13 @@ recover_one() {
   local id="$1"
   log "evaluating $id"
 
+  # fail-1 対策: caller のワーキングツリーが dirty なら skip（checkout でキャリーオーバーを防ぐ）
+  if ! git diff --quiet HEAD -- 2>/dev/null; then
+    log "  skipped: caller dirty (uncommitted changes detected) — ${id}"
+    log "skipped: caller dirty" >> "$LOG"
+    return 0
+  fi
+
   local state
   state=$($LQ issue.get "$id" | jq -r '.state.name')
   if [[ "$state" != "In Progress" ]]; then
@@ -227,7 +253,7 @@ recover_one() {
 
     # build 確認
     log "  running swift build to verify"
-    if swift build 2>&1 | tee /tmp/recover_build.log | tail -3 | grep -q "Build complete"; then
+    if swift build > /tmp/recover_build.log 2>&1; then
       log "  swift build PASS, proceeding with auto recovery"
       auto_commit_push_pr "$id" "$branch"
     else
