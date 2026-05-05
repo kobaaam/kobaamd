@@ -104,6 +104,7 @@ AI 自律パイプラインで生成されるシェルスクリプトには、�
 - [[autonomous-pipeline-philosophy]] — パイプラインの設計思想
 - [[postmortem-patterns]] — 過去の問題からの学び（パターン 8/9/11/12 が本記事と関連）
 - [[sparkle-release]] — KMD-27 で確立された多層防御の具体実装
+- [[dependency-inversion-guard]] — shell quoting / set -euo pipefail / trap cleanup を前提とした依存逆順ガードの shell パターン
 
 ## Sources
 

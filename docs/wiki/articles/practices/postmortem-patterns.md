@@ -1,8 +1,14 @@
 ---
 title: ポストモーテムから学ぶ実装パターン
 category: practices
-tags: [postmortem, patterns, codex, testing, observability, auto-carve-out]
-sources: [docs/learnings/2026-04-28-KMD-4.md, docs/learnings/2026-04-28-KMD-6.md, docs/learnings/2026-04-29-KMD-20.md, docs/learnings/2026-04-28-KMD-22.md, docs/learnings/2026-05-06-KMD-144.md]
+tags: [postmortem, patterns, codex, testing, observability, auto-carve-out, carve-out, clean-approve]
+sources:
+  - docs/learnings/2026-04-28-KMD-4.md
+  - docs/learnings/2026-04-28-KMD-6.md
+  - docs/learnings/2026-04-29-KMD-20.md
+  - docs/learnings/2026-04-28-KMD-22.md
+  - docs/learnings/2026-05-05-KMD-54.md
+  - docs/learnings/2026-05-06-KMD-144.md
 created: 2026-04-30
 updated: 2026-05-06
 ---
@@ -46,6 +52,40 @@ KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集�
 
 **問題**: KMD-22 で concern 6件が全て同列に並び、重要度が不明
 **対策**: concern を severity (high/medium/low) で分類し、high は REQUEST_CHANGES 相当に
+
+### パターン 7: クリーン APPROVE 直行の 4 条件
+<!-- llm-context: KMD-54 で実証された、Human in Review を経由せず Reviewed 直行できる PR の必要十分条件。AI レビュー観点が独立評価可能になる組み合わせ。 -->
+
+**問題**: AI レビューが `concern>0` または `[BREAKING]` を理由に Human in Review に滞留すると、リードタイムが伸び自律パイプラインのスループットが落ちる
+**対策**: 以下 4 条件を PRD・実装の両段階で揃えると、`kobaamd_review_pr` がクリーン APPROVE → Reviewed 直行できる:
+
+1. **PRD AC が網羅的**（観察可能で 3 件以上、抽象表現なし）
+2. **影響範囲マップ通りの変更**（PRD section 8 に列挙したファイルのみ。マップ外への手出しなし）
+3. **wiki-derived patterns を implement 側が自発適用**（quoting / `set -euo pipefail` / `trap` / 入力バリデーション。`security-hardening.md` 由来）
+4. **auto-carveable concern は別チケット化**（テスト整備・observability 強化など独立改善は本 PR を block しない）
+
+**実例**: KMD-54（pipeline_weekly に lint_wiki 組み込み）は 4 条件すべて充足し、Todo → Done が約 17 分・リワーク 0 回で完了した。
+
+### パターン 8: auto carve-out には re-open 手順をコメントに明記する
+<!-- llm-context: kobaamd_review_pr が auto-carveable concern を別チケットに退避する際、人間が「本 PR で対応すべき」と判断したときのリカバリ経路を carve-out 先 issue 本文に必ず書き込む規約。 -->
+
+**問題**: AI が独立改善として別チケットに carve-out した concern が、運用上は「AI による責務逃れ」に見える / 取り消し手順が不明で人間が介入しづらい
+**対策**: carve-out 先 issue 本文に以下 2 行を必ず含める:
+
+- `親チケット: KMD-XX (auto-carved-out by kobaamd_review_pr)`
+- `補足: 人間が「本 PR で対応すべき」と判断した場合は本チケットを revert/close して、KMD-XX を re-open してください`
+
+**根拠**: KMD-54 では本規約を満たす形で KMD-141（テスト整備）/ KMD-142（投稿失敗 observability）が起票され、carve-out のリカバリ経路が運用上担保された。`kobaamd_review_pr` のプロンプトに本規約を明文化することで、carve-out の信頼性が AI レビュー全体で底上げされる。
+
+### パターン 9: 依存逆順ガードを PRD と実装の両方に書く
+<!-- llm-context: 依存先 PR が未マージのまま依存元 PR がマージされても、weekly / daily ジョブが落ちないようにするためのガードパターンと、それを PRD section 8 で先に明文化する運用。 -->
+
+**問題**: `kobaamd_assign_work` は parent / blocked-by を見ないため、依存元 PR が依存先 PR より先にマージされうる
+**対策**: 依存先 script の不在時に warning + skip + exit=0 で抜けるガードを、**PRD section 8「その他リスク」と実装の両方に書く**。レビュー側もこれを独立観点として pass 判定する。
+
+**実例**: KMD-54 では `lint.sh`（依存先 KMD-52）が未マージでも weekly が落ちないガードを実装に組み込んだ。実際 PR #63（依存元）が PR #62（依存先）より先にマージされたが、main 上で安全に動作した。
+
+詳細パターンは [[dependency-inversion-guard]] を参照。
 
 ### パターン 12: サイレント失敗予防機構の自己観測責務
 <!-- llm-context: KMD-144 ingest_history.sh で導入した「lint silent skipped を観測する機構」自身がサイレント失敗するリスクと、観測機構を新規追加するときの設計責務についてのパターン。 -->
@@ -103,10 +143,12 @@ KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集�
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
-- [[prd-quality-cycle]] — パターン 1 の PRD への反映
+- [[prd-quality-cycle]] — パターン 1 / 7 の PRD への反映
 - [[security-hardening]] — シェル変数クォート等のセキュリティ視点の再発防止 / パターン 12 の「サイレント失敗パターン」表との接続
 - [[autonomous-pipeline-philosophy]] — パターン 13 / 14 の auto carve-out フローの設計意図
 - [[wiki-reference-policy]] — wiki 経由で再発防止知見を引き継ぐ手順
+- [[dependency-inversion-guard]] — パターン 9 の詳細とテンプレート
+- [[autonomous-pipeline-philosophy]] — パターン 7 / 8 が機能する前提となるレビュー運用
 
 ## Sources
 
@@ -114,4 +156,5 @@ KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集�
 - docs/learnings/2026-04-28-KMD-6.md
 - docs/learnings/2026-04-29-KMD-20.md
 - docs/learnings/2026-04-28-KMD-22.md
+- docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
