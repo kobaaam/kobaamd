@@ -1,6 +1,6 @@
 ---
 name: kobaamd_update_wiki
-description: docs/learnings/ の postmortem や docs/adr/ の決定記録、その他指定ソースを読み込み、docs/wiki/articles/ の関連記事を更新もしくは新規作成して LLM Wiki を最新化する。`--source <path>` で特定ファイル指定、`--since-last-run` で前回 ingest 以降の差分自動取り込み、引数なしで過去 7 日分。pipeline_weekly や review_postmortem 完了時から自動起動される。
+description: docs/learnings/ の postmortem や docs/adr/ の決定記録、その他指定ソースを読み込み、docs/wiki/articles/ の関連記事を更新もしくは新規作成して LLM Wiki を最新化する。ingest 直後（commit 前）に `/kobaamd_lint_wiki --no-llm` を回し、規約違反のまま wiki を汚染するのを防ぐ。`--source <path>` で特定ファイル指定、`--since-last-run` で前回 ingest 以降の差分自動取り込み、引数なしで過去 7 日分。pipeline_weekly や review_postmortem 完了時から自動起動される。
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
 ---
@@ -86,7 +86,121 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
      - <path>: <理由>
    ```
 
-6. **最終レポート**
+6. **lint ゲート（commit 直前 / 必須）**
+
+   ingest 内容（記事更新・新規作成・index.md / log.md 追記）が working tree に
+   揃った状態で `/kobaamd_lint_wiki` を回し、規約違反のまま commit することを防ぐ。
+
+   a. **lint.sh の実行**
+
+      ```bash
+      mkdir -p .logs
+      TS=$(date +%Y%m%d-%H%M%S)
+      NDJSON=".logs/wiki_lint_ingest_${TS}.ndjson"
+
+      if [ ! -x ./scripts/wiki/lint.sh ]; then
+        echo "warn: scripts/wiki/lint.sh not found — lint gate skipped" >&2
+        LINT_STATUS="skipped"
+      else
+        ./scripts/wiki/lint.sh --no-llm > "$NDJSON"
+        LINT_EXIT=$?
+        case "$LINT_EXIT" in
+          0) LINT_STATUS="pass" ;;
+          1) LINT_STATUS="violations" ;;
+          *) LINT_STATUS="error" ;;
+        esac
+      fi
+      ```
+
+      `--no-llm` を付ける理由: ingest 直後の整合性確認が主目的で、Haiku
+      ベースの section-context-missing 判定は手動 lint 側に委ねる（KMD-54 と
+      同じ運用方針）。手動 ingest 時に呼び出し側が `WIKI_LINT_LLM=1` env を
+      指定した場合のみ `--no-llm` を外して実行する（任意。デフォルト無効）。
+
+   b. **判定 → リカバリ分岐**
+
+      - `LINT_STATUS=pass`（違反 0 件）: そのまま step 7 へ進み、ingest 結果を
+        commit する。NDJSON は不要なので削除して構わない
+      - `LINT_STATUS=skipped`（lint.sh 不在）: warning を Final Report の
+        特記事項に明記し、step 7 へ進む（KMD-52 未マージ環境での保険）
+      - `LINT_STATUS=error`（exit code 2 など内部エラー）: warning を特記事項に
+        明記し、commit は実施する（lint 系の内部エラーで ingest 全体を止めない）。
+        後続の手動確認に委ねる
+      - `LINT_STATUS=violations`（違反あり）: 下記 c. へ
+
+   c. **自動修正 → 再 lint**
+
+      ```bash
+      ./scripts/wiki/lint.sh --fix --no-llm > /dev/null || true
+      ./scripts/wiki/lint.sh --no-llm > "$NDJSON"
+      RELINT_EXIT=$?
+      ```
+
+      `--fix` で対応するのは lint.sh の自動修正範囲のみ（タグ正規化 / 必須
+      フィールド欠落の TODO 補完 / frontmatter ブロック挿入）。broken-link /
+      orphan / stale / section-context-missing は自動修正されない。
+
+      - 再 lint で違反 0 件（`RELINT_EXIT=0`）: `LINT_STATUS=pass-after-fix` と
+        記録し、step 7 へ進む。**`--fix` 適用差分も含めて commit する**
+      - 再 lint でも違反が残る（`RELINT_EXIT=1`）: 下記 d. へ
+      - 再 lint で内部エラー（`RELINT_EXIT>=2`）: `LINT_STATUS=error` 扱いで
+        warning を特記事項に明記し、commit は実施
+
+   d. **違反残り時の Linear 報告（commit はしない）**
+
+      1. 違反が残る場合は **commit を実行しない**。working tree には ingest
+         差分（記事 / index.md / log.md / `--fix` で当たった修正）が残った
+         ままにする（人間が後続で手動 commit する判断材料にする）
+      2. 報告先 Linear issue の決定:
+         - 呼び出し側が `--linear-issue KMD-XX` 引数または `KOBAAMD_LINEAR_ISSUE`
+           env を渡している場合 → その issue
+         - `--since-last-run` 経由（pipeline_weekly 等） → epic
+           `KMD-44`（[KB] kobaamd ナレッジベース整備）
+         - `kobaamd_review_postmortem` 経由 → 呼び出し側が postmortem の
+           対応 issue を `--linear-issue` で渡す前提（未指定なら epic にフォールバック）
+         - 手動 `--source`（呼び出し元不明） → 未指定時は **stderr に警告を出して
+           Linear 投稿は省略**（誤通知を避ける）
+      3. コメント本文（NDJSON を集計して整形）:
+
+         ```markdown
+         ## Wiki Lint Failure (<YYYY-MM-DD> ingest)
+
+         `/kobaamd_update_wiki` の ingest 直後 lint で違反 N 件を検出しました。
+         自動修正後も残っているため、commit は中止しました。
+
+         ### ルール別件数
+
+         | rule | count |
+         |---|---|
+         | <rule> | <n> |
+
+         ### 上位 5 件
+
+         | file | rule | line | detail |
+         |---|---|---|---|
+         | <path> | <rule> | <line> | <detail> |
+
+         詳細 NDJSON: `<NDJSON path>`
+
+         → working tree には ingest 差分が残っています。修正後 commit してください。
+         ```
+
+         投稿は `./scripts/linear/lq.sh comment.add <issue-id> @<comment file>` で実施。
+      4. `LINT_STATUS=fail` と記録し、step 7 へ進む（commit はスキップする旨を
+         Final Report に明記）
+
+   e. **NDJSON ログの扱い**
+
+      - 違反 0 件 / pass-after-fix 時は `$NDJSON` を削除してよい（不要）
+      - 違反残り（`fail`）時は `$NDJSON` を残し、Linear コメント本文と
+        Final Report の両方からパスを参照する
+      - error / skipped 時は `$NDJSON` の有無は任意（残しても削除してもよい）
+
+7. **commit と最終レポート**
+
+   - `LINT_STATUS` が `pass` / `pass-after-fix` / `error` / `skipped` のいずれかなら
+     ingest 差分を commit する（既存のコミット運用に従う）。`--fix` 差分も含める
+   - `LINT_STATUS=fail` なら commit は実施しない。working tree の差分は残す
 
 ## 制約
 
@@ -119,7 +233,11 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 - <source>: <理由>
 
 index.md / log.md: 更新済み
+commit: 実施 / 中止（lint fail のため）
 
 特記事項:
+- lint: <pass | pass-after-fix(<N> 件 --fix で修正) | fail(<N> 件残り、commit 中止、Linear 報告: KMD-XX) | error(<details>) | skipped(lint.sh 不在)>
 - <矛盾、要人手レビュー、新カテゴリ提案など>
 ```
+
+**`lint:` 行は必ず含めること**（pass / pass-after-fix / fail / error / skipped のいずれか）。
