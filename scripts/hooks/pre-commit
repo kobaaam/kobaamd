@@ -30,16 +30,22 @@ if ! swift build --target kobaamdTests 2>&1 | tail -3; then
     exit 1
 fi
 
-# シークレット検出（全ステージングファイル対象）
+# シークレット検出（全ステージングファイル対象、ただし以下は除外）
+# - Sources/Resources/d2-browser.js: D2 描画用にバンドルされた WASM 入り JS。
+#   ランダムなバイナリバイトが AKIA... / AIza... 等の正規表現に偽陽性ヒットするため除外。
+# - *.wasm: 同様の理由でバイナリ全般を除外。
+# 対象拡張時は SECRET_ALLOWLIST_PATHSPEC を明示的に増やすこと（恒久 bypass を作らない）。
 echo "🔐 シークレット漏洩をチェックします..."
 SECRET_PATTERNS='(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{22,}|xoxb-[0-9]{10,}|xoxp-[0-9]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-ant-[a-zA-Z0-9-]{20,})'
-STAGED_DIFF=$(git diff --cached --diff-filter=ACMR)
+STAGED_DIFF=$(git diff --cached --diff-filter=ACMR -- \
+    ':(exclude)Sources/Resources/d2-browser.js' \
+    ':(exclude)*.wasm')
 if echo "$STAGED_DIFF" | grep -qEi "$SECRET_PATTERNS"; then
     echo "❌ シークレットらしき文字列を検出しました。コミットを中止します。"
     echo "   検出箇所:"
     echo "$STAGED_DIFF" | grep -nEi "$SECRET_PATTERNS" | head -5 | sed 's/^/   /'
     echo ""
-    echo "   誤検出の場合は git commit --no-verify で回避できます（非推奨）"
+    echo "   誤検出の場合は scripts/hooks/pre-commit の SECRET_ALLOWLIST_PATHSPEC を見直してください（非推奨: --no-verify）"
     exit 1
 fi
 
