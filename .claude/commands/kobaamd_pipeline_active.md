@@ -18,8 +18,34 @@ c. 以下の不整合パターンを検出・修正:
    - **PR がマージ済みなのに In Progress**: → Linear を `Done` に遷移
    - **PR が Close 済み（マージなし）なのに In Progress**: → Linear を `Todo` に戻す
    - **ブランチも PR もないのに In Progress**: → Linear を `Todo` に戻し、コメントで `[PIPELINE_SYNC] ブランチ/PR 未検出のため todo に戻しました` と記録
+   - **ローカルブランチあり + リモート未push + PR なし + uncommitted（or 未push commit あり）**: → **halted recovery を起動**（KMD-30 incident type、後述 0c）
 d. 修正があった場合は `.logs/pipeline_active.log` に `==== <日時> STATUS_SYNC: KMD-XX <旧状態> → <新状態> ====` を追記
 e. 修正がなければ「整合性 OK」と報告して次へ
+
+## ステップ 0c: halted recovery（自動 staged 救済 / 必須）
+
+中断耐性として、`scripts/recovery/recover_halted.sh --auto` を起動する。これは In Progress 状態で:
+
+- ローカルブランチがある（`feature/<KMD-XX>-*`）が
+- リモート push されていない、または PR が未作成
+- かつ uncommitted 変更や未 push commit が存在
+
+というパターンを検出して、以下を自動実行:
+
+1. ブランチに checkout → `swift build` で動作確認
+2. build pass → `git add -A && git commit -m "<KMD-XX>: WIP commit by halted recovery (auto)"`（pre-commit hook を通す。`--no-verify` 禁止）
+3. `git push -u origin <branch>`
+4. `gh pr create --title "[HALTED-RECOVERED] <KMD-XX>: ..." --body "..."`
+5. `halted-recovered` ラベル付与 + Linear を `in Review` に遷移
+6. build fail / pre-commit hook 失敗時は `halted-broken` ラベル付与 + Linear に警告コメント、人間介入待ち
+
+実行コマンド:
+
+```bash
+LQ_DRY_RUN=0 ./scripts/recovery/recover_halted.sh --auto
+```
+
+このステップで自動 PR 化された issue は通常通りフェーズ A の review_pr / review_security を通る。`[HALTED-RECOVERED]` プレフィックスと `halted-recovered` ラベルで識別可能なので、レビュアー（人間 / AI）は「中断された実装を引き継いだ PR」と認識すること。**Reviewed への直行は禁止**（人間ゲートは通常 PR と同じ）。
 
 ## フェーズ A: 既存 PR の処理
 
