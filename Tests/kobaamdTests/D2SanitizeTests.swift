@@ -2,8 +2,9 @@ import Testing
 @testable import kobaamd
 
 @Suite("D2 SVG Sanitization")
+@MainActor
 struct D2SanitizeTests {
-    private let view = D2WebView(svg: "")
+    private let view = D2WebView(d2Code: "", viewModel: D2PreviewViewModel())
 
     @Test("script タグが除去されること")
     func removesScriptTag() {

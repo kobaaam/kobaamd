@@ -71,6 +71,8 @@ struct D2PreviewView: View {
 
     var body: some View {
         ZStack {
+            D2WebView(d2Code: d2VM.pendingCode, viewModel: d2VM)
+
             if let errorMessage = d2VM.errorMessage, !errorMessage.isEmpty {
                 ScrollView {
                     Text(errorMessage)
@@ -78,10 +80,6 @@ struct D2PreviewView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(24)
                 }
-            } else if !d2VM.svg.isEmpty {
-                D2WebView(svg: d2VM.svg)
-            } else {
-                Color.kobaSurface
             }
 
             if d2VM.isRendering {
