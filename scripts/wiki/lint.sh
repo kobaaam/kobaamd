@@ -394,7 +394,7 @@ is_referenced() {
 
 VIOLATION_LOG=$(mktemp)
 PARSE_DIR_BASE="$PARSE_DIR"
-trap 'rm -rf "$PARSE_DIR_BASE"; rm -f "$slug_index_tmp" "$referrers_tmp" "$VIOLATION_LOG"' EXIT
+trap 'rm -rf "$PARSE_DIR_BASE"; rm -f "$slug_index_tmp" "$title_index_tmp" "$referrers_tmp" "$VIOLATION_LOG"' EXIT
 
 emit() {
   local file="$1" rule="$2" line="$3" detail="$4" model_tag="${5:-shell}"
