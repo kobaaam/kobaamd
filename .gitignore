@@ -17,8 +17,16 @@ DerivedData/
 # Swift Package Manager
 .swiftpm/
 
-# Claude Code local settings
-.claude/
+# Claude Code local settings (track project-level definitions, ignore caches/sessions)
+# 自律パイプラインの subagent / slash command / skill 定義は git で管理する。
+# `.claude/projects/`（セッション履歴）`.claude/cache/` 等はローカル限定。
+.claude/*
+!.claude/agents/
+!.claude/agents/**
+!.claude/commands/
+!.claude/commands/**
+!.claude/skills/
+!.claude/skills/**
 
 # Internal docs (not for public)
 PRD.md
