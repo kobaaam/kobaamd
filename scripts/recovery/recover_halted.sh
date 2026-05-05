@@ -20,6 +20,15 @@
 
 set -euo pipefail
 
+# concern #5 対策: 元ブランチ復帰失敗時の trap EXIT fallback
+_PREV_BRANCH=""
+_trap_restore_branch() {
+  if [[ -n "$_PREV_BRANCH" ]]; then
+    git checkout "$_PREV_BRANCH" 2>/dev/null || true
+  fi
+}
+trap '_trap_restore_branch' EXIT
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 LQ="${REPO_ROOT}/scripts/linear/lq.sh"
@@ -110,7 +119,7 @@ auto_commit_push_pr() {
       return 0
     fi
     while IFS= read -r f; do
-      [[ -e "$f" ]] && git add -- "$f"
+      [[ -e "$f" ]] && { git add -- "$f" || log "  skip: $f (git add rejected)"; }
     done <<< "$staged_and_modified"
 
     # pre-commit hook を必ず通す（--no-verify 禁止）
@@ -213,11 +222,15 @@ EOF
 # 単一 issue の判定 + recovery
 recover_one() {
   local id="$1"
+  # concern #5: trap EXIT 用に現在ブランチを記録
+  _PREV_BRANCH="$(git branch --show-current 2>/dev/null || true)"
   log "evaluating $id"
 
   # fail-1 対策: caller のワーキングツリーが dirty なら skip（checkout でキャリーオーバーを防ぐ）
-  if ! git diff --quiet HEAD -- 2>/dev/null; then
-    log "  skipped: caller dirty (uncommitted changes detected) — ${id}"
+  # concern #1: git diff --quiet HEAD は untracked-only を dirty 判定しないため
+  #   git status --porcelain も併用して untracked ファイルも検出する
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]] || ! git diff --quiet HEAD -- 2>/dev/null; then
+    log "  skipped: caller dirty (uncommitted/untracked changes detected) — ${id}"
     log "skipped: caller dirty" >> "$LOG"
     return 0
   fi
@@ -277,7 +290,10 @@ EOF
     fi
 
     # 元のブランチに戻る
-    [[ -n "$current_branch" && "$current_branch" != "$branch" ]] && git checkout "$current_branch" 2>&1 | tail -1
+    if [[ -n "$current_branch" && "$current_branch" != "$branch" ]]; then
+      git checkout "$current_branch" 2>&1 | tail -1 \
+        || log "  WARN: failed to restore previous branch '$current_branch' — see $LOG"
+    fi
     return 0
   fi
 
@@ -289,7 +305,10 @@ EOF
     # PR 作成のみ実行
     auto_commit_push_pr "$id" "$branch"
 
-    [[ -n "$current_branch" && "$current_branch" != "$branch" ]] && git checkout "$current_branch" 2>&1 | tail -1
+    if [[ -n "$current_branch" && "$current_branch" != "$branch" ]]; then
+      git checkout "$current_branch" 2>&1 | tail -1 \
+        || log "  WARN: failed to restore previous branch '$current_branch' — see $LOG"
+    fi
     return 0
   fi
 
