@@ -16,4 +16,5 @@ enum BundledJS {
     static let easymdeJS: String  = content(named: "easymde.min.js")
     static let easymdeCss: String = content(named: "easymde.min.css")
     static let svgPanZoom: String = content(named: "svg-pan-zoom.min.js")
+    static let d2BrowserJS: String = content(named: "d2-browser.js")
 }
