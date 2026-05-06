@@ -4,7 +4,7 @@ category: decisions
 tags: [pipeline, linear, subagent, automation]
 sources: [docs/adr/0007-autonomous-pipeline-linear.md, CLAUDE.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # AI 自律開発パイプラインの設計思想
@@ -38,6 +38,7 @@ GitHub Issues では状態遷移の柔軟性が不足。Linear は MCP 経由で
 
 - [[multi-llm-persona]] — LLM ペルソナの役割分担
 - [[prd-quality-cycle]] — PRD の品質サイクル
+- [[security-hardening]] — パイプラインに組み込む多層防御の運用
 
 ## Sources
 

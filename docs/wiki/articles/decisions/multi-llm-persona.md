@@ -4,7 +4,7 @@ category: decisions
 tags: [llm, claude, codex, gemini, persona]
 sources: [CLAUDE.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # マルチ LLM ペルソナ体制
@@ -39,6 +39,7 @@ kobaamd は Claude（設計・レビュー）、Codex CLI（実装）、Gemini�
 ## Related
 
 - [[autonomous-pipeline-philosophy]] — パイプライン全体の設計思想
+- [[ai-service]] — エディタ内 AI とパイプライン AI の使い分け
 
 ## Sources
 

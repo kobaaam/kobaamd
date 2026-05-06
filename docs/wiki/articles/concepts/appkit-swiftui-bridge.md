@@ -4,7 +4,7 @@ category: concepts
 tags: [appkit, swiftui, nstextview, nsviewrepresentable]
 sources: [docs/adr/0002-nstextview-appkit-wrap.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # AppKit-SwiftUI ブリッジ
@@ -33,6 +33,9 @@ macOS 26 で NSTextView が特定条件で不可視になるバグが発生。�
 
 - [[mvvm-observable]] — ブリッジ上の MVVM パターン
 - [[editor-core]] — NSTextViewWrapper の実装詳細
+- [[wkwebview-strategy]] — エディタと共存する WKWebView レンダリング戦略
+- [[d2-diagram-preview]] — WKWebView 経由の D2 ダイアグラムプレビュー
+- [[file-tree-outline-sync]] — サイドバーの NSOutlineView ブリッジ
 
 ## Sources
 

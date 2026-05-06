@@ -4,7 +4,7 @@ category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
 sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49]
 created: 2026-05-04
-updated: 2026-05-04
+updated: 2026-05-06
 ---
 
 # Wiki 参照ポリシー（Prompt Caching 標準運用）
@@ -117,8 +117,8 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 
 ## Related
 
-- [[ポストモーテムから学ぶ実装パターン]]
-- [[PRD 品質サイクル]]
+- [[postmortem-patterns]]
+- [[prd-quality-cycle]]
 
 ## Sources
 

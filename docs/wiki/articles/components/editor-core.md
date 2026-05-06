@@ -4,7 +4,7 @@ category: components
 tags: [editor, nstextview, syntax-highlight, find-replace]
 sources: [docs/adr/0002-nstextview-appkit-wrap.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # エディタコア (NSTextViewWrapper)
@@ -33,6 +33,10 @@ kobaamd のテキスト編集エンジン。NSTextView を SwiftUI にラップ�
 
 - [[appkit-swiftui-bridge]] — NSViewRepresentable パターンの概念
 - [[ai-service]] — AI 補完のバックエンド
+- [[mvvm-observable]] — EditorView の ViewModel 構造
+- [[wkwebview-strategy]] — エディタと並走するプレビュー側戦略
+- [[d2-diagram-preview]] — エディタから連携する D2 プレビュー
+- [[file-tree-outline-sync]] — サイドバーとエディタの位置同期
 
 ## Sources
 

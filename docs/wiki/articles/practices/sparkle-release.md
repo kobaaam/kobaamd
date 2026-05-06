@@ -4,7 +4,7 @@ category: practices
 tags: [sparkle, security, release, eddsa]
 sources: [docs/prd/KMD-27-sparkle-eddsa-public-key.md, docs/prd/KMD-16-auto-updater.md, docs/learnings/2026-04-28-KMD-6.md]
 created: 2026-05-01
-updated: 2026-05-01
+updated: 2026-05-06
 ---
 
 # Sparkle 署名付きリリース手順
@@ -76,6 +76,7 @@ Sparkle が「アップデートのインストールに失敗しました」を
 
 ## Related
 
+- [[security-hardening]] — Sparkle 公開鍵注入を含む多層防御運用
 - docs/prd/KMD-16-auto-updater.md
 - docs/prd/KMD-27-sparkle-eddsa-public-key.md
 

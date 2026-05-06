@@ -4,7 +4,7 @@ category: practices
 tags: [prd, review, quality, pipeline]
 sources: [docs/learnings/2026-04-28-KMD-4.md, docs/learnings/2026-04-28-KMD-6.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # PRD 品質基準と改善サイクル
@@ -44,6 +44,7 @@ updated: 2026-04-30
 
 - [[autonomous-pipeline-philosophy]] — パイプライン全体の思想
 - [[postmortem-patterns]] — 具体的な再発防止パターン
+- [[wiki-reference-policy]] — wiki 参照を含む PRD/設計知見の運用標準
 
 ## Sources
 
