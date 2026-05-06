@@ -38,12 +38,12 @@ e. 修正がなければ「整合性 OK」と報告して次へ
 **判定方法**:
 
 ```bash
-REVIEWED=$(./scripts/linear/lq.sh issue.list --team KMD --state "Reviewed" --limit 1 --json | jq 'length')
-HUMAN_IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "Human in Review" --limit 1 --json | jq 'length')
-IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "in Review" --limit 1 --json | jq 'length')
-DRAFT=$(./scripts/linear/lq.sh issue.list --team KMD --state "draft" --limit 1 --json | jq 'length')
-IN_PROGRESS=$(./scripts/linear/lq.sh issue.list --team KMD --state "In Progress" --limit 1 --json | jq 'length')
-TODO=$(./scripts/linear/lq.sh issue.list --team KMD --state "Todo" --limit 1 --json | jq 'length')
+REVIEWED=$(./scripts/linear/lq.sh issue.list --team KMD --state "Reviewed" --limit 1 | jq 'length')
+HUMAN_IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "Human in Review" --limit 1 | jq 'length')
+IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "in Review" --limit 1 | jq 'length')
+DRAFT=$(./scripts/linear/lq.sh issue.list --team KMD --state "draft" --limit 1 | jq 'length')
+IN_PROGRESS=$(./scripts/linear/lq.sh issue.list --team KMD --state "In Progress" --limit 1 | jq 'length')
+TODO=$(./scripts/linear/lq.sh issue.list --team KMD --state "Todo" --limit 1 | jq 'length')
 CONFLICTING=$(gh pr list --json number,mergeable --jq '[.[] | select(.mergeable == "CONFLICTING")] | length')
 ```
 
@@ -56,7 +56,7 @@ CONFLICTING=$(gh pr list --json number,mergeable --jq '[.[] | select(.mergeable 
   reviewed=0 human_in_review=0 in_review=0 conflicting=0 draft=0 in_progress=N todo=N
 ```
 
-その後、最終レポートとして「PIPELINE_ACTIVE_DONE: full no-op (early return)」とだけ報告して終了する。**ステップ 0c 以降のすべてのステップはスキップする**。
+その後、**ステップ 12 (post-run snapshot) を必ず実行してから**、最終レポートとして「PIPELINE_ACTIVE_DONE: full no-op (early return)」とだけ報告して終了する。**ステップ 0c〜11 はすべてスキップするが、ステップ 12 はスキップしない**（observability の対称性を保つため、early return 時も post-run スナップショットは必須）。
 
 ガード条件を一つでも満たさない場合は通常通りステップ 0c へ進む。
 
