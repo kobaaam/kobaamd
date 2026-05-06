@@ -1,8 +1,8 @@
 ---
 title: AI 自律開発パイプラインの設計思想
 category: decisions
-tags: [pipeline, linear, subagent, automation]
-sources: [docs/adr/0007-autonomous-pipeline-linear.md, CLAUDE.md]
+tags: [pipeline, linear, subagent, automation, auto-carve-out]
+sources: [docs/adr/0007-autonomous-pipeline-linear.md, CLAUDE.md, docs/learnings/2026-05-06-KMD-144.md]
 created: 2026-04-30
 updated: 2026-05-06
 ---
@@ -30,6 +30,35 @@ GitHub Issues では状態遷移の柔軟性が不足。Linear は MCP 経由で
 
 この設計は「信頼の漸進的拡大」の原則に基づく。AI の判断精度が向上すれば、ゲートをさらに減らせる。
 
+### auto carve-out フローの判断条件
+<!-- llm-context: kobaamd_review_pr が「APPROVE / Reviewed 直行 / Human in Review を経由しない」と判定する具体条件と、carve-out された concern を統合チケットとして起票する判断条件。 -->
+
+`kobaamd_review_pr` は concern を **rework / auto-carveable / human-judgment** に分類する。AI が機械的に裁ける auto-carveable concern（独立改善・別 PR が自然なもの）は別 issue を自動起票し、親 PR をブロックしない設計。
+
+#### Reviewed 直行が成立する 3 条件
+
+以下 3 条件をすべて満たすと、review_pr は APPROVE auto carve-out で `Reviewed` 直行を選択し、人間レビューを経由せず自動マージへ進む。
+
+1. **PRD AC を完全充足**（全項目 pass）
+2. **影響範囲が PRD 記載と一致**（PR コメントで「触れていない箇所」を明示）
+3. **残 concern が `auto-carveable` 分類のみ**（rework=0, human-judgment=0, `[BREAKING]` なし）
+
+逆に、PRD AC 充足が pass でも、影響範囲が PRD と乖離している、または concern が「仕様判断必要」に該当すると `Human in Review` に入る。実装段階で「PRD に書かれた影響範囲だけを触る」「CSI 改善は別 issue 起票で残す」を意識すると Reviewed 直行率が上がる。
+
+KMD-144 (PR #70) はこの 3 条件を満たし、in Review → Reviewed → Done が同日内で完了した。
+
+#### auto-carveable concern の統合チケット化
+
+親 PR のレビューで auto-carveable な concern が複数残ったとき、1 件 1 チケットに分割すると個々が小さすぎて優先度が上がらず Backlog に放置されやすい。以下 3 条件が揃う場合、複数の concern を 1 つの統合チケットとして起票してよい。
+
+1. **同じファイル群に閉じる**（例: KMD-144 はいずれも `kobaamd_update_wiki` 周辺）
+2. **影響範囲が共通**（同じモジュール / 同じパイプラインステップ）
+3. **同じレビュー観点で評価できる**（例: 「ingest プロセスの可観測性」というドメインでまとまる）
+
+逆にこの 3 条件が揃わないなら、無理に統合せず個別起票にする（PR が肥大化して影響範囲レビューが難しくなる）。
+
+詳細は [[postmortem-patterns]] パターン 13 / 14 を参照。
+
 ### Opus / Sonnet の使い分け
 
 判断・創造系（PRD 作成、コードレビュー、振り返り）は Opus、機械的操作系（ビルド検証、マージ、コメント修正）は Sonnet。コストと品質のバランス。
@@ -39,8 +68,10 @@ GitHub Issues では状態遷移の柔軟性が不足。Linear は MCP 経由で
 - [[multi-llm-persona]] — LLM ペルソナの役割分担
 - [[prd-quality-cycle]] — PRD の品質サイクル
 - [[security-hardening]] — パイプラインに組み込む多層防御の運用
+- [[postmortem-patterns]] — auto carve-out フローのパターン化（パターン 13 / 14）
 
 ## Sources
 
 - docs/adr/0007-autonomous-pipeline-linear.md
 - CLAUDE.md: 自律開発パイプラインセクション
+- docs/learnings/2026-05-06-KMD-144.md
