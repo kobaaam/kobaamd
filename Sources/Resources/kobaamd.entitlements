@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Hardened Runtime (KMD-26) と ad-hoc 署名の組み合わせで、外部 framework
+      （Sparkle.framework など）のロードを許可するために必要。
+
+      これが無いと dyld 段階の library validation で
+      "Library not loaded: @rpath/Sparkle.framework/..." エラーになる。
+
+      Notarization 時にも同 entitlement は許容される（Sparkle 公式推奨）。
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
