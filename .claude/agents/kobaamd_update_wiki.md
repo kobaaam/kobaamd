@@ -102,8 +102,11 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
         echo "warn: scripts/wiki/lint.sh not found — lint gate skipped" >&2
         LINT_STATUS="skipped"
       else
-        ./scripts/wiki/lint.sh --no-llm > "$NDJSON"
-        LINT_EXIT=$?
+        # set -e 環境下でも exit 1 (violations) を捕捉できるよう || で受ける。
+        # `LINT_EXIT=$(...); LINT_EXIT=$?` のような pipeline + `$?` 直取りは
+        # set -e で即死するので避けること。
+        LINT_EXIT=0
+        ./scripts/wiki/lint.sh --no-llm > "$NDJSON" || LINT_EXIT=$?
         case "$LINT_EXIT" in
           0) LINT_STATUS="pass" ;;
           1) LINT_STATUS="violations" ;;
@@ -128,12 +131,31 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
         後続の手動確認に委ねる
       - `LINT_STATUS=violations`（違反あり）: 下記 c. へ
 
+      **任意: error / skipped 時の commit 継続ポリシー切り替え**
+
+      デフォルトでは `error` / `skipped` でも commit を継続するが（ingest 全体を
+      止めない方針）、運用次第で以下の env により挙動を変えられる:
+
+      - `WIKI_INGEST_BLOCK_ON_ERROR=1`: `LINT_STATUS=error` で commit を中止し、
+        `LINT_STATUS=fail` 同等の扱い（working tree に差分を残し、Linear に報告）に
+        する。lint.sh の内部エラーが続くときに ingest を止めたい運用向け
+      - `WIKI_INGEST_BLOCK_ON_SKIPPED=1`: `LINT_STATUS=skipped`（lint.sh 不在）で
+        commit を中止する。lint.sh が必ずある前提の環境で保険として使う
+
+      未設定 / `0` の場合は従来どおり commit 継続。これらは optional で、デフォルト
+      挙動は変えないこと。
+
    c. **自動修正 → 再 lint**
 
       ```bash
-      ./scripts/wiki/lint.sh --fix --no-llm > /dev/null || true
-      ./scripts/wiki/lint.sh --no-llm > "$NDJSON"
-      RELINT_EXIT=$?
+      # --fix の exit code を別変数 FIX_EXIT で保持する。
+      # 再 lint が pass しても FIX_EXIT != 0 なら Final Report の lint: 行に
+      # ブレッドクラム "pass-after-fix(--fix exit=N だが再 lint で 0)" を残す。
+      FIX_EXIT=0
+      ./scripts/wiki/lint.sh --fix --no-llm > /dev/null || FIX_EXIT=$?
+
+      RELINT_EXIT=0
+      ./scripts/wiki/lint.sh --no-llm > "$NDJSON" || RELINT_EXIT=$?
       ```
 
       `--fix` で対応するのは lint.sh の自動修正範囲のみ（タグ正規化 / 必須
@@ -141,10 +163,16 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
       orphan / stale / section-context-missing は自動修正されない。
 
       - 再 lint で違反 0 件（`RELINT_EXIT=0`）: `LINT_STATUS=pass-after-fix` と
-        記録し、step 7 へ進む。**`--fix` 適用差分も含めて commit する**
+        記録し、step 7 へ進む。**`--fix` 適用差分も含めて commit する**。
+        ただし `FIX_EXIT != 0` の場合（`--fix` 自体が exit 2 等の内部エラーを
+        返したが再 lint は pass した）は、`LINT_STATUS=pass-after-fix` のまま
+        Final Report の `lint:` 行に
+        `pass-after-fix(--fix exit=$FIX_EXIT だが再 lint で 0)` のように
+        ブレッドクラムを必ず残す（`--fix` の異常を握りつぶさないため）
       - 再 lint でも違反が残る（`RELINT_EXIT=1`）: 下記 d. へ
       - 再 lint で内部エラー（`RELINT_EXIT>=2`）: `LINT_STATUS=error` 扱いで
-        warning を特記事項に明記し、commit は実施
+        warning を特記事項に明記し、commit は実施（`FIX_EXIT` の値も特記事項に
+        併記してデバッグの手がかりを残す）
 
    d. **違反残り時の Linear 報告（commit はしない）**
 
@@ -236,7 +264,7 @@ index.md / log.md: 更新済み
 commit: 実施 / 中止（lint fail のため）
 
 特記事項:
-- lint: <pass | pass-after-fix(<N> 件 --fix で修正) | fail(<N> 件残り、commit 中止、Linear 報告: KMD-XX) | error(<details>) | skipped(lint.sh 不在)>
+- lint: <pass | pass-after-fix(<N> 件 --fix で修正) | pass-after-fix(--fix exit=<N> だが再 lint で 0) | fail(<N> 件残り、commit 中止、Linear 報告: KMD-XX) | error(<details>, --fix exit=<N>) | skipped(lint.sh 不在)>
 - <矛盾、要人手レビュー、新カテゴリ提案など>
 ```
 
