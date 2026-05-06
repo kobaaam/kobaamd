@@ -108,8 +108,18 @@ else
   echo "[post-build] LC_RPATH already present; skipping"
 fi
 
-codesign --force --deep --sign - --options runtime "$APP"
-echo "[post-build] codesign applied (Hardened Runtime, ad-hoc) → $APP"
+# Hardened Runtime + ad-hoc 署名で外部 framework（Sparkle 等）をロードするには
+# library validation を緩める entitlement が必要。
+# entitlements は Sources/Resources/kobaamd.entitlements を参照する（KMD-148）。
+ENTITLEMENTS="Sources/Resources/kobaamd.entitlements"
+if [ -f "$ENTITLEMENTS" ]; then
+  codesign --force --deep --sign - --options runtime --entitlements "$ENTITLEMENTS" "$APP"
+  echo "[post-build] codesign applied (Hardened Runtime, ad-hoc, entitlements=$ENTITLEMENTS) → $APP"
+else
+  echo "[post-build] warning: $ENTITLEMENTS not found; codesign without entitlements (library validation may reject Sparkle)"
+  codesign --force --deep --sign - --options runtime "$APP"
+  echo "[post-build] codesign applied (Hardened Runtime, ad-hoc, no entitlements) → $APP"
+fi
 codesign --display --verbose=4 "$APP" 2>&1 | grep -E '^(Identifier|Format|Signature|TeamIdentifier|flags|CodeDirectory)' | sed 's/^/[post-build]   /'
 
 # Touch the app so Dock / Finder picks up the new icon
