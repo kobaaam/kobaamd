@@ -224,6 +224,24 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
         Final Report の両方からパスを参照する
       - error / skipped 時は `$NDJSON` の有無は任意（残しても削除してもよい）
 
+   f. **ingest history への記録と連続検出**
+
+      ```bash
+      # (1) lint_status を history に記録
+      ./scripts/wiki/ingest_history.sh append --status "$LINT_STATUS" --source-count "$SOURCE_COUNT" || true
+
+      # (2) 直近の連続 skipped/error を検出
+      HISTORY_REPORT=$(./scripts/wiki/ingest_history.sh check --threshold 5 --epic KMD-44 || true)
+      HISTORY_WARNING=$(printf '%s\n' "$HISTORY_REPORT" | grep -E '^warning=' | cut -d= -f2)
+      HISTORY_CONSECUTIVE=$(printf '%s\n' "$HISTORY_REPORT" | grep -E '^consecutive=' | cut -d= -f2)
+      HISTORY_TAIL=$(printf '%s\n' "$HISTORY_REPORT" | grep -E '^status=' | cut -d= -f2)
+      ```
+
+      `SOURCE_COUNT` には step 2 / 3 で確定した処理ソース件数を入れる。history
+      記録や連続検出に失敗しても ingest 自体は止めない。`HISTORY_WARNING=true`
+      の場合は Final Report の特記事項で `ingest history: warning(...)` を強調表示し、
+      連続 status と回数を明記する
+
 7. **commit と最終レポート**
 
    - `LINT_STATUS` が `pass` / `pass-after-fix` / `error` / `skipped` のいずれかなら
@@ -261,11 +279,12 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 - <source>: <理由>
 
 index.md / log.md: 更新済み
-commit: 実施 / 中止（lint fail のため）
+commit: <実施 | 中止 (lint fail のため)>
 
 特記事項:
 - lint: <pass | pass-after-fix(<N> 件 --fix で修正) | pass-after-fix(--fix exit=<N> だが再 lint で 0) | fail(<N> 件残り、commit 中止、Linear 報告: KMD-XX) | error(<details>, --fix exit=<N>) | skipped(lint.sh 不在)>
+- ingest history: <ok | warning(<status> が <N> 回連続、KMD-44 に通知済み)>
 - <矛盾、要人手レビュー、新カテゴリ提案など>
 ```
 
-**`lint:` 行は必ず含めること**（pass / pass-after-fix / fail / error / skipped のいずれか）。
+**`lint:` 行と `ingest history:` 行は必ず含めること**（lint は pass / pass-after-fix / fail / error / skipped、ingest history は ok / warning(...) のいずれか）。
