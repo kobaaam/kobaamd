@@ -22,6 +22,44 @@ c. 以下の不整合パターンを検出・修正:
 d. 修正があった場合は `.logs/pipeline_active.log` に `==== <日時> STATUS_SYNC: KMD-XX <旧状態> → <新状態> ====` を追記
 e. 修正がなければ「整合性 OK」と報告して次へ
 
+## ステップ 0b': No-op early return ガード（起動時 / 必須）
+
+ステップ 0b でステータス整合性が取れた直後、以下のガード条件をすべて満たす場合は subagent を起動せずに即終了する。launchd 30 分毎の起動で no-op cycle が連続した場合の token 空費（CLAUDE.md ~8k tokens + subagent プロンプト）を削減するための最適化。
+
+**ガード条件（すべて AND）**:
+
+1. `Reviewed` 状態の issue が **0 件**
+2. `Human in Review` 状態の issue が **0 件**
+3. `in Review` 状態の issue が **0 件**
+4. CONFLICTING な PR が **0 件**（`gh pr list --json number,mergeable --jq '[.[] | select(.mergeable == "CONFLICTING")] | length'`）
+5. `draft` 状態の issue が **0 件**
+6. `In Progress` 状態の issue が **1 件以上** OR `Todo` 状態の issue が **0 件**
+
+**判定方法**:
+
+```bash
+REVIEWED=$(./scripts/linear/lq.sh issue.list --team KMD --state "Reviewed" --limit 1 --json | jq 'length')
+HUMAN_IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "Human in Review" --limit 1 --json | jq 'length')
+IN_REVIEW=$(./scripts/linear/lq.sh issue.list --team KMD --state "in Review" --limit 1 --json | jq 'length')
+DRAFT=$(./scripts/linear/lq.sh issue.list --team KMD --state "draft" --limit 1 --json | jq 'length')
+IN_PROGRESS=$(./scripts/linear/lq.sh issue.list --team KMD --state "In Progress" --limit 1 --json | jq 'length')
+TODO=$(./scripts/linear/lq.sh issue.list --team KMD --state "Todo" --limit 1 --json | jq 'length')
+CONFLICTING=$(gh pr list --json number,mergeable --jq '[.[] | select(.mergeable == "CONFLICTING")] | length')
+```
+
+**早期終了処理**:
+
+すべてのガード条件を満たす場合、`.logs/pipeline_active.log` に以下を追記して exit:
+
+```
+==== <ISO8601 日時> PIPELINE_ACTIVE_DONE: full no-op (early return, no subagent invocation) ====
+  reviewed=0 human_in_review=0 in_review=0 conflicting=0 draft=0 in_progress=N todo=N
+```
+
+その後、最終レポートとして「PIPELINE_ACTIVE_DONE: full no-op (early return)」とだけ報告して終了する。**ステップ 0c 以降のすべてのステップはスキップする**。
+
+ガード条件を一つでも満たさない場合は通常通りステップ 0c へ進む。
+
 ## ステップ 0c: halted recovery（自動 staged 救済 / 必須）
 
 中断耐性として、`scripts/recovery/recover_halted.sh --auto` を起動する。これは In Progress 状態で:
