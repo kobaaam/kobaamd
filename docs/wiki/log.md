@@ -28,3 +28,16 @@
 - `CLAUDE.md`（gitignore 管理）にも同等の内容を「自律開発パイプライン > Wiki 参照ポリシー」と「モデル割り当て方針 > Haiku の用途」として追記
 - index.md の Practices セクションに新記事を登録
 - ソース: KMD-45, KMD-46（scripts/wiki/load_all.sh）, KMD-47（scripts/wiki/ask.sh）, KMD-48, KMD-49
+
+## [2026-05-06] ロール定義整理 + SSOT ルール明文化 + Phase 監視組込
+
+ハンドオフ文書 `docs/handoff/2026-05-06-cost-optimization-prompt.md` を踏まえ、コスト最適化 (KMD-117〜123) と halted リカバリ (PR #59) を統合したロール定義 3 記事を整備し、SSOT ルールと Phase 監視を仕組み化。
+
+- `articles/practices/team-structure.md` を**再作成**（5/1 作成分が stash 操作で消失していた）
+- `articles/practices/external-teams.md` を**再作成**（同上、halted 経験の集約節追加）
+- `articles/practices/role-dispatch.md` を**新規作成**（4 層辞書 + SSOT ルール節）
+- `scripts/hooks/pre-push` に `docs/wiki/articles/` 未コミット警告を追加（block しないが消失リスクを通知）
+- `.claude/commands/kobaamd_health_check.md` に Phase 移行トリガー監視ステップを追加（wiki 総量を `scripts/wiki/load_all.sh` で計測、12万 / 15万 / 18万 / 20万トークン閾値で WARNING / CRITICAL）
+- index.md の Practices セクションに 3 件追加
+- KMD-119〜123（Phase A コスト最適化 5 件）の priority を 4 → 3 (Normal) に上げ、人間承認済とみなして todo に進められる状態に
+- ソース: docs/handoff/2026-05-06-cost-optimization-prompt.md, KMD-117〜123, PR #59 (halted リカバリ), recover_halted.sh, scripts/wiki/load_all.sh, .claude/agents/, .claude/commands/, 既存 wiki 記事群
