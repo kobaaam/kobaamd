@@ -4,7 +4,7 @@ category: components
 tags: [d2, diagram, wkwebview, svg-pan-zoom]
 sources: [docs/adr/0011-d2-diagram-preview.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # D2 ダイアグラムプレビュー
@@ -100,8 +100,8 @@ D2 はプロセス起動のオーバーヘッドがあるため、Mermaid より
 
 ## Related
 
-- [[エディタコア (NSTextViewWrapper)]]
-- [[AppKit-SwiftUI ブリッジ]]
+- [[editor-core]] — NSTextView 側の本体（旧表記: エディタコア (NSTextViewWrapper)）
+- [[appkit-swiftui-bridge]] — WKWebView と AppKit/SwiftUI の橋渡し
 
 ## Sources
 

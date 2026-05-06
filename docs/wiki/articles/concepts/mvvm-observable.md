@@ -4,7 +4,7 @@ category: concepts
 tags: [architecture, swiftui, state-management]
 sources: [docs/adr/0001-mvvm-observable.md, docs/learnings/2026-04-29-KMD-20.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # MVVM と Observable パターン
@@ -40,6 +40,7 @@ KMD-20（ファイルテンプレート）の postmortem で、`TemplatePickerVi
 - [[appkit-swiftui-bridge]] — NSTextView ラップでの MVVM 適用
 - [[postmortem-patterns]] — MVVM 違反の再発防止パターン
 - [[editor-core]] — EditorView の ViewModel 構造
+- [[file-tree-outline-sync]] — サイドバーと OutlineView の MVVM 連携
 
 ## Sources
 

@@ -4,7 +4,7 @@ category: practices
 tags: [postmortem, patterns, codex, testing]
 sources: [docs/learnings/2026-04-28-KMD-4.md, docs/learnings/2026-04-28-KMD-6.md, docs/learnings/2026-04-29-KMD-20.md, docs/learnings/2026-04-28-KMD-22.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # ポストモーテムから学ぶ実装パターン
@@ -51,6 +51,8 @@ KMD-4/6/20/22 の振り返りから抽出した再発防止パターン集。実
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
 - [[prd-quality-cycle]] — パターン 1 の PRD への反映
+- [[security-hardening]] — シェル変数クォート等のセキュリティ視点の再発防止
+- [[wiki-reference-policy]] — wiki 経由で再発防止知見を引き継ぐ手順
 
 ## Sources
 

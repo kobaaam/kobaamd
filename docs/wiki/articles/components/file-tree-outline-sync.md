@@ -4,7 +4,7 @@ category: components
 tags: [file-tree, outline, sidebar, navigation, scroll-sync]
 sources: []
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-05-06
 ---
 
 # ファイルツリーとアウトラインの同期
@@ -127,9 +127,9 @@ FileTreeView ──(tap)──→ AppViewModel.openInTab() ──→ editorText 
 
 ## Related
 
-- [[エディタコア (NSTextViewWrapper)]] — `.jumpToLine` 通知の受信側
-- [[MVVM と Observable パターン]] — `@Observable` による状態伝播の仕組み
-- [[AppKit-SwiftUI ブリッジ]] — NSTextView ラップの詳細
+- [[editor-core]] — `.jumpToLine` 通知の受信側
+- [[mvvm-observable]] — `@Observable` による状態伝播の仕組み
+- [[appkit-swiftui-bridge]] — NSTextView ラップの詳細
 
 ## Sources
 
