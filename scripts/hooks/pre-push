@@ -1,12 +1,16 @@
 #!/bin/bash
 # kobaamd pre-push hook
-# main ブランチへの直接 push を禁止して PR ワークフローを強制する
+# main ブランチへの直接 push を禁止して PR ワークフローを強制する。
+# あわせて docs/wiki/articles/ の未コミット変更を警告（過去に stash 操作で記事が消失した経験から）。
 
 REMOTE=$1
 CURRENT_BRANCH=$(git symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# main への直接 push 禁止
 while read local_ref local_sha remote_ref remote_sha; do
-    # main への push を検出
     if [[ "$remote_ref" == "refs/heads/main" ]]; then
         echo "❌ main への直接 push は禁止されています。"
         echo ""
@@ -19,5 +23,19 @@ while read local_ref local_sha remote_ref remote_sha; do
         exit 1
     fi
 done
+
+# Wiki 記事の未コミット変更を警告（block しない）
+WIKI_UNTRACKED=$(git ls-files --others --exclude-standard -- docs/wiki/articles/ 2>/dev/null)
+WIKI_MODIFIED=$(git diff --name-only -- docs/wiki/articles/ 2>/dev/null)
+if [ -n "$WIKI_UNTRACKED" ] || [ -n "$WIKI_MODIFIED" ]; then
+    echo ""
+    echo "⚠️  docs/wiki/articles/ に未コミットの変更があります（push は続行します）:"
+    [ -n "$WIKI_UNTRACKED" ] && echo "$WIKI_UNTRACKED" | sed 's/^/    [untracked] /'
+    [ -n "$WIKI_MODIFIED" ] && echo "$WIKI_MODIFIED" | sed 's/^/    [modified] /'
+    echo ""
+    echo "    → wiki 記事は git stash 操作などで消失したケースがあります。"
+    echo "      別 commit で取り込み、index.md / log.md と一緒に push することを強く推奨します。"
+    echo ""
+fi
 
 exit 0
