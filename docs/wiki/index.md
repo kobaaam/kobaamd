@@ -36,3 +36,4 @@ kobaamd の設計思考・技術知見の知識ベース。
 - [concern carve-out（PR レビュー懸念の 3 分類と別チケット退避）](articles/practices/concern-carve-out.md) — concern を rework / auto-carveable / human-judgment に 3 分類するルールと、別チケット退避（carve-out）の運用 SSOT
 - [依存逆順耐性のためのガードパターン](articles/practices/dependency-inversion-guard.md) — 依存先 script 不在時に warning + skip + exit=0 で抜けるテンプレートと、PRD section 8 で先に明文化する運用（KMD-54 で実証）
 - [subagent プロンプト設計（Claude Code 暗黙注入を踏まえた）](articles/practices/subagent-prompt-design.md) — Claude Code が CLAUDE.md / README.md を session context へ暗黙注入する境界を踏まえ、subagent プロンプトでの明示 Read を削除しつつ Constraints セクション格上げで defense-in-depth するパターン（KMD-120 で実証）
+- [CLI 引数渡し規約（stdin 経由化と variadic option 回避）](articles/practices/cli-argument-conventions.md) — `claude -p` / `codex exec` 等への長文 prompt 渡しを stdin 経由 + `printf '%s'` で標準化し、Commander.js の variadic option 後置罠 / フォーマットメタ文字バグ / argv 漏出を一手に塞ぐ規約（KMD-154 で 1 週間サイレント失敗していた事例の再発防止）

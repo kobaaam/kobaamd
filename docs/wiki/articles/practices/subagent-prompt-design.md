@@ -84,6 +84,7 @@ KMD-120 PRD の AC 4 項目目「次回 postmortem で Karpathy Guidelines / 命
 - [[postmortem-patterns]]
 - [[prd-quality-cycle]]
 - [[autonomous-pipeline-philosophy]] — concern を auto-carveable と判定する 3 条件（動作影響なし / AC 範囲外 / 独立修正可）。KMD-120 の frontmatter `description:` 整合不備が 3 条件全充足で KMD-156 に auto-carve された経路
+- [[cli-argument-conventions]] — subagent を `claude -p --agent <name>` で起動するときの引数渡し規約。`--allowedTools` allowlist と並ぶ subagent 起動時の防御層（KMD-152 の最小権限化が KMD-154 で variadic option バグを誘発した経路への対策）
 
 ## Sources
 
