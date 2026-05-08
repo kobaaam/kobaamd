@@ -2,9 +2,9 @@
 title: Wiki 参照ポリシー（Prompt Caching 標準運用）
 category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
-sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49]
+sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-150]
 created: 2026-05-04
-updated: 2026-05-06
+updated: 2026-05-08
 ---
 
 # Wiki 参照ポリシー（Prompt Caching 標準運用）
@@ -55,6 +55,23 @@ echo "Phase 移行のトリガーを箇条書きで" | ./scripts/wiki/ask.sh -
 - `ANTHROPIC_API_KEY` 必須。未設定なら exit 1（OAuth / chatgpt 認証は使わない、API キーモードのみ）
 - 検索層（embedding / BM25）に切り替えるロジックは含まない。Phase 1 専用（Phase 移行のスケジュールは下記）
 
+#### 1.2 Haiku ベースの lint / 判定タスクは Claude Code subagent 経由（KMD-150 以降）
+
+`docs/wiki/articles/` の lint や、KB3 系の YES/NO 判定タスクのように **Haiku を使う場面では `ANTHROPIC_API_KEY` を直接利用せず、Claude Code subagent 経由で起動する**。
+
+- 既定経路: `claude -p --agent <name>`（`--agent` で `.claude/agents/*.md` の subagent 定義を読み込み、`model: haiku` のフロントマターで Haiku を指定）
+- 例: `scripts/wiki/lib/section-context-check.sh` は `kobaamd_lint_section_context` subagent を呼び、内部で `claude -p --agent kobaamd_lint_section_context` を起動する
+- これにより、API キーの発行・配布・ローテーションが不要になり、Claude Code 認証だけで Haiku 判定が回る
+- レガシー経路（`scripts/wiki/lint.sh --legacy-api` 等）は移行期間中のフォールバック。新規スクリプトでは使わない
+
+設計指針:
+
+- subagent の `tools:` は最小限に絞る（典型は `Read, Bash`）。これにより外部 context が混入せず、判定の再現性が安定する
+- subagent の出力は **stdout に NDJSON、stderr に統計サマリ** に分離する。呼び出し元の shell スクリプトは stdout から JSON 行だけ取り出して集計する
+- `claude -p` の出力に prose が混入する可能性があるため、呼び出し元では `jq -e .` でパース可能かつ期待する `rule` を含む行のみを抽出する防御を入れる
+
+Phase 移行のトリガー条件・運用手順は次節と共通。
+
 ### 2. Phase 移行のトリガー
 
 | Phase | 状態 | トリガー |
@@ -88,16 +105,21 @@ Haiku は **短い構造化タスクをバッチで大量に回す**用途に使
 
 **Haiku 利用時の必須ルール**:
 
-1. **Prompt Caching を必ず併用**: `cache_control: { type: "ephemeral" }` を文書部分（system or user の static block）に付与する。Haiku は単価が安いとはいえ、cache miss を量産するとコストが逆転する
-2. **バッチ処理を優先**: 1 記事内の複数チャンクは 1 セッションで連続処理する。`scripts/wiki/ask.sh` のような共通ヘルパーから呼び、セッション単位のキャッシュを活かす
-3. **失敗時のフォールバック**: リトライ 3 回、最終失敗は元入力をそのまま通過させて警告を stderr に出す（処理を止めない）。Haiku は判断が浅いぶん偶発的な誤りが起こりやすいので、品質ゲートとして「失敗時は no-op に倒す」を徹底する
-4. **content_hash ベースの差分処理**: 入力チャンクの内容ハッシュを記録し、変更のないチャンクは再生成しない。記事追加 / 更新のたびに全件を再処理しない
+1. **Claude Code subagent 経由で起動する（KMD-150 以降の必須）**: `ANTHROPIC_API_KEY` を直接利用するのではなく、`.claude/agents/<name>.md`（`model: haiku`）として subagent を定義し、`claude -p --agent <name>` で呼ぶ。API キーの発行・配布が不要になる
+2. **Prompt Caching を必ず併用**: `cache_control: { type: "ephemeral" }` を文書部分（system or user の static block）に付与する。Haiku は単価が安いとはいえ、cache miss を量産するとコストが逆転する。subagent 経由の場合は Claude Code 側のキャッシュ機構が同等の役割を担う
+3. **バッチ処理を優先**: 1 記事内の複数チャンクは 1 セッションで連続処理する。`scripts/wiki/ask.sh` のような共通ヘルパーから呼び、セッション単位のキャッシュを活かす
+4. **失敗時のフォールバック**: リトライ 3 回、最終失敗は元入力をそのまま通過させて警告を stderr に出す（処理を止めない）。Haiku は判断が浅いぶん偶発的な誤りが起こりやすいので、品質ゲートとして「失敗時は no-op に倒す」を徹底する
+5. **content_hash ベースの差分処理**: 入力チャンクの内容ハッシュを記録し、変更のないチャンクは再生成しない。記事追加 / 更新のたびに全件を再処理しない
 
 具体的な Haiku 利用箇所は KB2 〜 KB4 系チケットで個別の subagent / scripts に展開する:
 
 - KB2-2 / KB2-3: チャンク contextual prefix 生成
-- KB3-2 / KB3-4: セクション単独文脈判定 / unlinked mentions 判定
+- KB3-2 / KB3-4: セクション単独文脈判定 / unlinked mentions 判定（KMD-150 で subagent 経由化）
 - KB4-2: 評価クエリの半自動生成
+
+実装済みの subagent:
+
+- `kobaamd_lint_section_context` (`.claude/agents/kobaamd_lint_section_context.md`) — `scripts/wiki/lint.sh` のルール 4 (section-context-missing) を担当。`scripts/wiki/lib/section-context-check.sh` から `claude -p --agent` 経由で起動される
 
 ### 5. フォールバック手順（ヘルパー未整備時 / ad-hoc 用途）
 
@@ -128,3 +150,4 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 - KMD-47（[KB1] subagent から wiki 全件参照を行うヘルパーの整備）
 - KMD-48（[KB1] Prompt Caching のコスト・レイテンシ計測ベンチマーク）
 - KMD-49（[KB1] CLAUDE.md / SCHEMA.md に運用方針を明記）
+- KMD-150（[KB2] section-context-missing lint を Claude Code subagent (Haiku) 経由に置換）
