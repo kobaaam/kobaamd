@@ -59,6 +59,8 @@ export KOBAAMD_SU_PUBLIC_ED_KEY="YOUR_PUBLIC_KEY"
 
 **注意**: デバッグビルドでは公開鍵が注入されないため自動アップデートは動かない（リリースビルド `./scripts/post-build.sh release` でのみ有効）。
 
+**注意**: 再ビルド時は kobaamd を必ず停止する（`scripts/post-build.sh` が冒頭で `pkill -x kobaamd` を best-effort で実行する / KMD-151）。Hardened Runtime + ad-hoc 署名下で実行中プロセスのままバイナリを上書きすると、未ロードの code page をフォルトインした瞬間に `SIGKILL (Code Signature Invalid)` でクラッシュするため。
+
 ### Keychain エクスポート
 
 マシン乗り換え時は、Keychain Access で Sparkle 用の秘密鍵エントリを探してエクスポートする。移行先ではその秘密鍵を Keychain に取り込み、同じ公開鍵を `KOBAAMD_SU_PUBLIC_ED_KEY` として設定する。秘密鍵ファイルをリポジトリに置かないこと。

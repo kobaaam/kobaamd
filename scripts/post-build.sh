@@ -7,6 +7,11 @@ APP=".build/kobaamd.app"
 RESOURCES="$APP/Contents/Resources"
 PLIST="$APP/Contents/Info.plist"
 
+# 実行中の kobaamd を停止（Hardened Runtime 下での binary 上書き SIGKILL 回避 / KMD-151）
+# pkill -x で完全一致（kobaamd-* など別名バイナリを巻き込まない）
+# best-effort: プロセス未起動でもエラーにしない
+pkill -x kobaamd 2>/dev/null || true
+
 if [ ! -d "$APP" ]; then
   echo "[post-build] .app bundle not found at $APP — run swift build first"
   exit 1
