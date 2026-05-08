@@ -306,13 +306,13 @@ run_subagent() {
 
   if [ "$dry_run" -eq 1 ]; then
     err "[dry-run] would invoke subagent for $cache_miss sections (hit=$cache_hit)"
-    err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
+    err "file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
     rm -f "$pending_tmp" "$meta_tmp"
     return 0
   fi
 
   if [ "$cache_miss" -eq 0 ]; then
-    err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=0 violations=$subagent_violations"
+    err "file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=0 violations=$subagent_violations"
     rm -f "$pending_tmp" "$meta_tmp"
     return 0
   fi
@@ -407,7 +407,7 @@ run_subagent() {
   done <"$out_tmp"
 
   rm -f "$out_tmp" "$pending_tmp" "$meta_tmp"
-  err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
+  err "file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
 }
 
 # ============================================================================
