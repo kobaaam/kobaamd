@@ -105,184 +105,9 @@ if root=$(git rev-parse --show-toplevel 2>/dev/null); then
   esac
 fi
 
-# ============================================================================
-# Default path: delegate to Claude Code subagent (KMD-150)
-#
-# Permission policy (KMD-152): we pass an explicit `--allowedTools` allowlist
-# instead of the old bypass-permissions mode. This restricts the spawned
-# Haiku session to the exact set of utilities documented in the agent file
-# (`Read` + a curated set of `Bash(<cmd>:*)` patterns), so that prompt
-# injection on a wiki article cannot escalate into arbitrary command exec
-# (curl / ssh / rm -rf etc.).
-# ============================================================================
-
-run_subagent() {
-  if ! command -v claude >/dev/null 2>&1; then
-    err "claude CLI not found. Either install Claude Code or pass --legacy-api"
-    exit 1
-  fi
-  require_cmd jq
-
-  err "file=$relative_path route=subagent agent=kobaamd_lint_section_context"
-
-  # Compose the agent invocation prompt. The agent definition lives in
-  # `.claude/agents/kobaamd_lint_section_context.md` and reads `--file` /
-  # `--cache` from the prompt body.
-  local prompt
-  prompt="Run lint with the following arguments and emit NDJSON to stdout (no extra commentary):"$'\n'
-  prompt+="--file $relative_path"
-  if [ -n "$cache_path" ]; then
-    prompt+=$'\n'"--cache $cache_path"
-  fi
-  if [ "$dry_run" -eq 1 ]; then
-    prompt+=$'\n'"--dry-run"
-  fi
-
-  # `claude -p --agent <name>`: launch as a one-shot subagent, print result, exit.
-  # `--output-format text` keeps stdout clean for NDJSON consumers.
-  # Minimum-permission allowlist for the lint subagent.
-  # The legacy bypass-permissions mode is intentionally NOT used: spawning
-  # a subagent with broad Bash access means it could call e.g.
-  # `curl` / `rm -rf` / `ssh` even if `tools: Read, Bash` is declared in the
-  # agent frontmatter. We instead allow only the specific commands the agent
-  # is documented to need (see `.claude/agents/kobaamd_lint_section_context.md`).
-  local -a allowed_tools=(
-    "Read"
-    "Bash(python3:*)"
-    "Bash(jq:*)"
-    "Bash(shasum:*)"
-    "Bash(git rev-parse:*)"
-    "Bash(mkdir:*)"
-    "Bash(mv:*)"
-    "Bash(cat:*)"
-    "Bash(printf:*)"
-    "Bash(awk:*)"
-    "Bash(sed:*)"
-  )
-  # KMD-153: capture stdout / stderr separately so the agent's per-section
-  # WARN / progress logs are relayed to the caller's stderr instead of being
-  # silently dropped by the NDJSON filter below. Previously we used `2>&1`,
-  # which routed stderr into `$out_tmp` where every non-JSON line was
-  # discarded (`jq -e .` reject) — making lint skips invisible.
-  local out_tmp err_tmp rc attempt success
-  out_tmp=$(mktemp)
-  err_tmp=$(mktemp)
-  attempt=0
-  success=0
-  while [ "$attempt" -lt "$retries" ]; do
-    attempt=$((attempt + 1))
-    : >"$out_tmp"
-    : >"$err_tmp"
-    set +e
-    printf '%s' "$prompt" | claude -p \
-      --agent kobaamd_lint_section_context \
-      --output-format text \
-      --allowedTools "${allowed_tools[@]}" \
-      >"$out_tmp" 2>"$err_tmp"
-    rc=$?
-    set -e
-
-    # Relay the agent's stderr to our own stderr regardless of success, so
-    # that per-section WARN messages remain observable for debugging.
-    if [ -s "$err_tmp" ]; then
-      cat "$err_tmp" >&2
-    fi
-
-    if [ "$rc" -eq 0 ]; then
-      success=1
-      break
-    fi
-
-    err "WARN: subagent attempt ${attempt}/${retries} failed (exit=$rc) for $relative_path"
-    # Dump head of stdout for failure context (existing behaviour preserved).
-    head -c 2048 "$out_tmp" >&2 || true
-    printf '\n' >&2
-
-    if [ "$attempt" -lt "$retries" ]; then
-      sleep_for=$((1 << attempt))
-      sleep "$sleep_for"
-    fi
-  done
-  rm -f "$err_tmp"
-
-  # The agent is supposed to write NDJSON to stdout only, but `claude -p` can
-  # mix prose around the agent's output. We salvage by extracting any line that
-  # looks like a JSON object with the expected `rule` field.
-  if [ "$success" -ne 1 ]; then
-    err "WARN: all ${retries} subagent attempts failed for $relative_path — skipping"
-    rm -f "$out_tmp"
-    return 0
-  fi
-
-  # Filter: keep only lines that parse as JSON and have the expected rule.
-  local violations=0
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    case "$line" in
-      *'"rule"'*'"section-context-missing"'*) ;;
-      *) continue ;;
-    esac
-    if printf '%s' "$line" | jq -e . >/dev/null 2>&1; then
-      printf '%s\n' "$line"
-      violations=$((violations + 1))
-    fi
-  done <"$out_tmp"
-
-  rm -f "$out_tmp"
-  err "section-context-check: file=$relative_path route=subagent violations=$violations"
-}
-
-# ============================================================================
-# Legacy path: direct Anthropic Messages API with Prompt Caching
-# ============================================================================
-#
-# Kept behind --legacy-api for the transitional period (KMD-150). The body of
-# this function preserves the pre-KMD-150 behaviour verbatim so existing
-# observability (cache_create / cache_read) continues to work for anyone
-# willing to provide ANTHROPIC_API_KEY explicitly.
-
-run_legacy() {
-  if [ "$dry_run" -ne 1 ]; then
-    if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-      err "ANTHROPIC_API_KEY is not set (try: source ~/.zshrc) — or drop --legacy-api"
-      exit 1
-    fi
-    require_cmd curl
-  fi
-
-  require_cmd jq
-  require_cmd python3
-  require_cmd shasum
-
-  content_hash() {
-    printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
-  }
-
-  cache_lookup() {
-    local h="$1"
-    if [ -z "$cache_path" ] || [ ! -f "$cache_path" ]; then
-      return 0
-    fi
-    jq -r --arg h "$h" '.section_context[$h] // empty' "$cache_path" 2>/dev/null || true
-  }
-
-  cache_store() {
-    local h="$1" v="$2"
-    [ -n "$cache_path" ] || return 0
-    mkdir -p "$(dirname "$cache_path")"
-    if [ ! -f "$cache_path" ]; then
-      printf '%s' '{"section_context":{},"version":1}' >"$cache_path"
-    fi
-    local tmp
-    tmp=$(mktemp)
-    jq --arg h "$h" --arg v "$v" \
-      '.section_context[$h] = $v | .version = (.version // 1)' \
-      "$cache_path" >"$tmp" && mv "$tmp" "$cache_path"
-  }
-
-  py_extract=$(mktemp)
-  trap 'rm -f "$py_extract"' EXIT
-  cat >"$py_extract" <<'PY'
+py_extract=$(mktemp)
+trap 'rm -f "$py_extract"' EXIT
+cat >"$py_extract" <<'PY'
 import json, sys, re
 path = sys.argv[1]
 with open(path, "r", encoding="utf-8") as f:
@@ -346,7 +171,269 @@ for s in sections:
 print(json.dumps({"sections": out}, ensure_ascii=False))
 PY
 
-  sections_json=$(python3 "$py_extract" "$file_path")
+content_hash() {
+  printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
+}
+
+cache_lookup() {
+  local h="$1"
+  if [ -z "$cache_path" ] || [ ! -f "$cache_path" ]; then
+    return 0
+  fi
+  jq -r --arg h "$h" '.section_context[$h] // empty' "$cache_path" 2>/dev/null || true
+}
+
+cache_store() {
+  local h="$1" v="$2"
+  [ -n "$cache_path" ] || return 0
+  mkdir -p "$(dirname "$cache_path")"
+  if [ ! -f "$cache_path" ]; then
+    printf '%s' '{"section_context":{},"version":1}' >"$cache_path"
+  fi
+  local tmp
+  tmp=$(mktemp)
+  jq --arg h "$h" --arg v "$v" \
+    '.section_context[$h] = $v | .version = (.version // 1)' \
+    "$cache_path" >"$tmp" && mv "$tmp" "$cache_path"
+}
+
+extract_sections() {
+  local path="$1"
+  python3 "$py_extract" "$path"
+}
+
+subagent_meta_tmp=""
+subagent_violations=0
+
+emit_if_violation() {
+  local verdict="$1" h="$2"
+  case "$verdict" in
+    YES*|yes*|Yes*)
+      return 0
+      ;;
+    NO*|no*|No*)
+      local reason level title line detail
+      reason=$(printf '%s' "$verdict" | sed -E 's/^[Nn][Oo][:：]?[[:space:]]*//')
+      level=$(jq -r --arg h "$h" '.[$h].level' "$subagent_meta_tmp")
+      title=$(jq -r --arg h "$h" '.[$h].title' "$subagent_meta_tmp")
+      line=$(jq -r --arg h "$h" '.[$h].line' "$subagent_meta_tmp")
+      detail="H${level} '${title}': ${reason}"
+      jq -nc \
+        --arg file "$relative_path" \
+        --arg rule "section-context-missing" \
+        --argjson line "$line" \
+        --arg detail "$detail" \
+        --arg model "haiku" \
+        --arg section_id "H${level}/${title}" \
+        '{file:$file, rule:$rule, line:$line, detail:$detail, model:$model, section_id:$section_id}'
+      subagent_violations=$((subagent_violations + 1))
+      ;;
+    *)
+      err "WARN: unparseable verdict (hash=$h): $verdict"
+      ;;
+  esac
+}
+
+# ============================================================================
+# Default path: delegate to Claude Code subagent (KMD-150)
+#
+# Permission policy (KMD-152): we pass an explicit `--allowedTools` allowlist
+# instead of the old bypass-permissions mode. This restricts the spawned
+# Haiku session to the exact set of utilities documented in the agent file
+# (`Read` + a curated set of `Bash(<cmd>:*)` patterns), so that prompt
+# injection on a wiki article cannot escalate into arbitrary command exec
+# (curl / ssh / rm -rf etc.).
+# ============================================================================
+
+run_subagent() {
+  if ! command -v claude >/dev/null 2>&1; then
+    err "claude CLI not found. Either install Claude Code or pass --legacy-api"
+    exit 1
+  fi
+  require_cmd jq
+  require_cmd python3
+  require_cmd shasum
+
+  local sections_json section_count pending_tmp meta_tmp
+  sections_json=$(extract_sections "$file_path")
+  section_count=$(printf '%s' "$sections_json" | jq -r '.sections | length')
+
+  err "file=$relative_path route=subagent sections=$section_count agent=kobaamd_lint_section_context"
+
+  pending_tmp=$(mktemp)
+  meta_tmp=$(mktemp)
+  printf '%s\n' '[]' >"$pending_tmp"
+  printf '%s\n' '{}' >"$meta_tmp"
+
+  subagent_meta_tmp="$meta_tmp"
+  subagent_violations=0
+
+  local i section level title line body hash_input h cached
+  local cache_hit=0
+  local cache_miss=0
+  i=0
+  while [ "$i" -lt "$section_count" ]; do
+    section=$(printf '%s' "$sections_json" | jq -c ".sections[$i]")
+    level=$(printf '%s' "$section" | jq -r '.level')
+    title=$(printf '%s' "$section" | jq -r '.title')
+    line=$(printf '%s' "$section" | jq -r '.line')
+    body=$(printf '%s' "$section" | jq -r '.body')
+
+    hash_input="${relative_path}|H${level}|${title}|${body}"
+    h=$(content_hash "$hash_input")
+
+    jq --arg h "$h" --argjson lvl "$level" --arg t "$title" --argjson ln "$line" \
+      '. + {($h): {level:$lvl, title:$t, line:$ln}}' \
+      "$meta_tmp" >"${meta_tmp}.new" && mv "${meta_tmp}.new" "$meta_tmp"
+
+    cached=""
+    if [ -n "$cache_path" ]; then
+      cached=$(cache_lookup "$h")
+    fi
+
+    if [ -n "$cached" ]; then
+      cache_hit=$((cache_hit + 1))
+      emit_if_violation "$cached" "$h"
+    else
+      cache_miss=$((cache_miss + 1))
+      jq --arg h "$h" --argjson lvl "$level" --arg t "$title" --argjson ln "$line" --arg b "$body" \
+        '. + [{hash:$h, level:$lvl, title:$t, line:$ln, body:$b}]' \
+        "$pending_tmp" >"${pending_tmp}.new" && mv "${pending_tmp}.new" "$pending_tmp"
+    fi
+
+    i=$((i + 1))
+  done
+
+  if [ "$dry_run" -eq 1 ]; then
+    err "[dry-run] would invoke subagent for $cache_miss sections (hit=$cache_hit)"
+    err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
+    rm -f "$pending_tmp" "$meta_tmp"
+    return 0
+  fi
+
+  if [ "$cache_miss" -eq 0 ]; then
+    err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=0 violations=$subagent_violations"
+    rm -f "$pending_tmp" "$meta_tmp"
+    return 0
+  fi
+
+  local prompt
+  prompt="Run lint on the pending sections JSON file and emit NDJSON to stdout (no extra commentary)."$'\n'
+  prompt+="--input $pending_tmp"$'\n'
+  prompt+="--file $relative_path"
+
+  # `claude -p --agent <name>`: launch as a one-shot subagent, print result, exit.
+  # `--output-format text` keeps stdout clean for NDJSON consumers.
+  # Minimum-permission allowlist for the lint subagent.
+  # The legacy bypass-permissions mode is intentionally NOT used: spawning
+  # a subagent with broad Bash access means it could call e.g.
+  # `curl` / `rm -rf` / `ssh` even if `tools: Read, Bash` is declared in the
+  # agent frontmatter. We instead allow only the specific commands the agent
+  # is documented to need (see `.claude/agents/kobaamd_lint_section_context.md`).
+  local -a allowed_tools=(
+    "Read"
+    "Bash(python3:*)"
+    "Bash(jq:*)"
+    "Bash(shasum:*)"
+    "Bash(git rev-parse:*)"
+    "Bash(mkdir:*)"
+    "Bash(mv:*)"
+    "Bash(cat:*)"
+    "Bash(printf:*)"
+    "Bash(awk:*)"
+    "Bash(sed:*)"
+  )
+  # KMD-153: capture stdout / stderr separately so the agent's per-section
+  # WARN / progress logs are relayed to the caller's stderr instead of being
+  # silently dropped by the NDJSON filter below. Previously we used `2>&1`,
+  # which routed stderr into `$out_tmp` where every non-JSON line was
+  # discarded (`jq -e .` reject) — making lint skips invisible.
+  local out_tmp err_tmp rc attempt success
+  out_tmp=$(mktemp)
+  err_tmp=$(mktemp)
+  attempt=0
+  success=0
+  while [ "$attempt" -lt "$retries" ]; do
+    attempt=$((attempt + 1))
+    : >"$out_tmp"
+    : >"$err_tmp"
+    set +e
+    printf '%s' "$prompt" | claude -p \
+      --agent kobaamd_lint_section_context \
+      --output-format text \
+      --allowedTools "${allowed_tools[@]}" \
+      >"$out_tmp" 2>"$err_tmp"
+    rc=$?
+    set -e
+
+    if [ -s "$err_tmp" ]; then
+      cat "$err_tmp" >&2
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+      success=1
+      break
+    fi
+
+    err "WARN: subagent attempt ${attempt}/${retries} failed (exit=$rc) for $relative_path"
+    head -c 2048 "$out_tmp" >&2 || true
+    printf '\n' >&2
+
+    if [ "$attempt" -lt "$retries" ]; then
+      sleep_for=$((1 << attempt))
+      sleep "$sleep_for"
+    fi
+  done
+  rm -f "$err_tmp"
+
+  if [ "$success" -ne 1 ]; then
+    err "WARN: all ${retries} subagent attempts failed for $relative_path — skipping"
+    rm -f "$out_tmp" "$pending_tmp" "$meta_tmp"
+    return 0
+  fi
+
+  local line_json verdict
+  while IFS= read -r line_json; do
+    [ -n "$line_json" ] || continue
+    if ! printf '%s' "$line_json" | jq -e '.hash and .verdict' >/dev/null 2>&1; then
+      continue
+    fi
+    h=$(printf '%s' "$line_json" | jq -r '.hash')
+    verdict=$(printf '%s' "$line_json" | jq -r '.verdict')
+    if [ -n "$cache_path" ]; then
+      cache_store "$h" "$verdict"
+    fi
+    emit_if_violation "$verdict" "$h"
+  done <"$out_tmp"
+
+  rm -f "$out_tmp" "$pending_tmp" "$meta_tmp"
+  err "section-context-check: file=$relative_path route=subagent sections=$section_count cache_hit=$cache_hit cache_miss=$cache_miss violations=$subagent_violations"
+}
+
+# ============================================================================
+# Legacy path: direct Anthropic Messages API with Prompt Caching
+# ============================================================================
+#
+# Kept behind --legacy-api for the transitional period (KMD-150). The body of
+# this function preserves the pre-KMD-150 behaviour verbatim so existing
+# observability (cache_create / cache_read) continues to work for anyone
+# willing to provide ANTHROPIC_API_KEY explicitly.
+
+run_legacy() {
+  if [ "$dry_run" -ne 1 ]; then
+    if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+      err "ANTHROPIC_API_KEY is not set (try: source ~/.zshrc) — or drop --legacy-api"
+      exit 1
+    fi
+    require_cmd curl
+  fi
+
+  require_cmd jq
+  require_cmd python3
+  require_cmd shasum
+
+  local sections_json section_count article_body system_preamble
+  sections_json=$(extract_sections "$file_path")
   section_count=$(printf '%s' "$sections_json" | jq -r '.sections | length')
 
   err "file=$relative_path route=legacy sections=$section_count cache_control=ephemeral model=$model"
@@ -359,6 +446,7 @@ PY
 
   system_preamble='You are a documentation reviewer for the kobaamd LLM Wiki. The system block contains the full text of one wiki article. The user will quote one of its H2/H3 sections and ask whether that section, read in isolation (without the article title or surrounding context), conveys clearly what topic it covers. Reply with one of: "YES" or "NO: <one-line reason>". Do not add any other commentary.'
 
+  local i violations section level title line body hash_input h cached verdict section_quote payload_tmp response_tmp http_tmp attempt success curl_exit http_code answer reason detail sleep_for
   i=0
   violations=0
   while [ "$i" -lt "$section_count" ]; do
