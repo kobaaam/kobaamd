@@ -69,6 +69,7 @@ KMD-120 PRD の AC 4 項目目「次回 postmortem で Karpathy Guidelines / 命
 教訓: 観測前提の AC を含む PRD は、観測手段（集計スクリプト・ログ抽出方法）の整備を **同 PR の影響範囲または別チケット** として明記する。`kobaamd_research_create_ticket` / `kobaamd_create_prd` のプロンプトで観測前提 AC を検出した場合、観測手段の起票も併せて提案する運用が望ましい。本パターンは [[postmortem-patterns]] パターン 17 と [[prd-quality-cycle]] にも反映する。
 
 ### 6. KMD-120 の運用結果（参照実例）
+<!-- llm-context: 「subagent プロンプトから明示的な `Read CLAUDE.md` 行を削除して入力トークンを削減する」という KMD-120 タスクの実装結果サマリ。AC が実測前提だった点や、リードタイム・auto-carve 経路を、本記事の subagent プロンプト設計原則 1〜5 を裏付ける実例として並べたセクション。 -->
 
 - **対象 5 subagent**: `kobaamd_implement_code` / `kobaamd_create_prd` / `kobaamd_research_create_ticket` / `kobaamd_review_pr` / `kobaamd_review_security`
 - **明示 Read 行の実在件数**: 5 ファイル中 2 ファイルのみ（`kobaamd_create_prd` と `kobaamd_research_create_ticket`）。残り 3 は元々無く no-op
