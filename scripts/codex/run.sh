@@ -20,6 +20,8 @@
 # Env:
 #   LINEAR_API_KEY  required（BLOCKED 起票時のみ）
 #   CODEX_RUN_TEAM  default: KMD（BLOCKED 起票先 team key）
+#   CODEX_RUN_CONTEXT
+#                   optional usage log context（KMD-XX など）
 #   CODEX_RUN_DRY_RUN=1
 #                   skip codex 実行 + Linear 起票のスキップ判定だけ実施
 #
@@ -169,6 +171,7 @@ EOF
 }
 
 main() {
+  "${REPO_ROOT}/scripts/usage/log.sh" codex "run.sh" 0 "${CODEX_RUN_CONTEXT:-}" || true
   command -v jq >/dev/null || { err "jq が必要です (brew install jq)"; exit 2; }
 
   local stderr_file stdout_exit

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # scripts/wiki/ask.sh
 #
 # Send the entire kobaamd LLM Wiki (docs/wiki/articles/**/*.md) to the
@@ -39,7 +42,8 @@ usage() {
     'Environment:' \
     '  ANTHROPIC_API_KEY  Required. API key.' \
     '  ANTHROPIC_MODEL    Optional. Overrides the default model.' \
-    '  ANTHROPIC_BASE_URL Optional. Defaults to https://api.anthropic.com'
+    '  ANTHROPIC_BASE_URL Optional. Defaults to https://api.anthropic.com' \
+    '  ASK_CONTEXT        Optional usage log context (KMD-XX など)'
 }
 
 err() {
@@ -142,12 +146,12 @@ fi
 require_cmd jq
 require_cmd curl
 
-if ! ROOT=$(git rev-parse --show-toplevel 2>/dev/null); then
+if ! git -C "$REPO_ROOT" rev-parse --show-toplevel >/dev/null 2>&1; then
   err "not in a git repository (run from kobaamd repo)"
   exit 1
 fi
 
-load_all="$ROOT/scripts/wiki/load_all.sh"
+load_all="$REPO_ROOT/scripts/wiki/load_all.sh"
 if [ ! -x "$load_all" ]; then
   err "scripts/wiki/load_all.sh not found or not executable"
   exit 1
@@ -228,6 +232,8 @@ while [ "$attempt" -lt "$retries" ]; do
 
   : >"$response_tmp"
   : >"$http_status_tmp"
+
+  "$REPO_ROOT/scripts/usage/log.sh" claude "wiki_ask" 0 "${ASK_CONTEXT:-}" || true
 
   set +e
   curl --silent --show-error --fail-with-body \

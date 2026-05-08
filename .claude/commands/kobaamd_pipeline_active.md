@@ -158,6 +158,57 @@ LQ_DRY_RUN=0 ./scripts/recovery/recover_halted.sh --auto
 
 5. `/kobaamd_merge_pr` ← レビュー後に reviewed に遷移した issue を即マージ
 
+## ステップ 5b: 事前 usage チェック（フェーズ B 突入前 / 必須）
+
+直近 5 時間の API 呼び出し回数を `./scripts/usage/check.sh --window-hours 5 --json` で集計し、閾値（Claude > 100 / Codex > 50 / Gemini > 30）を超えていれば **フェーズ B（新規実装）をスキップ**してステップ 12 へ進む。フェーズ A（既存 PR の処理）はこの時点で実行済みなので、そのまま run 完了扱いにする。
+
+`check.sh` は exit code で判定する:
+
+- `0`: usage は閾値以下。通常通りフェーズ B に進む
+- `10`: 1 つ以上の API が閾値超過。KMD-117 にコメントしてフェーズ B をスキップ
+- `2`: usage ログ読込失敗や集計異常。**fail-open** とし、警告ログだけ残して通常通りフェーズ B に進む
+
+`set -e` 下でも継続判定できるよう、usage check の Bash invocation では一時的に `set +e` を使うこと。
+
+```bash
+mkdir -p .logs
+
+set +e
+USAGE_JSON=$(./scripts/usage/check.sh --window-hours 5 --json)
+USAGE_EXIT=$?
+set -e
+
+if [[ "$USAGE_EXIT" == "10" ]]; then
+  CLAUDE_C=$(echo "$USAGE_JSON" | jq -r '.claude.calls')
+  CODEX_C=$(echo "$USAGE_JSON" | jq -r '.codex.calls')
+  GEMINI_C=$(echo "$USAGE_JSON" | jq -r '.gemini.calls')
+  EXCEEDED=$(echo "$USAGE_JSON" | jq -r '.exceeded | join(", ")')
+
+  cat > /tmp/usage_skip_comment.md <<EOF
+[PIPELINE_ACTIVE] usage 高負荷のためフェーズ B をスキップ
+
+直近 5 時間の API 呼び出し回数:
+- Claude: ${CLAUDE_C} (threshold 100)
+- Codex:  ${CODEX_C} (threshold 50)
+- Gemini: ${GEMINI_C} (threshold 30)
+- 超過 API: ${EXCEEDED}
+
+新規実装（PRD → 実装 → レビュー → マージ）はスキップしました。
+フェーズ A（既存 PR の処理）は通常通り実行済みです。
+次回の launchd 起動（30 分後）で再度 usage を確認します。
+EOF
+
+  ./scripts/linear/lq.sh comment.add KMD-117 @/tmp/usage_skip_comment.md
+  echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) PHASE_B_SKIPPED: usage threshold exceeded (${EXCEEDED}) ====" >> .logs/pipeline_active.log
+  rm -f /tmp/usage_skip_comment.md
+  # フェーズ B をスキップしてステップ 12 へ進む
+elif [[ "$USAGE_EXIT" == "2" ]]; then
+  echo "==== $(date -u +%Y-%m-%dT%H:%M:%SZ) USAGE_CHECK_WARN: usage check failed (fail-open) ====" >> .logs/pipeline_active.log
+fi
+```
+
+usage が閾値以下、または `check.sh` が異常終了（exit 2、`.logs/api_usage.jsonl` が無い初回起動を含む）した場合は **fail-open** で通常通りフェーズ B に進む。これは「計測機構の不備で開発を止めない」原則に従う。
+
 ## フェーズ B: 新チケットの完全サイクル（**todo が尽きるか最大 5 サイクルまで繰り返す**）
 
 カウンタ `cycle = 0`、上限 `MAX_CYCLES = 5` で以下のループを実行する。各サイクルで 1 チケットの完全サイクル（PRD → 実装 → 検証 → レビュー → マージ → 振り返り）を回し、次のサイクルに進む。
