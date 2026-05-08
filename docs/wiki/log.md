@@ -86,3 +86,19 @@ KMD-120 (subagent から CLAUDE.md 明示 Read を削除) の postmortem を取�
 - 注記: 影響範囲は 1 新規 + 3 更新の 4 記事で、kobaamd_update_wiki の「1 ソース → 最大 3 記事」ソフトキャップを 1 記事超過している。autonomous-pipeline-philosophy.md は本ソースの Action Item「concern 三分類判定基準を docs/wiki/articles/practices/ 系記事として明文化」に直接対応するため、3 件枠から外せなかった（前回 ingest 中断分の継承も兼ねる）
 - lint: fail (./scripts/wiki/lint.sh --no-llm exit=1, violations=15)。**全 15 件は KMD-120 ingest と独立した既存違反**（external-teams 4 / role-dispatch 7 / team-structure 4 の Related 非対称 + `[[concern-carve-out]]` broken-link）。本 ingest 対象 4 ファイル（subagent-prompt-design / postmortem-patterns / prd-quality-cycle / autonomous-pipeline-philosophy）からの新規違反は 0 件。既存違反は別タスクで扱う（commit は中止、working tree に差分を残す）
 - ingest history: ok (status=fail, consecutive=0/threshold=5)
+
+## [2026-05-08] Wiki ingest（--source docs/learnings/2026-05-08-KMD-153.md）
+
+KMD-153（`section-context-check.sh` の stdout/stderr 分離 17 行追加 / 2 行変更）の postmortem を取り込み、auto-carve 二段連鎖（KMD-150 → KMD-153 → KMD-171）/ 観測機構変更時の smoke test 必須化 / review_security のゲート観点選択 / shell script 小規模 fix の経路 / フェーズ B 最短サイクル参考値（23 分）を既存 3 記事に統合。
+
+- sources:
+  - docs/learnings/2026-05-08-KMD-153.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 18「観測機構変更には smoke test を初手で含める」/ パターン 19「review_security はゲート観点を PR の本質に応じて選ぶ」/ パターン 20「shell script 小規模 surgical fix は main session 直接 Edit で十分」を追加。Related に [[role-dispatch]] 追加）
+  - articles/practices/role-dispatch.md（§2.3 transcript 表に shell script 小規模 fix 行追加、§4 近接ロールの境界に `*.sh` 30 行未満境界の行を新設し KMD-153 を実例として収録、sources / updated 更新）
+  - articles/decisions/autonomous-pipeline-philosophy.md（「多段 auto carve-out 連鎖（KMD-150 → 153 → 171）」節と「フェーズ B 最短サイクル参考値（23 分）」節を新設。Related に [[role-dispatch]] 追加）
+- new articles: なし
+- skipped sources（理由付き）: なし
+- 注記: 「観測機構変更時の smoke test」と「review_security のゲート観点選択」は新規パターンとして wiki 化に値したが、postmortem-patterns.md の §パターン群に追加するだけで足りたため新規記事は作成せず。shell script 小規模 fix の SSOT は role-dispatch §4 に置き、postmortem-patterns パターン 20 はそこを参照する形にした
+- lint: 未実行（Final Report で警告として申告）
+- ingest history: 未記録（lint.sh / ingest_history.sh の状態に依存）

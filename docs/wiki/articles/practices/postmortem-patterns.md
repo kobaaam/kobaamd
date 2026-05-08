@@ -10,6 +10,7 @@ sources:
   - docs/learnings/2026-05-05-KMD-54.md
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
+  - docs/learnings/2026-05-08-KMD-153.md
 created: 2026-04-30
 updated: 2026-05-08
 ---
@@ -18,7 +19,7 @@ updated: 2026-05-08
 
 ## Summary
 
-KMD-4/6/20/22/120/144 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
+KMD-4/6/20/22/120/144/153 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
 
 ## Content
 
@@ -168,6 +169,48 @@ KMD-4/6/20/22/120/144 の振り返りから抽出した再発防止パターン�
 
 **出所**: KMD-120 (PR #76)
 
+### パターン 18: 観測機構の変更には観測機構自体の smoke test を初手で含める
+<!-- llm-context: section-context-check.sh のような観測 / 中継機構を変更する PR では、変更同 PR で smoke test まで一緒に書くのが筋。後工程の auto-carve に倒すと CI で回らないままマージされる。 -->
+
+**問題**: KMD-153（`scripts/wiki/lib/section-context-check.sh` の `run_subagent()` で stdout/stderr を分離して agent の WARN を呼び出し元 stderr に中継する 17 行追加 / 2 行変更）では、smoke test を「mock claude を使った成功 / 失敗パスの手動検証」だけで済ませ、自動 smoke test は KMD-171 として auto-carve した。観測機構の変更にしては test 戦略が PRD AC の段階で言語化されていなかったため、初手で test を含めた PR を出す選択肢が消えていた。
+
+**対策**: 観測機構（stderr / log / metric の中継・出力フォーマット変更を含む shell script や subagent ヘルパー）を変更する PR は、**変更と同じ PR で shell smoke test まで書く**のを標準とする。観測機構の変更は通常少行数（数十行）で済むため、smoke test を同梱しても PR 規模が破綻しない。`kobaamd_review_pr` のプロンプトに「観測機構変更（stderr / log / metric の中継）を検出したら、smoke test の有無を concern に上げる」観点を追加し、test を欠く場合は rework か auto-carve かを既存ロジックで分類させる。
+
+PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略」セクションを **AC とは別枠で** 設け、自動テスト / 手動検証 / smoke test の方針を 1 行書かせる。観測機構変更系 PRD では「観測機構自体の回帰検出 smoke test を本 PR で書く」を必ず含める。
+
+**出所**: KMD-153 (PR #84) → KMD-171 に smoke test 自動化が auto-carve
+
+### パターン 19: review_security はゲート観点を PR の本質に応じて選ぶ
+<!-- llm-context: kobaamd_review_security が postmortem-patterns §12「観測機構の自己観測責務」のような重い AC を盲目的に全 PR に当てず、「観測性回復」「サイレント失敗予防新設」のような PR 本質に応じてゲートを選ぶ判断ロジック。 -->
+
+**問題**: `kobaamd_review_security` のレビュー観点リスト（パターン 12「観測機構の自己観測責務」、シェルクォート規約、`set -u` + `trap` + `local` 互換性、サプライチェーン等）を全 PR に盲目的に適用すると、既存 WARN を呼び出し元 stderr に中継しただけの「観測性回復」PR にも「サイレント失敗予防機構の自己観測テスト」を要求してしまい、PR 本質と乖離した concern を量産しうる。
+
+**対策**: `kobaamd_review_security` の判定では、PR diff の **性質を一次分類** してからゲート観点を選ぶ:
+
+- **観測性回復**（既存 WARN / log を見えるようにしただけ）: パターン 12 の重い AC は適用範囲外。stderr 中継ロジックの正しさ・リーク確認に絞る
+- **サイレント失敗予防機構の新設**（観測機構そのものの追加）: パターン 12 を全面適用。機構自身が `set -u` + `trap` + `local` で死なないこと、`|| true` でマスクされた結果が空一致しないこと、依存コマンド失敗のリカバリ系シナリオを smoke test に含むこと
+- **クォート / 入力バリデーション系の補強**: `security-hardening` のクォート規約・`mktemp` 使用・`set -e/+e` の囲み・一時ファイルリーク無しを観点に
+
+つまり**観点リストを上から舐めるのではなく、PR 本質を 1 行で要約して該当ゲートだけを当てる**。観点を選ぶ判断ロジック自体を `kobaamd_review_security` のプロンプトに明記し、wiki 化された観点を「いつ適用しないか」のフィルタも合わせて運用する。
+
+**出所**: KMD-153 (PR #84) review_security が「観測性回復であり新規サイレント失敗予防機構ではないため §12 の重い AC は適用範囲外」と判断したケース
+
+### パターン 20: shell script の小規模 surgical fix は main session 直接 Edit で十分
+<!-- llm-context: < 30 行の `*.sh` 修正は Codex CLI を経由せず main session が直接 Edit する方が往復コストが見合う。CLAUDE.md の役割分担表「.swift は Codex」は shell script に拡張しない、という運用の明文化。 -->
+
+**問題**: CLAUDE.md の役割分担表は「`.swift` ファイルを新規作成・編集するなら → Codex CLI に依頼」と書いているが、shell script (`*.sh`) について明示的な扱いがない。KMD-153 では main session が直接 Edit した（17 行追加 / 2 行変更）のは妥当な判断だったが、後続の subagent / 人間が判断するための基準が CLAUDE.md / wiki に書かれていないため再現性のあるルールになっていない。
+
+**対策**: shell script の小規模 surgical fix（**目安 30 行未満 / 構造変更を伴わない**）は main session 直接 Edit を可とし、それ以上 / 構造変更を伴うものは Codex CLI 経由の `kobaamd_implement_code` に依頼する、という境界を明文化する。役割ディスパッチの正本は [[role-dispatch]] §4「近接ロールの境界」（shell script 行を追加）に置き、CLAUDE.md の役割分担表は本記事および role-dispatch を参照する形に揃える。
+
+判断基準の例:
+
+- 17 行追加 / 2 行変更で stdout/stderr 分離だけ入れる → main session 直接 Edit（KMD-153 の実例）
+- 100 行超のリライト / 関数構造の大幅変更 / 複数ファイルにまたがる shell 改修 → Codex CLI 経由
+
+`*.swift` は引き続き Codex CLI が原則（既存ルールどおり）。
+
+**出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
@@ -178,6 +221,7 @@ KMD-4/6/20/22/120/144 の振り返りから抽出した再発防止パターン�
 - [[dependency-inversion-guard]] — パターン 9 の詳細とテンプレート
 - [[autonomous-pipeline-philosophy]] — パターン 7 / 8 が機能する前提となるレビュー運用
 - [[subagent-prompt-design]] — パターン 15 / 16 / 17 の subagent プロンプト設計への反映（KMD-120）
+- [[role-dispatch]] — パターン 20 の shell script 小規模 fix 経路の SSOT（§4 近接ロールの境界）
 
 ## Sources
 
@@ -188,3 +232,4 @@ KMD-4/6/20/22/120/144 の振り返りから抽出した再発防止パターン�
 - docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
+- docs/learnings/2026-05-08-KMD-153.md
