@@ -48,16 +48,10 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
 
    レビュー観点を「経験則の集積」として強化するため、wiki の practices 記事から該当する観点を抽出する。
 
-   - `docs/wiki/index.md` を Read してカタログ確認
-   - 必ず Read する記事:
-     - `docs/wiki/articles/practices/postmortem-patterns.md`（過去の轍 13 パターン）
-     - `docs/wiki/articles/practices/security-hardening.md`（シェルクォート規約・サイレント失敗パターン等）
-   - 該当する場合に Read（diff 領域に応じて）:
-     - リリース・署名関連 → `practices/sparkle-release.md`
-     - PRD 起因の問題 → `practices/prd-quality-cycle.md`
-     - 影響範囲・スコープ → `practices/concern-carve-out.md`
-     - 触る領域の `components/<関連>.md`
-   - 抽出: 各記事から「本 PR の diff に該当しうるチェック項目」を 1〜3 件、wiki 由来 observation として観点マトリクスに追加する（後段ステップ 6 の最終行 "wiki-derived patterns" として反映）
+   - PR の diff 領域を特定する（変更ファイルのカテゴリ: Swift View / Service / scripts / docs / Package.swift など）
+   - `./scripts/wiki/ask.sh "本 PR の diff 領域 (例: NSTextView / Sparkle / scripts/post-build / docs/wiki) に関連する practices/postmortem-patterns・security-hardening・該当 components の観点を全て列挙してください。各観点は (1) wiki 由来の article path、(2) 確認すべき具体項目、(3) 該当する場合に concern 以上で扱うべき条件、を含めてください。"` を実行する
+   - ask.sh の出力に列挙された article path のうち、観点ベースで深掘りが必要な記事だけを Read で精読する（典型は 0〜1 件）
+   - 抽出した観点を、後段ステップ 6 の観点マトリクス最終行 `wiki-derived patterns` に反映する
    - 同領域の過去 postmortem で発生した事故と類似のコード変更を発見したら、必ず `concern` 以上で記録する
 
 6. Review the diff against the following observation matrix. For each row, judge: pass / concern / fail.

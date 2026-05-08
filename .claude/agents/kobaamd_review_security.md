@@ -71,9 +71,10 @@ diff 全体を対象に以下のパターンをスキャン:
 
 1. `gh pr diff <num>` で diff 全文を取得
 1.5. **LLM Wiki の security 観点を読み込む（必須）**
-   - `docs/wiki/articles/practices/security-hardening.md` を Read（多層防御パターン・シェルクォート規約・サイレント失敗等）
-   - 必要に応じて `practices/sparkle-release.md`（リリース系 PR の場合）、`practices/postmortem-patterns.md`（過去の轍）も Read
-   - 各記事から本 PR diff に該当する観点を抽出し、後段ステップ 2 の 5 カテゴリチェックに加えて確認する
+   - PR の diff から関心領域を抽出する（依存変更 / シェル / Process / Sparkle / entitlements / post-build など）
+   - `./scripts/wiki/ask.sh "本 PR (diff 領域: <...>) のセキュリティレビュー観点を practices/security-hardening・practices/sparkle-release・practices/postmortem-patterns から全て挙げてください。各観点は (1) wiki article path、(2) 該当する CRITICAL/WARNING/INFO 判定基準、(3) 過去事故との関連、を含めてください。"` を実行する
+   - ask.sh の出力で言及された article のうち、CRITICAL の根拠確認が必要なものだけを Read で精読する（典型 0〜1 件）
+   - 後段ステップ 2 では 5 カテゴリチェックに加え、ask.sh で抽出した wiki-derived 観点も確認する
    - 過去 postmortem で同領域の事故があれば、必ず該当箇所を `WARNING` 以上で記録する
 2. 5カテゴリのチェックを順に実行（**追加で wiki-derived patterns 観点も確認**）
 3. 各カテゴリの結果を PASS / WARNING / CRITICAL に分類

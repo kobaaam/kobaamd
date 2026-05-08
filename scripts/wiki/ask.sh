@@ -193,7 +193,7 @@ fi
 # tagged with cache_control: ephemeral so the documents are cached.
 # The user turn carries the query (uncached).
 
-system_preamble=$'You are a research assistant for the kobaamd project.\nThe document section that follows contains the full LLM Wiki under docs/wiki/articles/.\nAnswer the user query strictly based on this Wiki when possible. If the Wiki is silent, say so explicitly.\nCite the relevant article paths (the `<!-- file: ... -->` markers) when you reference them.'
+system_preamble=$'You are a research assistant for the kobaamd project.\nThe document section that follows contains the full LLM Wiki under docs/wiki/articles/.\nEach article is delimited by an HTML comment marker of the form `<!-- file: <relative-path> -->` immediately before its content.\n\nAnswer the user query strictly based on this Wiki when possible. If the Wiki is silent on a topic, say so explicitly rather than fabricating.\n\nWhen you reference content from the Wiki:\n- Cite the article by its `<!-- file: ... -->` path (e.g., `docs/wiki/articles/practices/postmortem-patterns.md`).\n- If you synthesize across multiple articles, list each cited path.\n- Quote short excerpts (<= 2 lines) verbatim when precision matters; otherwise paraphrase and cite.\n\nOutput structure:\n1. Direct answer to the query.\n2. A `## Sources` section at the end listing every article path you drew from.'
 
 jq -n \
   --arg model "$model" \

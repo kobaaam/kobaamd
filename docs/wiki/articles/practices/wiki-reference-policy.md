@@ -2,7 +2,7 @@
 title: Wiki 参照ポリシー（Prompt Caching 標準運用）
 category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
-sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-150]
+sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150]
 created: 2026-05-04
 updated: 2026-05-08
 ---
@@ -54,6 +54,26 @@ echo "Phase 移行のトリガーを箇条書きで" | ./scripts/wiki/ask.sh -
 - 文書部分は `system: [{ type: "text", text: "<wiki>", cache_control: { type: "ephemeral" } }]` の構造で送る。**user メッセージ側に wiki を入れない**（user 側に置くと cache 境界が壊れる）
 - `ANTHROPIC_API_KEY` 必須。未設定なら exit 1（OAuth / chatgpt 認証は使わない、API キーモードのみ）
 - 検索層（embedding / BM25）に切り替えるロジックは含まない。Phase 1 専用（Phase 移行のスケジュールは下記）
+
+#### 1.1.1 subagent からの参照は ask.sh 経由が標準（Read 直読みは限定用途）
+
+KMD-121 以降、subagent (`kobaamd_create_prd` / `kobaamd_review_pr` / `kobaamd_review_prd` / `kobaamd_review_security` ほか) の wiki 参照ステップは **`./scripts/wiki/ask.sh` 経由を標準** とする。Read による個別記事の直読みは以下のケースに限る:
+
+- ask.sh の回答で挙がった article path のうち、**特定記事 1 件を精査する**必要があるとき
+- 短い節を引用する目的で位置を厳密に確認したいとき
+- 認証・ネットワーク不調で ask.sh が使えない一時的フォールバック
+
+ask.sh 経由を標準とする理由:
+
+- Prompt Caching によって 2 回目以降の呼び出しは `cache_read` が wiki 全量に近づき、cost ≈ 1/10 / レイテンシ短縮（KMD-48 ベンチマーク）
+- subagent ごとに記事候補を手選びすると、記事追加時に subagent プロンプトを更新し続ける運用負荷が発生する。ask.sh は wiki 全量を毎回 LLM に渡すので、新規記事を追加するだけで自動で参照対象になる
+- 観点抽出（postmortem パターン・該当 decisions・関連 components）を一度の API 呼び出しで横断できる
+
+運用上の確認:
+
+- subagent 起動時、ask.sh の stderr に出る `ask.sh usage: input=… output=… cache_create=… cache_read=…` を観測する
+- 1 サイクル内で `cache_read` が増えていれば期待通り（cache_create は初回のみ）
+- ask.sh の preamble はレスポンスに article path を必須で含めるよう設計されているため、subagent はその path を観点反映時に引用する
 
 #### 1.2 Haiku ベースの lint / 判定タスクは Claude Code subagent 経由（KMD-150 以降）
 
