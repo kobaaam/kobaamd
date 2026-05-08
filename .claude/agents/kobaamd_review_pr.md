@@ -21,12 +21,56 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
 2. Get the full diff: `gh pr diff <num>`.
 3. Read corresponding PRD: `docs/prd/<KMD-XX>-*.md`. Identify Acceptance Criteria **and section 8「影響範囲マップ」**.
 4. Read modified Swift files in their pre-change state via `git show main:<path>` for context.
-5. **Gemini による UI/UX 実装検証（UI 変更を含む PR では必須・初回レビュー時のみ）**
+5. **Gemini による UI/UX 実装検証（UI 変更を含む PR では必須・初回レビュー時のみ・機械ゲート化）**
 
    diff に SwiftUI View / NSView / レイアウト関連の変更が含まれる場合、Gemini に UI/UX の妥当性を検証させる。
    純粋なロジック変更・テスト追加・インフラ変更のみの PR ではスキップしてよい。
 
-   **収束ルール**: Gemini 検証は **初回レビュー時に必ず実行する**。再レビュー時（fix_pr_comments / rework_issue 後の再起動）は **前回 Gemini 検証結果を Linear コメント履歴から参照**するに留め、新規 concern を後段で追加しない。これによりレビューラウンドの爆発（後段で初出 concern が増えて carve-out フェーズが膨張する事象）を防止する。再レビュー時に新たな UI 変更が含まれている部分のみは差分検証してよい。
+   **収束ルール**: Gemini 検証は **初回レビュー時のみ実行する**。再レビュー時（fix_pr_comments / rework_issue 後の再起動）は **Linear コメント履歴を機械的に検査**して過去の Gemini 検証コメントが存在すればスキップし、前回結果を参照するに留める。これによりレビューラウンドの爆発（後段で初出 concern が増えて carve-out フェーズが膨張する事象、KMD-25 で 6 回呼び出し / 第 6 回で初出 concern を観測）を防止する。subagent の自己解釈に依存せず、コメント履歴の有無で機械的にゲートする。
+
+   **5-a. 機械ゲート（必須・冒頭で実行）**:
+
+   ```bash
+   source ~/.zshrc
+   LQ=./scripts/linear/lq.sh
+   ISSUE=KMD-XX  # 本 PR に対応する Linear issue ID
+
+   # 過去の Gemini 検証コメント数をカウント（タグマーカー含むものを優先、後方互換で本文一致も）
+   PAST=$($LQ comment.list "$ISSUE" 2>/dev/null | jq '[.[] | select(
+     (.body | contains("<!-- gemini-verification -->"))
+     or (.body | contains("Gemini UI/UX 検証"))
+     or (.body | contains("Gemini 検証結果"))
+   )] | length')
+
+   if [[ "${PAST:-0}" -gt 0 ]]; then
+     # 直近の Gemini 検証コメント ID を取得して引用
+     PAST_COMMENT_ID=$($LQ comment.list "$ISSUE" 2>/dev/null | jq -r '[.[] | select(
+       (.body | contains("<!-- gemini-verification -->"))
+       or (.body | contains("Gemini UI/UX 検証"))
+       or (.body | contains("Gemini 検証結果"))
+     )] | last | .id')
+     echo "Gemini 検証スキップ（過去コメント $PAST_COMMENT_ID を参照）"
+     # 5-c の差分検証フローへ（追加 commit に UI 変更が含まれる場合のみ）
+     SKIP_FULL_GEMINI=1
+   else
+     SKIP_FULL_GEMINI=0
+   fi
+   ```
+
+   - `PAST > 0` の場合は **フル PR diff の Gemini 呼び出しを実行しない**
+   - 直近のレビュー以降に新規 commit があるかつ UI 関連 hunk を含む場合のみ、5-c の **差分検証** に進む
+   - スキップ時には Linear に「Gemini 検証スキップ（前回コメント `<id>` を参照）」を明示コメント（ステップ 6 マトリクス反映前に投稿）:
+
+     ```bash
+     cat > /tmp/skip.md <<EOF
+     <!-- gemini-verification-skip -->
+     Gemini 検証スキップ（前回コメント \`$PAST_COMMENT_ID\` を参照）。
+     再レビュー時はコメント履歴の機械検査により再呼び出しを抑止しています（KMD-122）。
+     EOF
+     $LQ comment.add "$ISSUE" @/tmp/skip.md
+     ```
+
+   **5-b. 初回 Gemini 検証（`SKIP_FULL_GEMINI=0` のときのみ）**:
 
    手順:
    a. PRD Section 5（UI/UX）の設計意図を抽出する
@@ -42,7 +86,41 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
      -d @/tmp/req.json \
      | jq -r '.candidates[0].content.parts[0].text'
    ```
-   d. Gemini の指摘を観点マトリクスの「UI/UX 整合」行に反映する（PASS / concern / fail）
+   d. Gemini の検証結果を Linear に投稿する。**コメント先頭に `<!-- gemini-verification -->` タグを必ず含めること**（次回以降の機械ゲートが検出するためのマーカー）:
+   ```bash
+   cat > /tmp/gemini.md <<EOF
+   <!-- gemini-verification -->
+   ## Gemini UI/UX 検証結果（初回）
+
+   <Gemini の出力本文>
+   EOF
+   $LQ comment.add "$ISSUE" @/tmp/gemini.md
+   ```
+   e. Gemini の指摘を観点マトリクスの「UI/UX 整合」行に反映する（PASS / concern / fail）
+
+   **5-c. 差分検証（再レビュー時 + 新規 UI commit がある場合のみ）**:
+
+   `SKIP_FULL_GEMINI=1` で、かつ前回レビュー以降に新規 commit がある場合に限り実行する。**フル PR diff ではなく、前回レビュー以降の追加 commit の UI 関連 hunk のみ**を Gemini に渡す。
+
+   ```bash
+   # 前回 Gemini 検証コメント以降にプッシュされた commit を抽出
+   LAST_REVIEW_TS=$($LQ comment.list "$ISSUE" 2>/dev/null | jq -r '[.[] | select(
+     (.body | contains("<!-- gemini-verification -->"))
+   )] | last | .createdAt')
+   # createdAt 以降にローカルに来ている commit の diff のみ
+   gh pr view <num> --json commits --jq ".commits[] | select(.committedDate > \"$LAST_REVIEW_TS\") | .oid" > /tmp/new_commits.txt
+   if [[ -s /tmp/new_commits.txt ]]; then
+     # 新規 commit の累積 diff から UI 関連ファイル（**/*View*.swift, **/*.swift で SwiftUI/NSView を含む hunk）に絞る
+     # 抽出した差分のみを Gemini に渡す（フル PR diff は渡さない）
+     # プロンプトテンプレートは 5-b の c. と同様だが、「以下は前回レビュー以降の追加 commit の差分のみです」と明示する
+     # 結果は <!-- gemini-verification-delta --> タグ付きで Linear にコメント投稿
+     :
+   else
+     echo "新規 UI commit なし、差分検証もスキップ"
+   fi
+   ```
+
+   差分検証の Gemini プロンプトでは「**前回検証以降の追加変更のみを対象とし、既に検証済みの部分は重複指摘しないでください**」と明示する。新規 concern が出た場合のみマトリクスに反映する。
 
 5.5. **LLM Wiki の practices を観点として読み込む（必須）**
 
@@ -171,7 +249,8 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
 - 自動 carve-out した issue は priority 4 (Low) で起票（人間承認ゲート維持）
 - 自動 carve-out した場合は親 issue に集約コメントで「auto-carved-out: KMD-XX, ...（人間が revert 可能）」と必ず明示
 - `[BREAKING]` を含む PR は必ず `Human in Review` 経由（人間確認なしの自動マージは禁止。auto-carveable のみであっても [BREAKING] なら Human in Review）
-- Gemini UI/UX 検証は **初回レビュー時のみ実行**（再レビュー時は前回検証結果を参照し、新規 concern を後段で追加するのを避ける。レビューラウンド爆発の防止）
+- Gemini UI/UX 検証は **初回レビュー時のみ実行**（再レビュー時は前回検証結果を参照し、新規 concern を後段で追加するのを避ける。レビューラウンド爆発の防止）。判定は subagent の自己解釈ではなく **Linear コメント履歴を `$LQ comment.list` で取得して `<!-- gemini-verification -->` タグ or 「Gemini UI/UX 検証」「Gemini 検証結果」を含むコメントの有無で機械的にゲート**する（KMD-122）。再レビューで新規 UI commit がある場合は前回検証以降の差分のみを Gemini に投げる
+- 初回 Gemini 検証コメントは **必ずコメント先頭に `<!-- gemini-verification -->` タグを含める**（次回以降の機械ゲートのマーカー）。差分検証コメントは `<!-- gemini-verification-delta -->`、スキップコメントは `<!-- gemini-verification-skip -->` を付与する
 - **「次のアクション」を Linear コメントや Final Report に書いたら、本 subagent 内で実際の API call を実行するか、明示的に別 subagent / slash command を起動するまでをタスク完了の条件とする**（コメントに書くだけで終わらせない）
 
 ## Final Report Format
