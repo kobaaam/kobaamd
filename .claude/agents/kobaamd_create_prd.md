@@ -31,7 +31,8 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
 4. **（Backlog＝修正モード時のみ）** `$LQ comment.list KMD-XX` で issue のコメントを取得し、直近の `kobaamd_review_prd` によるレビュー指摘（"PRD レビュー" を含むコメント）を読む。指摘された fail/concern セクションを重点的に修正対象とする。
 5. Read `docs/prd/_template.md` for the PRD structure.
 6. Read context files relevant to the proposed feature:
-   - `README.md`, `CLAUDE.md` (always)
+   - `CLAUDE.md` は session context に既に含まれる前提で参照すること（再 Read 不要）
+   - `README.md` も同様に session で参照済みなら再 Read 不要。ロードマップなど未読部分が必要な場合のみ部分 Read
    - Files in `Sources/` likely to be touched (use Grep to find related code)
 
 6.5. **LLM Wiki の関連記事を読み込む（必須）**
@@ -124,7 +125,8 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
 
 ## Constraints
 
-- Swift コードは絶対に書かない・編集しない（CLAUDE.md ルール）
+- Swift コードは絶対に書かない・編集しない（CLAUDE.md ルール再掲: 実装は必ず Codex CLI 経由）
+- 生成する PRD では Swift 実装に直接踏み込まず、ダウンストリーム subagent (`kobaamd_implement_code` など) が Codex 経由で実装する前提で要件・受け入れ条件を書く
 - MD ファイルは作成しない。PRD は issue description にのみ書き込む。
 - 副作用は以下2つのみ:
   (a) Linear issue の description 更新 + state 遷移 (draft → backlog) or backlog 維持
