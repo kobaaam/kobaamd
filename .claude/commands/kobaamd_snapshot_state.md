@@ -6,7 +6,8 @@ Linear KMD チームの全アクティブ issue のステータスを取得し�
 
 ## 手順
 
-1. `source ~/.zshrc && ./scripts/linear/lq.sh issue.list --team KMD --limit 250` で全 issue を取得（lq.sh は includeArchived=false がデフォルト）
+0. `LINEAR_API_KEY` が環境にロード済みであることを前提とする。手動実行時は冒頭の Bash invocation で `source ~/.zshrc` を 1 回実行する。pipeline_active 経由で呼ばれた場合は親プロセスが既に source 済みのため不要（KMD-131）
+1. `./scripts/linear/lq.sh issue.list --team KMD --limit 250` で全 issue を取得（lq.sh は includeArchived=false がデフォルト）
 2. 以下の JSON 形式で `.logs/pipeline_state.json` に **上書き** 保存:
 
 ```json

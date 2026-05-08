@@ -6,7 +6,7 @@ description: パイプライン基盤の死活監視（EM 的視点）— launch
 
 ## 実行手順
 
-`source ~/.zshrc` を実行してから、以下を順に確認する。各項目は OK / WARNING / CRITICAL の 3 段階で判定する。
+最初の Bash invocation で `source ~/.zshrc` を 1 回だけ実行してから、以下を順に確認する（subagent / pipeline 経由で呼ばれた場合は親プロセスが既に source 済みのためスキップ可。KMD-131）。各項目は OK / WARNING / CRITICAL の 3 段階で判定する。
 
 ### 1. launchd ジョブの死活
 
@@ -175,7 +175,7 @@ CRITICAL があった場合はそれに続けて項目別の詳細を 1 行ず�
 
 ## 事前確認
 
-- `source ~/.zshrc` で各種 API キーを読み込む
+- 各種 API キー（`LINEAR_API_KEY` など）が環境にロード済みであること。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - Linear I/O は `./scripts/linear/lq.sh` 経由
 
 ## 想定モデル

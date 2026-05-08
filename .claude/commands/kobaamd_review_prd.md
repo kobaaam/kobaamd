@@ -10,7 +10,7 @@ Agent tool で起動する際は `subagent_type: "kobaamd_review_prd"` を指定
 - 引数が空の場合は、KMD team の backlog issue 一覧を提示して終了
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（Linear I/O は `./scripts/linear/lq.sh` 経由）
+- `LINEAR_API_KEY` / `GEMINI_API_KEY` が環境にロード済みであること（Linear I/O は `./scripts/linear/lq.sh` 経由、Gemini は技術選定の妥当性チェックで利用）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - 対象 KMD-XX の Linear issue description に PRD が書き込まれていること
 
 完了後の報告:

@@ -11,7 +11,7 @@ GitHub の kobaaam/kobaamd リポジトリの Issues を確認し、未取り込
 
 事前確認:
 - `gh` CLI 認証済み
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む
+- `LINEAR_API_KEY` が環境にロード済みであること。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - Linear の標準 GitHub 連携設定がある場合は重複起票しないよう注意（既存 issue の links を確認）
 
 実行手順（`LQ=./scripts/linear/lq.sh`）:

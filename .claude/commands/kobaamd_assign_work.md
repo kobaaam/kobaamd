@@ -9,7 +9,7 @@ KMD team の `todo` ステータスにある issue の中から、次に着手�
 - 既に in-progress に1件以上ある場合は、新規アサインしない（WIP=1 ルール）
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（`scripts/linear/lq.sh` が必要）
+- `LINEAR_API_KEY` が環境にロード済みであること（`scripts/linear/lq.sh` が必要）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - in-progress の issue 数を確認（>=1 ならアサイン中止）
 
 選定基準（優先順位）:

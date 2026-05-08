@@ -9,7 +9,7 @@ Agent tool で起動する際は `subagent_type: "kobaamd_merge_pr"` を指定�
 - 期待形式: `KMD-XX`（単一 issue を手動マージ）または空（reviewed 全件を自動マージ、launchd 起動を想定）
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（Linear I/O は `./scripts/linear/lq.sh` 経由）
+- `LINEAR_API_KEY` が環境にロード済みであること（Linear I/O は `./scripts/linear/lq.sh` 経由）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - `gh` CLI 認証済み
 - main ブランチに対する push 権限がある PAT / OAuth が設定済み
 
