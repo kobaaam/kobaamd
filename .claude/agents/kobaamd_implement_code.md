@@ -35,14 +35,15 @@ Issue identifier (e.g., `KMD-12`) as the first argument. Halt and ask if missing
    - 受け入れ条件（PRD section 6）
    - **触れてはいけない箇所**（PRD section 8「変更してはいけない箇所」をそのまま転記する）
    - 制約: SwiftUI + AppKit, MVVM (`@Observable`), 既存テスト維持
-7. Invoke Codex via Bash:
+7. Invoke Codex via Bash（前段スクリプト `scripts/codex/run.sh` 経由 — 429 / quota 検出を共通化）:
    ```
    source ~/.zshrc
-   cat << 'EOF' | codex exec
+   cat << 'EOF' | ./scripts/codex/run.sh
    <prompt>
    EOF
    ```
-   - **Codex がクォータ超過エラー（429 / rate limit / quota exceeded）で失敗した場合**: `$LQ issue.transition KMD-XX Todo` で戻し、`$LQ issue.create --team KMD --title "[BLOCKED] OpenAI API クォータ超過" --priority 1` で別チケットを起票する（人間が課金対応後に Done にする）
+   - **`./scripts/codex/run.sh` の exit code が 42 の場合**: Codex のクォータ枯渇 / rate limit / 429 / usage limit を検出済み。`[BLOCKED] Codex quota / rate-limit detected` チケットは run.sh が自動起票済み（既存があれば skip）なので、ここでは `$LQ issue.transition KMD-XX Todo` で issue を Todo に戻して halt する。人間が課金対応 / クォータ復旧後にパイプラインが再開する
+   - exit code が 0 / 42 以外の場合は従来通り、エラーをフィードバックして retry（max 2 retries）または escalate
 8. Read Codex output. Apply changes via Edit/Write — do NOT skip review of the diff. If Codex output is unclear, retry with refined prompt (max 2 retries).
 9. Run `swift build` to verify compile. If fails, summarize error and decide: retry Codex with error fed back, or escalate (halt and report).
 10. If build OK, run `swift test`. If fails, same retry logic.

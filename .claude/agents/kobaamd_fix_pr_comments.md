@@ -51,13 +51,15 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
    - 指摘ごとに「ファイル・行・修正内容」を明示する
    - PRD の受け入れ条件との整合性を再確認する
    - **触れてはいけない箇所**（PRD section 8）を必ず含める
-7. Codex で修正を実装する
+7. Codex で修正を実装する（前段スクリプト `scripts/codex/run.sh` 経由 — 429 / quota 検出を共通化）
    ```
    source ~/.zshrc
-   cat << 'EOF' | codex exec
+   cat << 'EOF' | ./scripts/codex/run.sh
    <prompt>
    EOF
    ```
+   - **exit code が 42 の場合**: Codex の quota / rate-limit / 429 を検出済み。`[BLOCKED]` チケットは run.sh が自動起票済み（既存があれば skip）。issue は `In Progress` のまま留めて halt し、Linear に "Codex quota 検出のため halt（BLOCKED チケット参照）" とコメントする
+   - exit code 0 / 42 以外の場合は従来通り、エラーを Codex にフィードバックして retry（max 2 retries）
 8. diff を確認し、指摘外の変更が混入していないかチェックする
 9. `swift build` → `swift test` で確認。失敗時は Codex に再依頼（max 2回）
 9.5. **中断耐性のための WIP コミット & push（必須）** — `swift build` 通過直後に:

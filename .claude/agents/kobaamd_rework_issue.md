@@ -65,13 +65,15 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
    - **要求される変更**: spec_change / design_change / impl_fix の内容
    - **更新後の受け入れ条件**: PRD section 6
    - **触れてはいけない箇所**: PRD section 8
-4. Codex CLI で実装:
+4. Codex CLI で実装（前段スクリプト `scripts/codex/run.sh` 経由 — 429 / quota 検出を共通化）:
    ```
    source ~/.zshrc
-   cat << 'EOF' | codex exec
+   cat << 'EOF' | ./scripts/codex/run.sh
    <prompt>
    EOF
    ```
+   - **exit code が 42 の場合**: Codex の quota / rate-limit / 429 を検出済み。`[BLOCKED]` チケットは run.sh が自動起票済み（既存があれば skip）。issue は元のステータス（in Review / Human in Review）のまま留めて halt し、Linear に "Codex quota 検出のため rework halt（BLOCKED チケット参照）" とコメントする
+   - exit code 0 / 42 以外の場合は従来通り、エラーを Codex にフィードバックして retry（max 2 retries）
 5. Codex の出力をレビューし、フィードバックに対応しているか確認
 6. `swift build` でビルド確認。失敗時は Codex に再依頼（max 2 retries）
 7. `swift test` でテスト確認。失敗時は同上
