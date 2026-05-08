@@ -100,13 +100,35 @@ LQ_DRY_RUN=0 ./scripts/recovery/recover_halted.sh --auto
    d. 解消済みブランチを元のブランチ名で force push
    e. CONFLICTING が 0 件になったら次へ
 
-3. **レビュー ↔ 修正ループ（in-progress がなくなるまで繰り返す / 最大5回）**
+3. **レビュー ↔ 修正ループ（in-progress がなくなるまで繰り返す / 最大3回）**
 
    毎ループで以下を順に実行する:
    a. `/kobaamd_review_pr --auto` ← in-review の issue を全件レビュー（クリーン APPROVE → Reviewed 直行 / [BREAKING] or concern>0 → Human in Review / fail>0 → In Progress）
    b. REQUEST_CHANGES が出た場合: `/kobaamd_fix_pr_comments --auto` ← 指摘を修正して in-review に戻す
    c. in-progress（REQUEST_CHANGES 起因）が 0 件になったらループ終了
-   d. 5回繰り返しても in-progress が残る場合はループを抜け、残件を報告して人間にエスカレーション
+   d. **3回繰り返しても in-progress が残る場合**: 同じ指摘で修正が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える。複数 issue が残っている場合は for ループで全件処理する:
+
+      ```bash
+      # 残っている in-progress（REQUEST_CHANGES 起因）の各 KMD-XX について
+      cat > /tmp/escalation_comment.md <<'EOF'
+      [PIPELINE_ACTIVE] Auto-rework 3 連続失敗、人間判断に切り替え
+
+      review_pr ↔ fix_pr_comments ループが 3 回連続で REQUEST_CHANGES を解消できませんでした。
+      Codex / Claude が指摘の意図を取り違えて同じミスを繰り返している可能性が高いため、
+      自動修正を停止して人間にエスカレーションします。
+
+      対応案:
+      - PR の最新コメント / レビュー指摘を読み直し、必要なら PRD / 仕様を見直す
+      - 人間が Linear コメントで具体的な修正方針を返すと、次回起動時の「人間フィードバック対応」（フェーズ A ステップ 4）が `rework_issue` を起動して再開します
+      EOF
+
+      for KMD_XX in $STUCK_ISSUES; do
+        ./scripts/linear/lq.sh issue.transition "$KMD_XX" "Human in Review"
+        ./scripts/linear/lq.sh comment.add "$KMD_XX" @/tmp/escalation_comment.md
+      done
+      ```
+
+      その後、ループを抜けて残件を最終レポートに記載する。
 
 4. **人間フィードバック対応（Human in Review / in Review に新しい人間コメントがある場合）**
 
@@ -151,14 +173,35 @@ end while
 
 6. `/kobaamd_create_prd --auto` ← draft issue を全件 PRD 化して backlog に昇格（draft がなければスキップ）
 
-7. **PRD レビュー ↔ 修正ループ**（ステップ 6 で PRD が作成された場合のみ / 最大5回）
+7. **PRD レビュー ↔ 修正ループ**（ステップ 6 で PRD が作成された場合のみ / 最大3回）
 
    各 PRD 化された issue に対して以下をループ:
    a. `/kobaamd_review_prd <KMD-XX>` を実行
    b. PASS → ループ終了、次のステップへ
    c. REQUEST_REVISION → `/kobaamd_create_prd <KMD-XX>` で PRD を修正（backlog 状態のまま再実行、レビュー指摘コメントを自動読み取り）
    d. 修正完了後、a に戻って再レビュー
-   e. 5回繰り返しても PASS しない場合はループを抜け、人間にエスカレーション
+   e. **3回繰り返しても PASS しない場合**: 同じ指摘で PRD が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える。複数 issue が残っている場合は for ループで全件処理する:
+
+      ```bash
+      cat > /tmp/escalation_comment.md <<'EOF'
+      [PIPELINE_ACTIVE] Auto-rework 3 連続失敗、人間判断に切り替え
+
+      review_prd ↔ create_prd ループが 3 回連続で REQUEST_REVISION を解消できませんでした。
+      AI が指摘の意図を取り違えて同じミスを繰り返している可能性が高いため、
+      自動修正を停止して人間にエスカレーションします。
+
+      対応案:
+      - 直近の review_prd コメントと PRD 本体を読み比べ、要件定義レベルで合意が取れているか確認
+      - 人間が Linear コメントで方針を返すと、次回起動時の「人間フィードバック対応」（フェーズ A ステップ 4）が `rework_issue` を起動して再開します
+      EOF
+
+      for KMD_XX in $STUCK_PRD_ISSUES; do
+        ./scripts/linear/lq.sh issue.transition "$KMD_XX" "Human in Review"
+        ./scripts/linear/lq.sh comment.add "$KMD_XX" @/tmp/escalation_comment.md
+      done
+      ```
+
+      その後、ループを抜けて当該 issue は次のステップに進めず、最終レポートに残件として記載する。
 
 8. `/kobaamd_assign_work --auto` ← todo にあれば WIP=1 制御で1件選定し `kobaamd_implement_code` を起動
 
