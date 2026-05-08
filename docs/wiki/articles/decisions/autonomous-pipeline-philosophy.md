@@ -7,8 +7,9 @@ sources:
   - CLAUDE.md
   - docs/learnings/2026-05-05-KMD-54.md
   - docs/learnings/2026-05-06-KMD-144.md
+  - docs/learnings/2026-05-08-KMD-120.md
 created: 2026-04-30
-updated: 2026-05-06
+updated: 2026-05-08
 ---
 
 # AI 自律開発パイプラインの設計思想
@@ -51,6 +52,25 @@ GitHub Issues では状態遷移の柔軟性が不足。Linear は MCP 経由で
 
 KMD-144 (PR #70) はこの 3 条件を満たし、in Review → Reviewed → Done が同日内で完了した。
 
+#### concern を auto-carveable と判定する 3 条件
+<!-- llm-context: kobaamd_review_pr が PR の各 concern を rework / auto-carveable / human-judgment に三分類するとき、auto-carveable と判定するための具体条件。前節の「Reviewed 直行 3 条件」は PR レベルの判定で、これは個々の concern レベルの判定条件。 -->
+
+`kobaamd_review_pr` は PR に検出した個々の concern を rework / auto-carveable / human-judgment に三分類する。**concern を auto-carveable** と判定するのは、以下 **3 条件すべて**を満たすときに限る。
+
+1. **動作影響なし**（本 PR の振る舞いに影響を与えない / リグレッション源にならない）
+2. **AC 範囲外**（本 PR の PRD AC で要求していない独立改善 / 観測強化 / リファクタ）
+3. **独立修正可**（本 PR を block せず別 PR で完結する。依存先が本 PR の変更箇所に閉じていない）
+
+3 条件のいずれかが欠けるなら、その concern は **rework**（本 PR で直すべき）か **human-judgment**（仕様判断が必要）に倒す。auto-carve せず、本 PR をブロックする側に倒すこと。
+
+**KMD-120 (PR #76) の参照実例**: review_pr が検出した concern 1 件は frontmatter `description:` フィールドの整合だった。これは
+
+- 動作影響なし（ドキュメントメタの整合のみ、subagent の挙動は変わらない）
+- AC 範囲外（PRD AC は本文 Workflow / Constraints の更新を要求しており frontmatter は対象外）
+- 独立修正可（5 subagent の本文と無関係に追って修正可能）
+
+の 3 条件すべてを満たしたため、KMD-156 に auto-carve され、親 PR は Reviewed 直行 → 自動マージで 8 分マージとなった。詳細は [[subagent-prompt-design]] §6 と [[postmortem-patterns]] パターン 14 を参照。
+
 #### auto-carveable concern の統合チケット化
 
 親 PR のレビューで auto-carveable な concern が複数残ったとき、1 件 1 チケットに分割すると個々が小さすぎて優先度が上がらず Backlog に放置されやすい。以下 3 条件が揃う場合、複数の concern を 1 つの統合チケットとして起票してよい。
@@ -83,6 +103,7 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - [[security-hardening]] — パイプラインに組み込む多層防御の運用
 - [[postmortem-patterns]] — クリーン APPROVE 直行 4 条件、auto carve-out 規約、auto carve-out フローのパターン化（パターン 13 / 14）
 - [[dependency-inversion-guard]] — pipeline_weekly が依存逆順でも落ちないためのガードパターン
+- [[subagent-prompt-design]] — KMD-120 で concern auto-carveable 3 条件が機能した参照実例
 
 ## Sources
 
@@ -90,3 +111,4 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - CLAUDE.md: 自律開発パイプラインセクション
 - docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
+- docs/learnings/2026-05-08-KMD-120.md
