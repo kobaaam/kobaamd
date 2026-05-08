@@ -21,9 +21,9 @@ Codex 呼出のたびに `source ~/.zshrc` を heredoc 前段に置いている�
 ## 3. 機能要件
 
 - 必須要件:
-  - 各 subagent / slash command に「冒頭で 1 回 source 済みである前提」を明文化したセクションを追加
-  - Codex / Gemini 呼出 heredoc 内の `source ~/.zshrc` を削除（冒頭 source に集約）
-  - 同一 Bash call 内で `source` した環境変数は引き継がれる Bash tool 挙動を明文化
+  - 各 subagent / slash command のドキュメントに「各 Bash invocation の冒頭で 1 回 source する」前提を明文化したセクションを追加（旧表現「subagent 冒頭で 1 回 source 済みである前提」は誤り）
+  - Codex / Gemini 呼出 heredoc 内の `source ~/.zshrc` を削除（同一 Bash call 内での source 効果は後続コマンドにも届くため、heredoc 内での再 source は不要）
+  - Claude Code の Bash tool は invocation ごとに独立 subshell である事実と、同一 Bash call 内での source 効果引き継ぎを明文化
 - オプション要件:
   - 実装後の実時間効果を 1 サイクル分計測（best-effort、困難なら theoretical 見積りで可）
 
@@ -38,10 +38,10 @@ Codex 呼出のたびに `source ~/.zshrc` を heredoc 前段に置いている�
 
 ## 6. 受け入れ条件 (Acceptance Criteria)
 
-- [x] 各 subagent の Linear I/O セクションを「subagent 冒頭で 1 回 source 済みである前提」に書き換え
-- [x] Codex 呼出 heredoc から `source ~/.zshrc` を削除
-- [x] 同一 Bash call 内で `source` した環境変数は引き継がれることを明文化（Bash tool の挙動）
-- [x] 実装後、実時間効果を計測 or theoretical 見積りを Linear コメントに記載
+- [x] 各 subagent / slash command のドキュメントを「各 Bash invocation の冒頭で 1 回 source する」前提に書き換え（Claude Code の Bash tool は invocation ごとに独立 subshell のため、前の Bash call の source 効果は別の Bash call に引き継がれない）
+- [x] Codex / Gemini 呼出 heredoc から `source ~/.zshrc` を削除（同一 Bash call 内では source の効果が後続コマンドにも届くため heredoc 内の再 source は不要）
+- [x] 上記の Bash tool 挙動（invocation 独立 / 同一 call 内引き継ぎ）を各ファイルに明文化
+- [x] 実装後、実時間効果を計測 or theoretical 見積りを PRD 本体に記載（AC4）
 
 ## 7. テスト戦略
 
@@ -82,13 +82,27 @@ Codex 呼出のたびに `source ~/.zshrc` を heredoc 前段に置いている�
 ### その他リスク
 
 - 既存コードへの影響: なし（Swift コード変更なし）
-- 互換性: 既存の Bash 実行は同じ Bash call 内で source していれば継続動作。冒頭 source を忘れた subagent では `LINEAR_API_KEY not set` エラーになるが、これは fail-fast として望ましい
+- 互換性: 既存の Bash 実行は各 Bash call の冒頭で source していれば継続動作。各 Bash call の冒頭で source し忘れた場合は `LINEAR_API_KEY not set` 等のエラーになるが、これは fail-fast として望ましい（「subagent 冒頭で 1 回だけ」という誤った前提で書かれた Bash call は各 call の冒頭 source が漏れているため、修正が必要）
 - 外部依存: なし
 
 ## 9. 計測・成果指標
 
-- Bash tool overhead: 削減量を 1 サイクル分実測 or theoretical 見積り
-- 月数百回規模の実時間短縮効果
+### AC4 実測値（PR #91 実装時に計測）
+
+zsh subshell の `source ~/.zshrc` を 5 回連続実測（warm cache、MacBook Pro M3 Pro）:
+
+| 回 | real |
+|---|---|
+| 1 | 0.15s |
+| 2 | 0.04s |
+| 3 | 0.03s |
+| 4 | 0.03s |
+| 5 | 0.03s |
+
+- 1 サイクル（pipeline_active 1 回）あたり heredoc 内の冗長 source を 5〜10 invocation 削減 × 30〜150ms ≈ **150ms〜1.5s / サイクル**
+- pipeline_active は 30 分間隔（1440 cycle/月）→ 月次 **3.6〜36 分** の Bash tool overhead 削減
+
+**重要な注訂**: invocation ごとの 1 回 source は依然として必要（Bash tool の独立 subshell 特性）。今回の最適化対象は「同一 Bash call 内での冗長 source」（heredoc 等）であり、Bash call をまたぐ source の省略ではない。
 
 ## 10. 参考資料
 

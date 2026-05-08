@@ -35,6 +35,6 @@ description: ウィークリー系パイプライン（1 週間間隔想定）�
 各ステップの結果サマリと、人間がレビュー推奨な提案があれば最後に 1 段落でまとめてください。
 
 事前確認:
-- **パイプライン起動直後に最初の Bash invocation で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY` などをロード）。配下の slash command / subagent は本パイプラインから呼ばれた時点で環境変数を引き継ぐ前提のため、それぞれが冒頭で再 source する必要はない（KMD-131）
+- **各 Bash invocation の冒頭で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY` などをロード）。Claude Code の Bash tool は invocation ごとに独立した subshell のため、各 Bash call の先頭で毎回 source する（KMD-131）
 - `ANTHROPIC_API_KEY` は step 6 では不要（`--no-llm` のため。他の step では必要）
 - `gh` CLI 認証済み

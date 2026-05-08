@@ -238,7 +238,7 @@ end while
 各ステップの結果サマリと、次回起動時に注目すべき点（[BREAKING] 確認待ち / ループ上限超過 / 人間判断待ち）があれば 1〜2 行で報告してください。
 
 事前確認:
-- **パイプライン起動直後に最初の Bash invocation で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` をロード）。配下の subagent / slash command は本パイプラインから呼ばれた時点で環境変数を引き継ぐ前提のため、それぞれが冒頭で再 source する必要はない（KMD-131）
+- **各 Bash invocation の冒頭で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` をロード）。Claude Code の Bash tool は invocation ごとに独立した subshell のため、パイプラインの最初の Bash call で source しても別の Bash call には引き継がれない。各 Bash call の先頭で毎回 source する（KMD-131）
 - Linear I/O は `./scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）
 - `gh` CLI 認証済み
 

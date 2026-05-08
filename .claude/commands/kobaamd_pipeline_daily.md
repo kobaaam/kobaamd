@@ -26,5 +26,5 @@ description: デイリー系パイプライン（24 時間間隔想定）— arc
 各ステップの結果サマリ（処理件数・特に注目すべき stale issue など）を簡潔に報告。
 
 事前確認:
-- **パイプライン起動直後に最初の Bash invocation で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY` をロード、Linear I/O は `./scripts/linear/lq.sh` 経由）。配下の slash command は本パイプラインから呼ばれた時点で環境変数を引き継ぐ前提のため、それぞれが冒頭で再 source する必要はない（KMD-131）
+- **各 Bash invocation の冒頭で `source ~/.zshrc` を 1 回実行する**（`LINEAR_API_KEY` をロード、Linear I/O は `./scripts/linear/lq.sh` 経由）。Claude Code の Bash tool は invocation ごとに独立した subshell のため、各 Bash call の先頭で毎回 source する（KMD-131）
 - `gh` CLI 認証済み

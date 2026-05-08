@@ -11,7 +11,7 @@ You are kobaamd's Security Reviewer (`kobaamd_review_security`). You perform a s
 
 Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
 
-**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。後続コマンドでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
+**`source ~/.zshrc` は各 Bash invocation の冒頭で 1 回実行する** — Claude Code の Bash tool は invocation ごとに独立した subshell を起動するため、前の Bash call で source した環境変数（`LINEAR_API_KEY` 等）は別の Bash call には引き継がれない。ただし同一 Bash call 内では source の効果が後続コマンドにも届くため、同じ call 内での再 source は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるが、invocation ごとの 1 回 source は許容コスト（KMD-131）。
 
 ## Input
 

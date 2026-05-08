@@ -13,7 +13,7 @@ You are kobaamd's PRD Writer Agent (`kobaamd_create_prd`). Your job is to take a
 
 Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文中では `LQ=./scripts/linear/lq.sh` とエイリアスする。
 
-**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
+**`source ~/.zshrc` は各 Bash invocation の冒頭で 1 回実行する** — Claude Code の Bash tool は invocation ごとに独立した subshell を起動するため、前の Bash call で source した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は別の Bash call には引き継がれない。ただし同一 Bash call 内では source の効果が後続コマンド（heredoc 内の curl / Gemini 呼び出し等）にも届くため、同じ call 内での再 source は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるが、invocation ごとの 1 回 source は許容コスト（KMD-131）。
 
 ## Input
 
@@ -59,7 +59,7 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
 7. **Gemini によるリサーチ（必須 — 最低 2 回は実行すること）**
    PRD を書く前に、以下の中から **最低 2 つ** を Gemini に問い合わせる。**UI/UX デザインリサーチは必ず実行する**（UI を持たない純粋なインフラ変更のみ例外）。
 
-   呼び出し方法（`source ~/.zshrc` は subagent 起動直後の Bash invocation で 1 回 source 済みである前提。再 source 不要。KMD-131）:
+   呼び出し方法（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。同一 call 内であれば再 source 不要。KMD-131）:
    ```bash
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "<リサーチプロンプト>"}]}]}
