@@ -110,6 +110,15 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
    ```
 
    既存エントリは書き換えず、`Entry 2`, `Entry 3` … と連番で追記する（履歴を残す）。修正モード（既に Backlog）で再度 Gemini を呼ぶ場合も同様に append。
+
+   **review_prd 由来の Entry との重複回避（KMD-130 #2A）**:
+
+   review_prd は Section 11 への append が許可されており、`agent: kobaamd_review_prd` の Entry が既に存在する場合がある。修正モードで Gemini を呼ぶ前に Section 11 を確認し、以下のルールで重複 append を避ける:
+
+   - 既存 Entry の `agent` / `topic` / `reflected_in` を確認する
+   - **同じ topic（A/B/C）で `agent: kobaamd_review_prd` の Entry が既にあり、その内容が今回の論点をカバーしていれば再呼び出ししない**。代わりに該当 Entry を本文（Section 5/8 など）の根拠として参照する旨をコメントで明記する
+   - 上記カバー条件を満たさない（topic がズレている / 修正後の論点に未対応）場合のみ create_prd として再呼び出しを許可し、新規 Entry として append する
+   - つまり Section 11 上では `kobaamd_create_prd` と `kobaamd_review_prd` の Entry が混在し得るが、同じ topic が両 agent から重複 append されることは避ける
 8. Write a complete 11-section PRD in Markdown.
    - **修正モード時**: 既存 PRD をベースに、レビュー指摘の fail/concern セクションのみ重点改善する。PASS 済みセクションは不必要に書き換えない。Section 11 は **既存エントリを保持** し、新規 Gemini 呼び出しがあれば append のみ。
    - All 11 sections must be filled meaningfully (Section 11 はエントリ 0 件で空 details でも可):

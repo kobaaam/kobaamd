@@ -72,6 +72,15 @@ create_prd / review_prd で Gemini を呼び出した際の生プロンプト + 
 同じ機能領域の Gemini 回答が記録済みなら再呼び出しせずに「create_prd 時の回答 + PRD への反映度」を評価する。
 重複 Gemini calls を抑制し、PRD レビューサイクルの cost を下げるための共有ログ。
 
+append 権限（KMD-130 #2A）:
+- create_prd: 自由に append（Step 7D）
+- review_prd: 再呼び出ししたときに限り append（Step 4）。Section 1〜10 への編集は禁止。Section 11 のみ追記可
+- 既存 Entry の書き換え・削除はどちらも禁止（履歴保全）
+
+重複 append 回避:
+- review_prd 自身は 1 セッション内で同じ topic を複数 append しない（最大 1 entry / topic）
+- create_prd 修正モードは Section 11 を確認し、`agent: kobaamd_review_prd` の同 topic Entry が既にあれば再呼び出しを抑止する
+
 エントリのテンプレ:
 - timestamp: ISO8601 (UTC or +0900 でよい。実際の呼び出し時刻)
 - agent: kobaamd_create_prd / kobaamd_review_prd

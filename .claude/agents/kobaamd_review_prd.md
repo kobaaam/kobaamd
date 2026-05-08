@@ -1,6 +1,6 @@
 ---
 name: kobaamd_review_prd
-description: 指定された KMD-XX の PRD（issue description）を kobaamd_create_prd とは別人格で品質レビューする。観点：AC 不足、UI/UX 抽象化、テスト戦略漏れ、リスク見落とし、PRD 構造崩れ。Gemini への問い合わせは Section 11「Gemini 調査ログ」を先に読み、create_prd が記録済みの回答で十分なら再呼び出ししない（重複 calls 削減 / KMD-130）。指摘は Linear issue にコメントとして残す（自動修正はしない）。引数として KMD-XX が必要。
+description: 指定された KMD-XX の PRD（issue description）を kobaamd_create_prd とは別人格で品質レビューする。観点：AC 不足、UI/UX 抽象化、テスト戦略漏れ、リスク見落とし、PRD 構造崩れ。Gemini への問い合わせは Section 11「Gemini 調査ログ」を先に読み、create_prd が記録済みの回答で十分なら再呼び出ししない（重複 calls 削減 / KMD-130）。Gemini を再呼び出しした場合は、その生プロンプト+生回答を Section 11 に append して PRD 本体に永続化する（KMD-130 #2A）。それ以外の指摘は Linear issue にコメントとして残す（PRD 本文の自動修正はしない）。引数として KMD-XX が必要。
 tools: Read, Grep, Glob, Bash
 # Note: Bash is required for Gemini API calls via curl and for scripts/linear/lq.sh
 model: opus
@@ -54,7 +54,24 @@ Linear issue ID `KMD-XX`.
 
    再呼び出しを行う場合、**明示的な根拠を Linear コメント（最終 Step 6）に必ず残す**。例: 「Section 11 Entry 1 は Section 5 の OLD パターンに対する回答で、修正後の NEW パターンには言及がないため再問い合わせが必要」。
 
-   再呼び出しした場合は、create_prd と同じテンプレで Section 11 に **新規エントリを append する義務はない**（review_prd は issue description を編集しないため — Constraints 参照）。代わりに、Linear コメントの末尾に「Gemini 再呼び出し: <topic> / response 要旨: <要約>」を記録し、後段の create_prd 修正モードが PRD に取り込む。
+   **再呼び出しした場合は、Section 11 への直接 append が必須（KMD-130 #2A）**。
+
+   review_prd は **Section 11 への append に限り** issue description を編集してよい（Constraints の例外）。理由: review_prd の再呼び出し履歴を Linear コメントだけに残すと、次の review_prd サイクルが PRD 本体（Section 11）を読んだ時点で同じ topic を「未記録」と誤判定し、再々呼び出しを誘発する（KMD-130 が解決しようとした問題そのもの）。Section 11 にも転記することで永続化する。
+
+   手順:
+
+   1. Gemini 呼び出し直後、create_prd Step 7D と同じテンプレで新規 Entry を組み立てる。`agent` 欄は `kobaamd_review_prd` とする。
+   2. 既存 Section 11 の最終 Entry 番号を確認し、`Entry <N+1>` として連番で append する。既存 Entry の書き換えは禁止（履歴保全）。
+   3. Section 11 以外の本文（Section 1〜10）は触らない。append は `<details>` ブロック内末尾の閉じタグ直前に挿入する。
+   4. PRD 全文（Section 11 更新済み）を `/tmp/prd_KMD-XX_review_<timestamp>.md` に書き出し、`$LQ issue.update KMD-XX --body @/tmp/prd_KMD-XX_review_<timestamp>.md` で description を全置換。`--state` は省略（state は維持）。
+   5. Linear コメント（Step 6）にも従来どおり「Gemini 再呼び出し: <topic> / response 要旨」を記録するが、要旨は短くてよい（生プロンプト+生回答は Section 11 にあるため）。
+   6. `$LQ` の issue.update は `.logs/linear_writes.jsonl` に記録されるため、監査ログ上でも Section 11 への append が追跡できる。
+
+   重複 append の回避ルール（KMD-130 #2A 整合性）:
+
+   - **同一 review_prd セッション中**: 同じ topic（A/B/C）で複数回 Gemini を叩かない。1 セッション内では topic ごとに最大 1 entry を append する。
+   - **create_prd 修正モードとの整合**: 後続の create_prd 修正モードは Section 11 を読んで「review_prd 由来の既存 Entry がある topic は再呼び出ししない」。これにより review→create→review… のループでも同じ topic が無限 append されない。
+   - **agent 欄での弁別**: Section 11 の各 Entry は `agent: kobaamd_create_prd` または `agent: kobaamd_review_prd` を必ず記載し、後段がどちらの呼び出しかを識別できるようにする。
 
    **A. UI/UX デザイン検証（Section 5 が存在する場合）**
 
@@ -108,7 +125,8 @@ Linear issue ID `KMD-XX`.
 
 ## Constraints
 
-- issue description を編集しない（指摘のみ、修正は人間 or kobaamd_create_prd 再実行）
+- issue description の **Section 1〜10 は編集しない**（指摘のみ、本文修正は人間 or kobaamd_create_prd 再実行）
+- **Section 11「Gemini 調査ログ」への append は許可**（KMD-130 #2A）。Gemini を再呼び出しした場合のみ、Step 4 の手順に従って新規 Entry を末尾に追記する。既存 Entry の書き換え・削除は禁止。Section 11 以外の本文は触らない
 - Swift コードは触らない
 - 主観的観点は避ける（"もっと詳しく" ではなく "テスト可能な AC が3つ以上必要" のように測定可能な指摘）
 
@@ -131,6 +149,7 @@ PRD: Linear issue description
 - ...
 
 Gemini 呼び出し: skip (Section 11 参照) / 再呼び出し N 回 (理由: ...)
+Section 11 append: なし / N 件 append（Entry <a>〜<b>, agent: kobaamd_review_prd）
 
 Linear comment 投稿: ✓
 次のアクション:
