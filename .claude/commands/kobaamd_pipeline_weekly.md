@@ -9,6 +9,19 @@ description: ウィークリー系パイプライン（1 週間間隔想定）�
 3. `/kobaamd_summarize_changelog` ← 直近タグ以降の done を集約してリリースノート生成
 4. `/kobaamd_improve_prompt` ← `docs/learnings/` から各 subagent のプロンプト改善案を提案（learnings 2 件未満なら自動スキップ）
 5. `/kobaamd_update_wiki --since-last-run` ← 前回 ingest 以降に増えた `docs/learnings/` / `docs/adr/` を `docs/wiki/articles/` に取り込み
+5b. **月初（実行日の day-of-month が 7 以下）なら追加で** `/kobaamd_update_wiki --since-last-month-low` ← 先月の `wiki_value: low` 判定 learnings を救済対象として一括検討（KMD-133）
+   - 判定例:
+     ```bash
+     DAY=$(date +%-d)  # 1〜31 を 0 詰めなしで取得
+     if [[ "$DAY" -le 7 ]]; then
+       echo "月初（day=$DAY）→ low 救済ジョブを実行"
+       # → /kobaamd_update_wiki --since-last-month-low を起動
+     else
+       echo "月初ではない（day=$DAY）→ low 救済ジョブを skip"
+     fi
+     ```
+   - low 判定で skip された learnings は無条件に取り込むのではなく、update_wiki が「既に類似記事あり / 抽象化困難」を判断して個別に skip / 統合する
+   - 救済対象 0 件なら "no low-value learnings in last month" を報告して継続
 6. `/kobaamd_lint_wiki --no-llm` ← Wiki 規約違反を検出（NDJSON）。違反 1 件以上なら `scripts/wiki/lint_report.sh --epic KMD-44` にパイプして Linear epic にコメント投稿
    - 実行コマンド例（slash 内部の指示として書く）:
      ```bash
