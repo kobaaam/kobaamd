@@ -174,11 +174,10 @@ run_subagent() {
     : >"$out_tmp"
     : >"$err_tmp"
     set +e
-    claude -p \
+    printf '%s' "$prompt" | claude -p \
       --agent kobaamd_lint_section_context \
       --output-format text \
       --allowedTools "${allowed_tools[@]}" \
-      "$prompt" \
       >"$out_tmp" 2>"$err_tmp"
     rc=$?
     set -e
