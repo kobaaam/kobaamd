@@ -1,6 +1,6 @@
 ---
 name: kobaamd_create_prd
-description: Linear (KMD team) の draft/backlog ステータスにある指定 issue の PRD を作成・修正する。draft → 新規 PRD 作成して backlog に昇格。backlog → review_prd の指摘を読み取り PRD を修正。引数として issue ID（KMD-XX）が必要。
+description: Linear (KMD team) の draft/backlog ステータスにある指定 issue の PRD を作成・修正する。draft → 新規 PRD 作成して backlog に昇格。backlog → review_prd の指摘を読み取り PRD を修正。Gemini への問い合わせは生プロンプト + 生回答 + 時刻 + モデル名を PRD Section 11「Gemini 調査ログ」に記録し、review_prd と共有する（重複 calls 削減）。引数として issue ID（KMD-XX）が必要。
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -87,9 +87,32 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
    - A の結果 → Section 2, 5
    - B の結果 → Section 3, 4, 8
    - C の結果 → Section 1, 10
-8. Write a complete 10-section PRD in Markdown.
-   - **修正モード時**: 既存 PRD をベースに、レビュー指摘の fail/concern セクションのみ重点改善する。PASS 済みセクションは不必要に書き換えない。
-   - All 10 sections must be filled meaningfully:
+
+   ### D. Gemini 調査ログの記録（**必須** / KMD-130）
+   Gemini を呼び出すたびに、PRD Section 11「Gemini 調査ログ」に **生プロンプト + 生回答 + 呼び出し時刻 + モデル名 + topic + 反映先セクション** をエントリとして append する。要約せず生文で残すこと。これにより review_prd は Section 11 を読んで重複呼び出しを回避できる（KMD-130）。
+
+   テンプレ：
+   ```markdown
+   ### Entry <N>
+   - **timestamp**: <`date -u +"%Y-%m-%dT%H:%M:%SZ"` 等で取得した実時刻>
+   - **agent**: kobaamd_create_prd
+   - **model**: gemini-3.1-pro-preview
+   - **topic**: A. UI/UX デザインリサーチ / B. 技術実装リサーチ / C. 競合比較
+   - **prompt**:
+     ```
+     <生プロンプト>
+     ```
+   - **response**:
+     ```
+     <生回答 — 要約禁止>
+     ```
+   - **reflected_in**: Section <番号>（具体的にどこに反映したか）
+   ```
+
+   既存エントリは書き換えず、`Entry 2`, `Entry 3` … と連番で追記する（履歴を残す）。修正モード（既に Backlog）で再度 Gemini を呼ぶ場合も同様に append。
+8. Write a complete 11-section PRD in Markdown.
+   - **修正モード時**: 既存 PRD をベースに、レビュー指摘の fail/concern セクションのみ重点改善する。PASS 済みセクションは不必要に書き換えない。Section 11 は **既存エントリを保持** し、新規 Gemini 呼び出しがあれば append のみ。
+   - All 11 sections must be filled meaningfully (Section 11 はエントリ 0 件で空 details でも可):
    - Section 1 背景・目的: tie back to kobaamd vision and existing roadmap
    - Section 2 ターゲットユーザーとユースケース: concrete personas and scenarios
    - Section 3 機能要件: 必須要件 と オプション要件 を分けて列挙
@@ -100,6 +123,7 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
    - Section 8 想定リスク・依存: 既存コードへの影響を具体ファイル名で
    - Section 9 計測・成果指標: 任意（書けないなら "リリース後評価のため未定義" と明記）
    - Section 10 参考資料: 類似 OSS、関連 Apple ドキュメント
+   - Section 11 Gemini 調査ログ: ステップ 7D で append したエントリ群（folded `<details>` 内）。Gemini を一度も呼ばなかった場合は details 内を空にして「呼び出しなし」と1行記載でよい
 8. Update the Linear issue via `$LQ issue.update`:
    ```bash
    # PRD 全文をファイル経由で渡す（heredoc → /tmp/prd_KMD-XX.md → @file 引数）
@@ -118,11 +142,12 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
 
 ## PRD Quality Bar
 
-- All 10 sections must be filled. No `TBD` placeholders unless truly unresolvable — in which case explicitly note "TBD: <reason>".
+- All 11 sections must be present. No `TBD` placeholders unless truly unresolvable — in which case explicitly note "TBD: <reason>".
 - Section 5 (UI/UX) must include either an ASCII wire OR a clear textual layout description naming SwiftUI views/positions. Vague descriptions ("いい感じに表示") are forbidden.
 - Section 6 (Acceptance Criteria) must have at least 3 testable criteria as checkboxes. Each must be observable in build/run, not subjective.
 - Section 7 (Test Strategy) must specify which `Sources/` files require unit tests, with exact file paths.
 - Section 8 (Risks) must call out concrete impact: which existing files will be modified, what migration is needed if any.
+- Section 11 (Gemini 調査ログ) は Gemini を呼び出した場合は **必ず生プロンプト + 生回答** を 1 エントリ以上記録する。要約のみ、回答省略は禁止（review_prd が読み返すための共有ログのため）。Gemini 未呼び出しなら details 内を空にして「呼び出しなし」と明記。
 
 ## Constraints
 

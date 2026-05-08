@@ -64,3 +64,43 @@ author: <human or agent name>
 
 ## 10. 参考資料
 （類似 OSS、関連技術ドキュメント）
+
+## 11. Gemini 調査ログ
+<!--
+create_prd / review_prd で Gemini を呼び出した際の生プロンプト + 生回答 + 呼び出し時刻 + モデル名を時系列で記録する。
+このセクションは折り畳み（details タグ）。review_prd は Step 4 冒頭でここを読み、
+同じ機能領域の Gemini 回答が記録済みなら再呼び出しせずに「create_prd 時の回答 + PRD への反映度」を評価する。
+重複 Gemini calls を抑制し、PRD レビューサイクルの cost を下げるための共有ログ。
+
+エントリのテンプレ:
+- timestamp: ISO8601 (UTC or +0900 でよい。実際の呼び出し時刻)
+- agent: kobaamd_create_prd / kobaamd_review_prd
+- model: gemini-3.1-pro-preview など実際に叩いたモデル
+- topic: A. UI/UX デザインリサーチ / B. 技術実装リサーチ / C. 競合比較 / その他
+- prompt: 実際に Gemini に渡した text（要約せず生文）
+- response: Gemini の生回答（要約せず生文）
+- reflected_in: PRD のどのセクションに反映したか（例: Section 5 ワイヤー / Section 8 リスク）
+-->
+
+<details>
+<summary>Gemini 調査ログ（create_prd / review_prd 共有 — クリックで展開）</summary>
+
+### Entry 1
+- **timestamp**: YYYY-MM-DDTHH:MM:SS+0900
+- **agent**: kobaamd_create_prd
+- **model**: gemini-3.1-pro-preview
+- **topic**: A. UI/UX デザインリサーチ / B. 技術実装リサーチ / C. 競合比較 / その他
+- **prompt**:
+  ```
+  <Gemini に渡した生プロンプト>
+  ```
+- **response**:
+  ```
+  <Gemini の生回答>
+  ```
+- **reflected_in**: Section X（どこに反映したか）
+
+<!-- 追加エントリは Entry 2, Entry 3 ... と連番で append する。既存エントリを書き換えない（履歴として残す） -->
+
+</details>
+

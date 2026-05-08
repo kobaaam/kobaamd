@@ -1,6 +1,6 @@
 ---
 name: kobaamd_review_prd
-description: 指定された KMD-XX の PRD（issue description）を kobaamd_create_prd とは別人格で品質レビューする。観点：AC 不足、UI/UX 抽象化、テスト戦略漏れ、リスク見落とし、PRD 構造崩れ。指摘は Linear issue にコメントとして残す（自動修正はしない）。引数として KMD-XX が必要。
+description: 指定された KMD-XX の PRD（issue description）を kobaamd_create_prd とは別人格で品質レビューする。観点：AC 不足、UI/UX 抽象化、テスト戦略漏れ、リスク見落とし、PRD 構造崩れ。Gemini への問い合わせは Section 11「Gemini 調査ログ」を先に読み、create_prd が記録済みの回答で十分なら再呼び出ししない（重複 calls 削減 / KMD-130）。指摘は Linear issue にコメントとして残す（自動修正はしない）。引数として KMD-XX が必要。
 tools: Read, Grep, Glob, Bash
 # Note: Bash is required for Gemini API calls via curl and for scripts/linear/lq.sh
 model: opus
@@ -22,7 +22,7 @@ Linear issue ID `KMD-XX`.
 
 ## Workflow
 
-1. Fetch the issue via `$LQ issue.get KMD-XX`. Read the `description` field — this is the PRD. If the description does not contain all 10 sections (背景・目的 through 参考資料), report "PRD が不完全または未作成" and halt.
+1. Fetch the issue via `$LQ issue.get KMD-XX`. Read the `description` field — this is the PRD. If the description does not contain Section 1〜10 (背景・目的 through 参考資料), report "PRD が不完全または未作成" and halt. Section 11（Gemini 調査ログ）は KMD-130 以降のテンプレで追加された任意セクション扱い — 存在しなければ「create_prd が古いテンプレで作成した」とみなし、観点マトリクスの「11 Gemini 調査ログ」を `concern: 旧テンプレで作成、次回 create_prd で Section 11 を追加すること` として記録する（halt しない）。
 2. Read the PRD in full from the description.
 3. Read referenced source files (Section 8 risks usually names them).
 3.5. **LLM Wiki の decisions / practices と PRD の整合性をチェック（必須）**
@@ -40,15 +40,32 @@ Linear issue ID `KMD-XX`.
    - 矛盾を発見したら、観点マトリクス（ステップ 5）の「セクション 1（背景・目的）」または「セクション 8（リスク）」に `concern` 以上で記録する
    - wiki に該当記事が 0 件なら、Final Report に "wiki: no relevant articles" と明記して進む
 
-4. **Gemini による妥当性チェック（必須）**
+4. **Gemini による妥当性チェック（条件付き — Section 11 を先に読む / KMD-130）**
 
-   **A. UI/UX デザイン検証（Section 5 が存在する場合 = ほぼ常に実行）**
-   PRD の Section 5 が提案する UI パターンについて、Gemini に macOS HIG 準拠度と競合比較の妥当性を確認する。
-   プロンプト例: 「以下の UI 設計は macOS HIG に準拠していますか？ また、同種の機能で Bear/Obsidian/Typora/iA Writer が採用しているパターンと比較して適切ですか？ <Section 5 の要約>」
+   **冒頭（必須）: PRD Section 11「Gemini 調査ログ」を先に読む**
+
+   review_prd は新しく Gemini を叩く前に、create_prd が PRD Section 11 に記録した生プロンプト + 生回答を必ず読む。同じ機能領域に関する Gemini 回答が既に記録済みであれば **再呼び出ししない**。代わりに「create_prd 時の Gemini 回答 + その PRD への反映度」を評価して観点マトリクス（Step 5）に含める。
+
+   再呼び出しを許可する条件は **以下のいずれかを満たすときのみ**:
+   - Section 11 が空、または「呼び出しなし」と記載されている
+   - create_prd 時の Gemini 回答が古い（モデルバージョン違い、または Apple/macOS の前提が変わっている）
+   - 記録された回答が PRD の論点をカバーしていない（topic がズレている、Section 5 の UI パターンに対する直接的回答が欠けている、など）
+   - PRD 修正モードで新規論点が追加され、既存ログでは判断できない
+
+   再呼び出しを行う場合、**明示的な根拠を Linear コメント（最終 Step 6）に必ず残す**。例: 「Section 11 Entry 1 は Section 5 の OLD パターンに対する回答で、修正後の NEW パターンには言及がないため再問い合わせが必要」。
+
+   再呼び出しした場合は、create_prd と同じテンプレで Section 11 に **新規エントリを append する義務はない**（review_prd は issue description を編集しないため — Constraints 参照）。代わりに、Linear コメントの末尾に「Gemini 再呼び出し: <topic> / response 要旨: <要約>」を記録し、後段の create_prd 修正モードが PRD に取り込む。
+
+   **A. UI/UX デザイン検証（Section 5 が存在する場合）**
+
+   従来は「ほぼ常に実行」だったが、**Section 11 に Section 5 の UI パターンに関する Gemini 回答（topic A）が記録済みで、PRD の現行 Section 5 内容と一致しているなら skip 可**（KMD-130 の AC-5 で明示的に緩和）。skip した場合は観点マトリクスの「セクション 5（UI/UX）」評価コメントに「Section 11 Entry <N> を参照済」と明記する。
+
+   再呼び出しが必要なときのプロンプト例: 「以下の UI 設計は macOS HIG に準拠していますか？ また、同種の機能で Bear/Obsidian/Typora/iA Writer が採用しているパターンと比較して適切ですか？ <Section 5 の要約>」
    Gemini が問題を指摘した場合、Section 5 の concern/fail に含める。
 
    **B. 技術的妥当性チェック（Section 3/4/8 に技術選定がある場合）**
-   PRD が特定の API・ライブラリ・アーキテクチャを指定している場合、Gemini にその妥当性を確認する（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。KMD-131）:
+
+   こちらも同様に、Section 11 に topic B（技術実装リサーチ）の回答が記録済みで現行 Section 3/4/8 と整合しているなら skip 可。再呼び出しが必要なときのみ、以下で Gemini を叩く（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。KMD-131）:
    ```bash
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "<PRDの技術選定に関する質問>"}]}]}
@@ -78,10 +95,14 @@ Linear issue ID `KMD-XX`.
 | 8 リスク | 具体ファイル名・影響範囲 | 抽象的記述 |
 | 9 計測 | 指標 or 未定義注記 | 空欄 |
 | 10 参考 | 類似 OSS or Apple Doc | 空欄 |
+| 11 Gemini 調査ログ | Gemini を呼んだなら生プロンプト+生回答が記録、未呼び出しなら明記 | 呼び出ししたのに記録なし、要約のみで生回答欠落 |
 
 5. Compile findings into a comment for the Linear issue:
    - 全合格: "PRD レビュー: 全観点 PASS" を1行で
    - 不合格あり: 表形式で観点ごとに pass/concern/fail と指摘内容
+   - **Gemini 調査について必ず明記する**（KMD-130）:
+     - Section 11 を参照して再呼び出しを skip した場合: 「Gemini: Section 11 Entry <N> を参照、再呼び出し不要」
+     - 再呼び出しした場合: 「Gemini 再呼び出し（topic: A/B/C）/ 根拠: <Section 11 が古い・不十分・カバー外、など具体理由> / response 要旨: <2〜3 文の要約。create_prd 修正モードが PRD Section 11 に正式エントリとして取り込む前提>」
 6. Post to Linear via `$LQ comment.add KMD-XX @/tmp/review.md`.
 7. Report.
 
@@ -101,13 +122,15 @@ PRD: Linear issue description
 判定: PASS / REQUEST_REVISION
 
 セクション別:
-- pass: <count>/10
+- pass: <count>/11
 - concern: <list>
 - fail: <list>
 
 主要指摘:
 - <section>: <issue>
 - ...
+
+Gemini 呼び出し: skip (Section 11 参照) / 再呼び出し N 回 (理由: ...)
 
 Linear comment 投稿: ✓
 次のアクション:
