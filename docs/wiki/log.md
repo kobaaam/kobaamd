@@ -41,3 +41,16 @@
 - index.md の Practices セクションに 3 件追加
 - KMD-119〜123（Phase A コスト最適化 5 件）の priority を 4 → 3 (Normal) に上げ、人間承認済とみなして todo に進められる状態に
 - ソース: docs/handoff/2026-05-06-cost-optimization-prompt.md, KMD-117〜123, PR #59 (halted リカバリ), recover_halted.sh, scripts/wiki/load_all.sh, .claude/agents/, .claude/commands/, 既存 wiki 記事群
+
+## [2026-05-06] Wiki ingest（review_postmortem KMD-144）
+
+- sources:
+  - docs/learnings/2026-05-06-KMD-144.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 12 / 13 / 14 を新規追加: 観測機構の自己観測責務 / auto-carveable 統合チケット化 / Reviewed 直行 3 条件）
+  - articles/practices/security-hardening.md（サイレント失敗パターン表に「予防機構の自己観測欠如」行を追記、シェルクォート規約に `set -u` + `trap` + `local` 互換性ルールを追加）
+  - articles/decisions/autonomous-pipeline-philosophy.md（auto carve-out フローの判断条件節を新設: Reviewed 直行 3 条件 + 統合チケット化 3 条件）
+- new articles: なし
+- skipped sources（理由付き）: なし
+- lint: pass (./scripts/wiki/lint.sh --no-llm exit=0, violations=0)
+- ingest history: ok (status=pass, consecutive=0/threshold=5)
