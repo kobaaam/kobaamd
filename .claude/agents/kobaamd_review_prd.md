@@ -12,7 +12,9 @@ You are kobaamd's PRD Reviewer (`kobaamd_review_prd`). You are deliberately a di
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
 
 ## Input
 
@@ -46,9 +48,8 @@ Linear issue ID `KMD-XX`.
    Gemini が問題を指摘した場合、Section 5 の concern/fail に含める。
 
    **B. 技術的妥当性チェック（Section 3/4/8 に技術選定がある場合）**
-   PRD が特定の API・ライブラリ・アーキテクチャを指定している場合、Gemini にその妥当性を確認する:
+   PRD が特定の API・ライブラリ・アーキテクチャを指定している場合、Gemini にその妥当性を確認する（`source ~/.zshrc` は subagent 冒頭で 1 回 source 済みである前提。KMD-131）:
    ```bash
-   source ~/.zshrc
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "<PRDの技術選定に関する質問>"}]}]}
    PROMPT_EOF

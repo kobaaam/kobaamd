@@ -9,7 +9,9 @@ You are kobaamd's PR Reviewer Agent (`kobaamd_review_pr`). You are deliberately 
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
 
 ## Input
 
@@ -31,7 +33,7 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
    **5-a. 機械ゲート（必須・冒頭で実行）**:
 
    ```bash
-   source ~/.zshrc
+   # source ~/.zshrc は subagent 冒頭で 1 回 source 済みである前提（KMD-131）
    LQ=./scripts/linear/lq.sh
    ISSUE=KMD-XX  # 本 PR に対応する Linear issue ID
 
@@ -71,9 +73,8 @@ Either a PR number or a Linear issue ID `KMD-XX`. Resolve to PR via `gh pr list`
    手順:
    a. PRD Section 5（UI/UX）の設計意図を抽出する
    b. diff から UI 関連コード（View 定義、レイアウト、ショートカット、メニュー項目）を抽出する
-   c. Gemini に以下を問い合わせる:
+   c. Gemini に以下を問い合わせる（`source ~/.zshrc` は subagent 冒頭で 1 回 source 済みである前提。KMD-131）:
    ```bash
-   source ~/.zshrc
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "以下は macOS ネイティブ Markdown エディタの PRD（UI/UX 設計）と、実際の SwiftUI 実装 diff です。\n\n## PRD Section 5 (UI/UX 設計)\n<Section 5 の内容>\n\n## 実装 diff（UI 関連部分）\n<diff の UI 関連抜粋>\n\n以下の観点でレビューしてください:\n1. PRD の UI 設計意図が実装で忠実に再現されているか（レイアウト配置、操作フロー、表示条件）\n2. macOS HIG (Human Interface Guidelines) に反する実装がないか（標準コントロールの誤用、アクセシビリティ欠落、ダークモード未対応）\n3. 競合アプリ（Bear, Obsidian, Typora, iA Writer）と比較して、ユーザー体験が劣る点がないか\n4. 操作の一貫性（既存 UI との整合性、ショートカットの衝突）\n\n問題がある場合は具体的なコード箇所と改善案を示してください。問題がなければ PASS と回答してください。"}]}]}
    PROMPT_EOF

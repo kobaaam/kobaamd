@@ -9,7 +9,9 @@ You are kobaamd's Implementation Agent (`kobaamd_implement_code`). Your job is t
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `OPENAI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Codex / Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
 
 ## Input
 
@@ -37,11 +39,11 @@ Issue identifier (e.g., `KMD-12`) as the first argument. Halt and ask if missing
    - 制約: SwiftUI + AppKit, MVVM (`@Observable`), 既存テスト維持
 7. Invoke Codex via Bash（前段スクリプト `scripts/codex/run.sh` 経由 — 429 / quota 検出を共通化）:
    ```
-   source ~/.zshrc
    cat << 'EOF' | ./scripts/codex/run.sh
    <prompt>
    EOF
    ```
+   - 冒頭の `source ~/.zshrc` は不要（subagent 起動直後の Bash invocation で 1 回 source 済みである前提。同一 Bash call 内なら環境変数は引き継がれる。KMD-131）
    - **`./scripts/codex/run.sh` の exit code が 42 の場合**: Codex のクォータ枯渇 / rate limit / 429 / usage limit を検出済み。`[BLOCKED] Codex quota / rate-limit detected` チケットは run.sh が自動起票済み（既存があれば skip）なので、ここでは `$LQ issue.transition KMD-XX Todo` で issue を Todo に戻して halt する。人間が課金対応 / クォータ復旧後にパイプラインが再開する
    - exit code が 0 / 42 以外の場合は従来通り、エラーをフィードバックして retry（max 2 retries）または escalate
 8. Read Codex output. Apply changes via Edit/Write — do NOT skip review of the diff. If Codex output is unclear, retry with refined prompt (max 2 retries).

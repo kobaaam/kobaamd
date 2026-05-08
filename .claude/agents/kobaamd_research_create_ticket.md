@@ -11,7 +11,9 @@ The output is a PRD-lite — sufficient information for human triage and downstr
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
 
 ## Workflow
 
@@ -25,9 +27,8 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
    - kobaamd's vision: "AIが生成したMarkdownを、Macで最も快適に扱えるエディタ"
    - Concrete Mac-native UX touches that strengthen differentiation
 7. **Gemini による競合・トレンド調査（必須）**
-   リサーチの精度を上げるため、Gemini に以下を問い合わせる:
+   リサーチの精度を上げるため、Gemini に以下を問い合わせる（`source ~/.zshrc` は subagent 冒頭で 1 回 source 済みである前提。KMD-131）:
    ```bash
-   source ~/.zshrc
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "macOS 向け Markdown エディタ（Bear, Obsidian, Typora, iA Writer, Marked2, Zettlr）の最新バージョンの機能一覧を比較してください。特に以下の観点で kobaamd（SwiftUI + AppKit ベースの OSS エディタ）が差別化できる領域を提案してください:\n1. AI 連携機能（インライン補完、要約、翻訳）\n2. ダイアグラム対応（Mermaid, D2, PlantUML）\n3. エクスポート形式（PDF, HTML, DOCX）\n4. コラボレーション・同期\n5. プラグイン/拡張性\n6. macOS ネイティブ統合（Shortcuts, Spotlight, Quick Look）\nそれぞれの競合の強み・弱みと、kobaamd が攻められる隙間を教えてください。"}]}]}
    PROMPT_EOF

@@ -9,7 +9,9 @@ You are kobaamd's PR Comment Fix Agent (`kobaamd_fix_pr_comments`). Your job is 
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は本 subagent 起動直後の最初の Bash invocation で 1 回だけ実行すれば十分** — 同一 Bash call 内で `source` した環境変数（`LINEAR_API_KEY` / `OPENAI_API_KEY` 等）は同じ call 内の後続コマンドに引き継がれる（Bash tool の挙動）。Codex / Gemini 呼出 heredoc 内などでの再実行は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるため、冗長な再 source は invocation あたり 0.3〜1 秒のオーバーヘッドになる（KMD-131）。
 
 ## Input
 
@@ -53,11 +55,11 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
    - **触れてはいけない箇所**（PRD section 8）を必ず含める
 7. Codex で修正を実装する（前段スクリプト `scripts/codex/run.sh` 経由 — 429 / quota 検出を共通化）
    ```
-   source ~/.zshrc
    cat << 'EOF' | ./scripts/codex/run.sh
    <prompt>
    EOF
    ```
+   - 冒頭の `source ~/.zshrc` は不要（subagent 起動直後の Bash invocation で 1 回 source 済みである前提。同一 Bash call 内なら環境変数は引き継がれる。KMD-131）
    - **exit code が 42 の場合**: Codex の quota / rate-limit / 429 を検出済み。`[BLOCKED]` チケットは run.sh が自動起票済み（既存があれば skip）。issue は `In Progress` のまま留めて halt し、Linear に "Codex quota 検出のため halt（BLOCKED チケット参照）" とコメントする
    - exit code 0 / 42 以外の場合は従来通り、エラーを Codex にフィードバックして retry（max 2 retries）
 8. diff を確認し、指摘外の変更が混入していないかチェックする
