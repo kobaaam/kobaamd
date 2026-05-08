@@ -13,7 +13,40 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 - `--since-last-run`: `docs/wiki/log.md` の最新 ingest 日付以降に変更されたソースを自動検出
 - 引数なし: 過去 7 日間に追加・変更された `docs/learnings/*.md` と `docs/adr/*.md` の全ファイルを対象
 
+### 補助フラグ
+
+- `--no-pr`: commit のみ実施し、push / PR 作成をスキップする。**親 subagent（典型的には `kobaamd_review_postmortem`）が独自に branch / commit / PR を管理する場合のみ使う**。デフォルトは false で、本 subagent 自身が push + PR 作成まで行う
+
 ## Workflow
+
+0. **作業ブランチを必ず確保する（main の working tree に直書きしない）**
+
+   親 subagent から `--no-pr` 付きで呼ばれた場合は、親が既に feature branch を
+   切っている前提なので、現ブランチをそのまま使う（main 直書きにならないことを
+   `git symbolic-ref HEAD` で確認）。
+
+   `--no-pr` が無いスタンドアロン起動（`pipeline_weekly` 等）の場合は本 subagent
+   自身が batch ブランチを切る:
+
+   ```bash
+   if [ "$NO_PR" = "1" ]; then
+     # 親が branch を管理する。現ブランチが main なら fail-fast
+     CURRENT_BRANCH=$(git symbolic-ref --short HEAD)
+     if [ "$CURRENT_BRANCH" = "main" ]; then
+       echo "error: --no-pr で起動されたが現ブランチが main。親 subagent が branch を切るべきです" >&2
+       exit 1
+     fi
+   else
+     # スタンドアロン起動: batch ブランチを派生
+     git fetch origin main
+     BATCH_BRANCH="feature/wiki-batch-$(date +%Y-%m-%d-%H%M)"
+     git switch -c "$BATCH_BRANCH" origin/main
+   fi
+   ```
+
+   いずれの経路でも、開始時点で working tree が dirty（他人の WIP）の場合は
+   abort し Final Report に "skipped: dirty working tree (caller WIP)" と
+   明記する。
 
 1. **準備**
    - `docs/wiki/SCHEMA.md` を読み込み、記事フォーマット規則・分類カテゴリ・**「記載規約」セクション**（5 項目）を必ず確認
@@ -242,16 +275,49 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
       の場合は Final Report の特記事項で `ingest history: warning(...)` を強調表示し、
       連続 status と回数を明記する
 
-7. **commit と最終レポート**
+7. **commit + push + PR（必須・main 直書き禁止）**
+
+   step 0 で確保した feature branch 上で必ず PR 化する。**main の working tree
+   に dirty 差分を残さない**ことが本 subagent の責務。
+
+   ```bash
+   # LINT_STATUS が fail のときは commit しない（既存挙動を維持）
+   if [ "$LINT_STATUS" = "fail" ]; then
+     echo "lint fail: commit / push / PR をスキップ。working tree に差分を残す"
+   else
+     # ingest 差分を stage（learnings は親が管理しているケースを考慮し
+     # docs/learnings/ も含める。重複 stage は無害）
+     git add docs/wiki/ docs/learnings/
+
+     if git diff --cached --quiet; then
+       echo "no changes to commit (no-op ingest)"
+     else
+       git commit -m "wiki: ingest <trigger summary>"
+
+       if [ "$NO_PR" = "1" ]; then
+         echo "--no-pr 指定: push / PR 作成は親 subagent に委ねる"
+       else
+         BR=$(git symbolic-ref --short HEAD)
+         git push -u origin "$BR"
+         if ! gh pr view --head "$BR" >/dev/null 2>&1; then
+           gh pr create \
+             --title "wiki: batch ingest ($BR)" \
+             --body "Wiki batch ingest from kobaamd_update_wiki. Sources / changes are listed in the diff and in docs/wiki/log.md. 🤖 Generated with kobaamd_update_wiki"
+         fi
+       fi
+     fi
+   fi
+   ```
 
    - `LINT_STATUS` が `pass` / `pass-after-fix` / `error` / `skipped` のいずれかなら
-     ingest 差分を commit する（既存のコミット運用に従う）。`--fix` 差分も含める
-   - `LINT_STATUS=fail` なら commit は実施しない。working tree の差分は残す
+     上記フローで commit + push + PR を実施。`--fix` 差分も含める
+   - `LINT_STATUS=fail` なら commit / push / PR とも実施しない（既存挙動を維持、人間判断に委ねる）
+   - commit / push / PR のいずれかで失敗した場合、working tree の差分は残し、Final Report に明記する
 
 ## 制約
 
 - Swift コードは触らない
-- `docs/wiki/articles/` の更新・追加 と `docs/wiki/index.md` / `docs/wiki/log.md` の追記のみが副作用
+- 副作用は `docs/wiki/articles/` の更新・追加、`docs/wiki/index.md` / `docs/wiki/log.md` の追記、および専用 feature branch 上での commit / push / PR 作成のみ。**main の working tree には絶対に直書きしない**（step 0 / 7 を遵守）
 - **生成 / 更新する記事は `docs/wiki/SCHEMA.md` の「記載規約」5 項目をすべて満たすこと**。違反する記事を書かない。違反の有無を Final Report の「特記事項」で自己申告する
 - 1 ソース → 最大 3 記事まで影響範囲（更新 or 新規 合計）
 - 1 ソースあたり新規記事は最大 1 件（過剰生成防止）
