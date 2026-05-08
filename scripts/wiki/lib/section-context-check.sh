@@ -107,6 +107,13 @@ fi
 
 # ============================================================================
 # Default path: delegate to Claude Code subagent (KMD-150)
+#
+# Permission policy (KMD-152): we pass an explicit `--allowedTools` allowlist
+# instead of the old bypass-permissions mode. This restricts the spawned
+# Haiku session to the exact set of utilities documented in the agent file
+# (`Read` + a curated set of `Bash(<cmd>:*)` patterns), so that prompt
+# injection on a wiki article cannot escalate into arbitrary command exec
+# (curl / ssh / rm -rf etc.).
 # ============================================================================
 
 run_subagent() {
@@ -133,8 +140,25 @@ run_subagent() {
 
   # `claude -p --agent <name>`: launch as a one-shot subagent, print result, exit.
   # `--output-format text` keeps stdout clean for NDJSON consumers.
-  # We explicitly disallow tools that could leak external context: only Read +
-  # Bash are needed by the agent.
+  # Minimum-permission allowlist for the lint subagent.
+  # The legacy bypass-permissions mode is intentionally NOT used: spawning
+  # a subagent with broad Bash access means it could call e.g.
+  # `curl` / `rm -rf` / `ssh` even if `tools: Read, Bash` is declared in the
+  # agent frontmatter. We instead allow only the specific commands the agent
+  # is documented to need (see `.claude/agents/kobaamd_lint_section_context.md`).
+  local -a allowed_tools=(
+    "Read"
+    "Bash(python3:*)"
+    "Bash(jq:*)"
+    "Bash(shasum:*)"
+    "Bash(git rev-parse:*)"
+    "Bash(mkdir:*)"
+    "Bash(mv:*)"
+    "Bash(cat:*)"
+    "Bash(printf:*)"
+    "Bash(awk:*)"
+    "Bash(sed:*)"
+  )
   local out_tmp rc attempt success
   out_tmp=$(mktemp)
   attempt=0
@@ -146,7 +170,7 @@ run_subagent() {
     claude -p \
       --agent kobaamd_lint_section_context \
       --output-format text \
-      --permission-mode bypassPermissions \
+      --allowedTools "${allowed_tools[@]}" \
       "$prompt" \
       >"$out_tmp" 2>&1
     rc=$?

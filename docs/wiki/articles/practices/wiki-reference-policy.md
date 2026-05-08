@@ -2,7 +2,7 @@
 title: Wiki 参照ポリシー（Prompt Caching 標準運用）
 category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
-sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150]
+sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150, KMD-152]
 created: 2026-05-04
 updated: 2026-05-08
 ---
@@ -90,6 +90,14 @@ ask.sh 経由を標準とする理由:
 - subagent の出力は **stdout に NDJSON、stderr に統計サマリ** に分離する。呼び出し元の shell スクリプトは stdout から JSON 行だけ取り出して集計する
 - `claude -p` の出力に prose が混入する可能性があるため、呼び出し元では `jq -e .` でパース可能かつ期待する `rule` を含む行のみを抽出する防御を入れる
 
+**最小権限の allowlist で起動する（KMD-152 以降）**:
+
+- subagent を起動するときは `claude -p --allowedTools "Read" "Bash(<cmd>:*)" ...` のように **明示的な allowlist** を指定し、`--permission-mode bypassPermissions` は使わない
+- subagent 定義ファイル（`.claude/agents/<name>.md`）の frontmatter `tools:` だけでは不十分。Claude Code の現行仕様では frontmatter は `Read, Bash` のような粗い宣言しかできず、`Bash` を許すと内部で `curl` / `ssh` / `rm -rf` 等の任意コマンドが通る
+- 実装パターン: subagent 側のドキュメント（`## 制約・厳守事項`）に「呼ばれることを想定するコマンドのリスト」を明記し、呼び出し元 shell スクリプトの `--allowedTools` 配列にも同じリストを書く。両者がドリフトすると subagent 起動が失敗するので、運用 PR では必ず両方を同時更新する
+- 攻撃モデル上の意義: AI 自律パイプライン（30 分間隔）で wiki 記事を AI が編集する KB3 系設計と組み合わさると、プロンプトインジェクション経由で任意コマンド実行に直結する経路が理論上開く。Bash allowlist を絞っておくことで、注入が成功しても **lint subagent が叩ける道具が `python3` / `jq` / `shasum` / `git rev-parse` / `mkdir` / `mv` / `cat` / `printf` / `awk` / `sed` に限定される**
+- 実装例: `scripts/wiki/lib/section-context-check.sh` の `run_subagent()`、および `.claude/agents/kobaamd_lint_section_context.md` の `## 制約・厳守事項` を参照
+
 Phase 移行のトリガー条件・運用手順は次節と共通。
 
 ### 2. Phase 移行のトリガー
@@ -171,3 +179,4 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 - KMD-48（[KB1] Prompt Caching のコスト・レイテンシ計測ベンチマーク）
 - KMD-49（[KB1] CLAUDE.md / SCHEMA.md に運用方針を明記）
 - KMD-150（[KB2] section-context-missing lint を Claude Code subagent (Haiku) 経由に置換）
+- KMD-152（[KB2-followup] section-context-check の subagent を最小権限 allowlist 化）
