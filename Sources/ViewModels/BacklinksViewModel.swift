@@ -8,6 +8,7 @@ final class BacklinksViewModel {
     var unlinked: [Backlink] = []
     var isLoading: Bool = false
     var hasAnthropicKey: Bool = false
+    weak var appViewModel: AppViewModel?
 
     private let checker: BacklinkContextCheckerProtocol
     private let cache: BacklinkContextCache
@@ -87,6 +88,7 @@ final class BacklinksViewModel {
                 try FileService().saveFile(at: backlink.sourceURL, content: updated)
             }.value
 
+            appViewModel?.syncTabContent(url: backlink.sourceURL, updated: updated)
             unlinked.removeAll { $0.id == backlink.id }
         } catch {
             return

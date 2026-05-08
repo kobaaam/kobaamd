@@ -88,61 +88,58 @@ struct BacklinksView: View {
                 await appViewModel.openFileAndJump(url: backlink.sourceURL, line: backlink.line)
             }
         } label: {
-            rowContent(backlink: backlink, showsConvertButton: false)
+            rowContent(backlink: backlink)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 44, alignment: .leading)
+                .background(
+                    hoveredID == backlink.id
+                        ? Color.kobaInk.opacity(0.06)
+                        : Color.clear
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredID = hovering ? backlink.id : (hoveredID == backlink.id ? nil : hoveredID)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(backlink.sourceURL.lastPathComponent) \(backlink.line)行目 \(backlink.snippet)")
     }
 
     private func unlinkedRow(_ backlink: Backlink) -> some View {
-        rowContent(backlink: backlink, showsConvertButton: true)
-    }
-
-    private func rowContent(backlink: Backlink, showsConvertButton: Bool) -> some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(backlink.sourceURL.lastPathComponent)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.kobaInk)
-                        .lineLimit(1)
-
-                    Text("L\(backlink.line)")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Color.kobaMute2)
+        HStack(spacing: 0) {
+            Button {
+                Task { @MainActor in
+                    await appViewModel.openFileAndJump(url: backlink.sourceURL, line: backlink.line)
                 }
-
-                Text(backlink.snippet)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.kobaMute)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
+            } label: {
+                rowContent(backlink: backlink)
+                    .padding(.leading, 10)
+                    .padding(.trailing, 4)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 44, alignment: .leading)
             }
+            .buttonStyle(.plain)
 
-            Spacer(minLength: 0)
-
-            if showsConvertButton {
-                Button {
-                    Task {
-                        await backlinksViewModel.convertToLink(backlink)
-                    }
-                } label: {
-                    Text("Convert to link")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.kobaAccent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.kobaAccent.opacity(0.12))
-                        )
+            Button {
+                Task {
+                    await backlinksViewModel.convertToLink(backlink)
                 }
-                .buttonStyle(.plain)
+            } label: {
+                Text("Convert to link")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.kobaAccent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.kobaAccent.opacity(0.12))
+                    )
             }
+            .buttonStyle(.plain)
+            .padding(.trailing, 10)
         }
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 44, alignment: .leading)
         .background(
             hoveredID == backlink.id
                 ? Color.kobaInk.opacity(0.06)
@@ -153,6 +150,28 @@ struct BacklinksView: View {
             hoveredID = hovering ? backlink.id : (hoveredID == backlink.id ? nil : hoveredID)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(backlink.sourceURL.lastPathComponent) \(backlink.line)行目 \(backlink.snippet)")
+        .accessibilityLabel("\(backlink.sourceURL.lastPathComponent) \(backlink.line)行目 \(backlink.snippet) Convert to link ボタン付き")
+    }
+
+    private func rowContent(backlink: Backlink) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(backlink.sourceURL.lastPathComponent)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.kobaInk)
+                    .lineLimit(1)
+
+                Text("L\(backlink.line)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Color.kobaMute2)
+            }
+
+            Text(backlink.snippet)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.kobaMute)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
