@@ -10,6 +10,7 @@ struct SidebarView: View {
 
     @State private var outlinePanelRatio: CGFloat = 0.35
     @State private var dragStartRatio: CGFloat = 0.35
+    @State private var isBacklinksExpanded: Bool = false
     @State private var isTodoExpanded: Bool = false
     @State private var isDraggingHandle: Bool = false
 
@@ -20,9 +21,11 @@ struct SidebarView: View {
 
             // MARK: File tree + resize handle + outline (flex area)
             GeometryReader { geo in
+                let backlinksHeaderHeight: CGFloat = 28
+                let backlinksBodyHeight: CGFloat = isBacklinksExpanded ? min(200, geo.size.height * 0.35) : 0
                 let todoHeaderHeight: CGFloat = 28
                 let todoBodyHeight: CGFloat = isTodoExpanded ? min(240, geo.size.height * 0.35) : 0
-                let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight
+                let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight - backlinksHeaderHeight - backlinksBodyHeight
                 let isOutlineEmpty = appViewModel.outlineViewModel.items.isEmpty
                 let outlineHeight: CGFloat = isOutlineEmpty ? 60 : max(60, availableHeight * outlinePanelRatio)
                 let fileHeight = max(60, availableHeight - outlineHeight)
@@ -52,6 +55,10 @@ struct SidebarView: View {
                             .accessibilityElement(children: .contain)
                             .accessibilityLabel("アウトライン")
                     }
+
+                    backlinksSection
+                        .frame(height: backlinksHeaderHeight + backlinksBodyHeight)
+                        .clipped()
 
                     // ── TODO collapsible area ──
                     todoSection
@@ -133,6 +140,47 @@ struct SidebarView: View {
     }
 
     // MARK: - TODO collapsible section
+
+    private var backlinksSection: some View {
+        let count = appViewModel.backlinksViewModel.linked.count + appViewModel.backlinksViewModel.unlinked.count
+        let headerColor: Color = count > 0 ? .kobaInk : .kobaMute2
+
+        return VStack(spacing: 0) {
+            Color.kobaLine
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isBacklinksExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isBacklinksExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("BACKLINKS")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    Text("(\(count))")
+                        .font(.system(size: 10, design: .monospaced))
+                    Spacer()
+                }
+                .foregroundStyle(headerColor)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.kobaSurface)
+            .accessibilityLabel("Backlinks 一覧")
+            .accessibilityHint("クリックで展開・折り畳み")
+
+            if isBacklinksExpanded {
+                BacklinksView(backlinksViewModel: appViewModel.backlinksViewModel)
+                    .frame(maxHeight: 200)
+            }
+        }
+    }
 
     private var todoSection: some View {
         let todoCount = appViewModel.todoViewModel.items.count
