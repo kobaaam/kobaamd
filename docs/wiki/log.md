@@ -42,6 +42,21 @@
 - KMD-119〜123（Phase A コスト最適化 5 件）の priority を 4 → 3 (Normal) に上げ、人間承認済とみなして todo に進められる状態に
 - ソース: docs/handoff/2026-05-06-cost-optimization-prompt.md, KMD-117〜123, PR #59 (halted リカバリ), recover_halted.sh, scripts/wiki/load_all.sh, .claude/agents/, .claude/commands/, 既存 wiki 記事群
 
+## [2026-05-06] Wiki ingest（--source docs/learnings/2026-05-05-KMD-54.md）
+
+- sources:
+  - docs/learnings/2026-05-05-KMD-54.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 7「クリーン APPROVE 直行の 4 条件」/ パターン 8「auto carve-out re-open 規約」/ パターン 9「依存逆順ガードを PRD と実装の両方に書く」を追加）
+  - articles/practices/prd-quality-cycle.md（影響範囲マップの効能 — KMD-54 事例セクションを追記）
+  - articles/decisions/autonomous-pipeline-philosophy.md（auto carve-out によるクリーン APPROVE 直行運用を追記）
+  - articles/practices/security-hardening.md（Related に [[dependency-inversion-guard]] を追加 — 双方向リンクの整合のため）
+- new articles:
+  - articles/practices/dependency-inversion-guard.md（依存逆順耐性のためのガードパターン。lint.sh 不在ガードを KMD-54 事例として収録）
+- skipped sources（理由付き）:
+  - なし
+- 注記: KMD-52（lint.sh、Human in Review）は本記事執筆時点で未マージ。新規記事内では「依存先 script」「KMD-52」と表記しつつ、KMD-54 で実装したガードが KMD-52 マージ前でも機能する点を強調。
+
 ## [2026-05-06] Wiki ingest（review_postmortem KMD-144）
 
 - sources:

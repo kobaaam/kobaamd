@@ -1,8 +1,12 @@
 ---
 title: PRD 品質基準と改善サイクル
 category: practices
-tags: [prd, review, quality, pipeline]
-sources: [docs/learnings/2026-04-28-KMD-4.md, docs/learnings/2026-04-28-KMD-6.md]
+tags: [prd, review, quality, pipeline, impact-map]
+sources:
+  - docs/learnings/2026-04-28-KMD-4.md
+  - docs/learnings/2026-04-28-KMD-6.md
+  - docs/learnings/2026-04-29-KMD-20.md
+  - docs/learnings/2026-05-05-KMD-54.md
 created: 2026-04-30
 updated: 2026-05-06
 ---
@@ -40,14 +44,27 @@ updated: 2026-05-06
 
 影響範囲マップを PRD に明記した結果、リワーク 0 回でマージ成功。
 
+### 影響範囲マップ（PRD section 8）の効能 — KMD-54 事例
+<!-- llm-context: PRD section 8 に「変更してはいけない箇所」を防御的に書くことで、AI レビュー観点が独立評価可能になり、Human in Review を経由せずクリーン APPROVE 直行できることを示した事例。 -->
+
+KMD-54（pipeline_weekly に lint_wiki を組み込み）では、PRD section 8 に **変更対象 3 ファイル + 変更禁止ファイル一覧（Swift / plist / Package.* など）** を明文化した。これにより:
+
+- `kobaamd_review_pr` の観点判定が「マップ通り 3 ファイルのみ変更」「マップ外への手出しなし」を独立評価できた
+- implement 側もマップに従う動機が強くなり（後で review_pr に指摘される）、レビューが一発で通った
+- 結果としてリワーク 0 回・Todo → Done 約 17 分でクリーン APPROVE 直行を達成
+
+加えて section 8「その他リスク」に **依存逆順耐性のためのガード**（依存先 lint.sh 不在時の skip）を予め書き込んでおいたことで、レビュー側もこれを観点として pass 判定できた。詳細は [[dependency-inversion-guard]] を参照。
+
 ## Related
 
 - [[autonomous-pipeline-philosophy]] — パイプライン全体の思想
-- [[postmortem-patterns]] — 具体的な再発防止パターン
+- [[postmortem-patterns]] — 具体的な再発防止パターン（クリーン APPROVE 直行 4 条件を含む）
 - [[wiki-reference-policy]] — wiki 参照を含む PRD/設計知見の運用標準
+- [[dependency-inversion-guard]] — section 8 で書く依存逆順ガードのテンプレート
 
 ## Sources
 
 - docs/learnings/2026-04-28-KMD-4.md
 - docs/learnings/2026-04-28-KMD-6.md
 - docs/learnings/2026-04-29-KMD-20.md
+- docs/learnings/2026-05-05-KMD-54.md

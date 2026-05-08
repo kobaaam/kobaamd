@@ -1,8 +1,12 @@
 ---
 title: AI 自律開発パイプラインの設計思想
 category: decisions
-tags: [pipeline, linear, subagent, automation, auto-carve-out]
-sources: [docs/adr/0007-autonomous-pipeline-linear.md, CLAUDE.md, docs/learnings/2026-05-06-KMD-144.md]
+tags: [pipeline, linear, subagent, automation, auto-carve-out, carve-out]
+sources:
+  - docs/adr/0007-autonomous-pipeline-linear.md
+  - CLAUDE.md
+  - docs/learnings/2026-05-05-KMD-54.md
+  - docs/learnings/2026-05-06-KMD-144.md
 created: 2026-04-30
 updated: 2026-05-06
 ---
@@ -63,15 +67,26 @@ KMD-144 (PR #70) はこの 3 条件を満たし、in Review → Reviewed → Don
 
 判断・創造系（PRD 作成、コードレビュー、振り返り）は Opus、機械的操作系（ビルド検証、マージ、コメント修正）は Sonnet。コストと品質のバランス。
 
+### auto carve-out によるクリーン APPROVE 直行
+<!-- llm-context: kobaamd_review_pr が auto-carveable concern を別チケットに退避することで、本 PR を block せず Human in Review を経由せずに Reviewed 直行できる運用。スループット最大化の中核機構。 -->
+
+`kobaamd_review_pr` は concern を **rework / auto-carveable / human-judgment** に三分類する。auto-carveable（独立改善・別 PR が自然なもの）は Linear に別チケットを自動起票し、本 PR をブロックせず `Reviewed` に直行させる。
+
+これにより、Human in Review に入るのは **本当に人間判断が必要な場合のみ**（`human-judgment` か `[BREAKING]`）に絞られ、AI が機械的に裁ける UI 磨き込み・追加機能アイデア・テスト整備の充実などは自動 carve-out で退避される。
+
+KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 投稿失敗 observability）を起票してクリーン APPROVE 直行し、Reviewed → Done が約 4 分で完了した。carve-out 先 issue 本文には「親 KMD-XX (auto-carved-out by kobaamd_review_pr)」と「人間が本 PR で対応すべきと判断した場合は本チケットを close/revert して親を re-open する」手順を必ず含める規約になっており、carve-out のリカバリ経路が運用上担保されている（[[postmortem-patterns]] パターン 8 を参照）。
+
 ## Related
 
 - [[multi-llm-persona]] — LLM ペルソナの役割分担
 - [[prd-quality-cycle]] — PRD の品質サイクル
 - [[security-hardening]] — パイプラインに組み込む多層防御の運用
-- [[postmortem-patterns]] — auto carve-out フローのパターン化（パターン 13 / 14）
+- [[postmortem-patterns]] — クリーン APPROVE 直行 4 条件、auto carve-out 規約、auto carve-out フローのパターン化（パターン 13 / 14）
+- [[dependency-inversion-guard]] — pipeline_weekly が依存逆順でも落ちないためのガードパターン
 
 ## Sources
 
 - docs/adr/0007-autonomous-pipeline-linear.md
 - CLAUDE.md: 自律開発パイプラインセクション
+- docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
