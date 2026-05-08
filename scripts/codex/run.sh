@@ -92,17 +92,20 @@ existing_blocked_issue() {
 # 既存がある場合はその identifier を返して skip する。
 create_blocked_issue() {
   local stderr_snippet="$1"
-  local existing
-  if existing=$(existing_blocked_issue); then
-    err "既存の BLOCKED チケット: $existing — 起票 skip"
-    echo "$existing"
-    return 0
-  fi
-  local existing_status=$?
-  if [[ "$existing_status" == "2" ]]; then
-    err "既存チェック失敗（Linear 接続不可など）— 起票はスキップ"
-    return 1
-  fi
+  local existing existing_status
+  existing=$(existing_blocked_issue); existing_status=$?
+  case "$existing_status" in
+    0)
+      err "既存の BLOCKED チケット: $existing — 起票 skip"
+      echo "$existing"
+      return 0
+      ;;
+    2)
+      err "既存チェック失敗（Linear 接続不可など）— 起票はスキップ"
+      return 1
+      ;;
+  esac
+  # existing_status == 1: 既存なし → 新規起票へ
 
   if [[ "$DRY_RUN" == "1" ]]; then
     err "[DRY_RUN] BLOCKED チケットを新規起票する（実行スキップ）"
