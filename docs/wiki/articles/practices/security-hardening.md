@@ -106,6 +106,7 @@ AI 自律パイプラインで生成されるシェルスクリプトには、�
 - [[sparkle-release]] — KMD-27 で確立された多層防御の具体実装
 - [[dependency-inversion-guard]] — shell quoting / set -euo pipefail / trap cleanup を前提とした依存逆順ガードの shell パターン
 - [[external-teams]] — Sparkle / GitHub / launchd 等の外部依存に対する多層防御の運用集約
+- [[cli-argument-conventions]] — `claude -p` 等の subprocess CLI への引数渡し規約（stdin 経由化 / variadic option 回避 / `printf '%s'` 無害化）。シェル変数クォート規約・入力バリデーション・サイレント失敗予防の延長線上にある防御層
 
 ## Sources
 

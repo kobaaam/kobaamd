@@ -87,6 +87,22 @@ KMD-120 (subagent から CLAUDE.md 明示 Read を削除) の postmortem を取�
 - lint: fail (./scripts/wiki/lint.sh --no-llm exit=1, violations=15)。**全 15 件は KMD-120 ingest と独立した既存違反**（external-teams 4 / role-dispatch 7 / team-structure 4 の Related 非対称 + `[[concern-carve-out]]` broken-link）。本 ingest 対象 4 ファイル（subagent-prompt-design / postmortem-patterns / prd-quality-cycle / autonomous-pipeline-philosophy）からの新規違反は 0 件。既存違反は別タスクで扱う（commit は中止、working tree に差分を残す）
 - ingest history: ok (status=fail, consecutive=0/threshold=5)
 
+## [2026-05-09] Wiki ingest（--source docs/learnings/2026-05-09-KMD-154.md）
+
+KMD-154（[KB2-followup] 2 経路差分検証中に subagent 経路の CLI 引数 variadic バグを発見・修正、stdin 経由化で恒久対応）の postmortem を取り込み、CLI 引数渡し規約を新規記事として確立。あわせて postmortem-patterns に観測機構自己観測責務の三層実装パターン（pipeline_active smoke / pipeline_weekly 全件回帰 / CI guard）と scope shift の 4 点 justify、stdin 経由化規約を追加。Related の双方向性担保のため security-hardening / subagent-prompt-design / wiki-reference-policy に逆参照を追加（4 既存ファイル更新）。
+
+- sources:
+  - docs/learnings/2026-05-09-KMD-154.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 12 拡張: §12.1 三層検出機構 (pipeline_active smoke / pipeline_weekly 全件 / CI guard) + MTBD SLO 24h / パターン 21「scope shift の 4 点 justify (a) 当初 AC, (b) 阻害要因, (c) シフト後 scope, (d) 残差処理計画」 / パターン 22「stdin 経由化が CLI 引数 variadic バグの汎用予防策」を追加。Related に [[cli-argument-conventions]] を追加、autonomous-pipeline-philosophy への重複行を整理。tags に cli-arguments / scope-shift を追加、sources に KMD-154 追加）
+  - articles/practices/wiki-reference-policy.md（Related に [[cli-argument-conventions]] を追加。§1.3 で記録した KMD-154 の variadic option バグの予防策を集約した記事への参照を確立）
+  - articles/practices/security-hardening.md（Related に [[cli-argument-conventions]] を追加。シェル変数クォート規約・入力バリデーション・サイレント失敗予防の延長線上の防御層として位置付け、双方向リンク担保）
+  - articles/practices/subagent-prompt-design.md（Related に [[cli-argument-conventions]] を追加。`--allowedTools` allowlist 設計と並ぶ subagent 起動時の防御層として位置付け、双方向リンク担保）
+- new articles:
+  - articles/practices/cli-argument-conventions.md（CLI 引数渡し規約。5 つの規約: 1.stdin 経由化標準 / 2.可変長オプションの後ろに位置引数を置かない / 3.`printf '%s'` でフォーマットメタ文字無害化 / 4.観測機構変更時 smoke test 同梱 / 5.CI guard で variadic option 後置パターン lint。canonical example: `scripts/wiki/lib/section-context-check.sh` の `run_subagent()`。Related: [[postmortem-patterns]] / [[wiki-reference-policy]] / [[security-hardening]] / [[subagent-prompt-design]]）
+- skipped sources（理由付き）: なし
+- 注記: 影響範囲は 1 新規 + 4 更新の 5 記事で、kobaamd_update_wiki の「1 ソース → 最大 3 記事」ソフトキャップを 2 記事超過。理由は新規記事 cli-argument-conventions の Related 4 件全てで双方向リンクを担保する SCHEMA 規約 5 を満たすため、参照先全てに逆リンクを追記する必要があった（postmortem-patterns / wiki-reference-policy / security-hardening / subagent-prompt-design の 4 記事）。core 更新は 2 記事（postmortem-patterns 拡張 + 新規 cli-argument-conventions）に絞り、残り 3 記事は Related 1 行追記のみの最小差分にとどめた
+
 ## [2026-05-08] Wiki ingest（--source docs/learnings/2026-05-08-KMD-153.md）
 
 KMD-153（`section-context-check.sh` の stdout/stderr 分離 17 行追加 / 2 行変更）の postmortem を取り込み、auto-carve 二段連鎖（KMD-150 → KMD-153 → KMD-171）/ 観測機構変更時の smoke test 必須化 / review_security のゲート観点選択 / shell script 小規模 fix の経路 / フェーズ B 最短サイクル参考値（23 分）を既存 3 記事に統合。

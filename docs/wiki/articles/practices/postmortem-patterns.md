@@ -1,7 +1,7 @@
 ---
 title: ポストモーテムから学ぶ実装パターン
 category: practices
-tags: [postmortem, patterns, codex, testing, observability, auto-carve-out, carve-out, clean-approve]
+tags: [postmortem, patterns, codex, testing, observability, auto-carve-out, carve-out, clean-approve, cli-arguments, scope-shift]
 sources:
   - docs/learnings/2026-04-28-KMD-4.md
   - docs/learnings/2026-04-28-KMD-6.md
@@ -11,15 +11,16 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-09-KMD-154.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-09
 ---
 
 # ポストモーテムから学ぶ実装パターン
 
 ## Summary
 
-KMD-4/6/20/22/120/144/153 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
+KMD-4/6/20/22/120/144/153/154 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
 
 ## Content
 
@@ -107,6 +108,33 @@ KMD-4/6/20/22/120/144/153 の振り返りから抽出した再発防止パター
 - 観測機構そのもののテストに「依存コマンド失敗 / 環境変数未設定 / 不正入力」のリカバリ系シナリオを最低 1 つ含める
 
 **出所**: KMD-144 review_pr concern (auto-carveable → KMD-146 に集約)
+
+#### 12.1 三層検出機構（KMD-154 で実証された具体実装パターン）
+<!-- llm-context: KMD-154 で「subagent 経路が約 1 週間サイレント失敗していた」事例を踏まえ、観測機構の自己観測を pipeline_active / pipeline_weekly / CI guard の三層で持つ実装パターン。MTBD を短縮する具体策。 -->
+
+KMD-154 で発覚した「KMD-150 で導入した subagent 経路が KMD-152 の最小権限化以降 **本番で 1 度も成功していなかった**（CLI 引数解釈バグで全呼び出しが失敗）」事例から、観測機構の自己観測責務（パターン 12）を**具体実装パターン**として三層に整理する。**Mean Time Before Detection (MTBD)** を SLO として記録し、サイレント失敗の最長放置期間を週次で観測する:
+
+| 層 | 頻度 | 役割 | 実装例 |
+|---|---|---|---|
+| (a) pipeline_active フェーズ A 末尾の smoke check | 30 分 | 観測機構を 1 ターゲットに対して実際に走らせ exit 0 を確認 | `scripts/wiki/lib/section-context-check.sh --file <代表記事> --dry-run=0` を 1 件だけ叩いて exit code を `.logs/` に記録 |
+| (b) pipeline_weekly 末尾の全件回帰 | 週 1 | 観測機構を全ターゲットに対して走らせ統計を取る | `scripts/wiki/lint.sh --no-llm` または `lint.sh`（Haiku 経由）を全 19 記事に対して回し、violation 件数の推移を記録 |
+| (c) CI guard / pre-commit で静的検出 | コミット時 | 構造的にバグが混入しやすいパターンを正規表現で検出 | KMD-172 で実装予定の variadic option 後置 lint。`claude -p ... --allowedTools <tools...> "$var"` を grep ベースで検出 |
+
+各層の独立性が重要:
+
+- (a) が壊れていても (b) で週次に拾える
+- (b) が cron 実行されていなくても (c) で次回 commit 時に拾える
+- (c) を bypass して merge されても (a) の 30 分後で拾える
+
+KMD-154 の事例では (a)(b)(c) いずれも未整備だったため約 1 週間（5 月初頭〜5 月 8 日）放置された。**観測機構を新規追加する PR では、層 (a) の smoke check を同 PR で同梱すること**を AC に必ず含める（パターン 18 と整合）。CI guard は規約・smoke test を守れなかった場合の最終防衛線であり、規約自体の代替ではない。
+
+**MTBD（Mean Time Before Detection）の SLO 化**:
+
+- 各観測機構について「サイレント失敗が起きてから検出までの最長時間」を記録する
+- 目標: **24 時間以内**（pipeline_active 30 分 × 48 サイクル + 余裕）
+- 1 週間以上の放置は post-incident review 対象（KMD-154 が初の review 事例）
+
+**出所**: KMD-154 (PR #87)、パターン 12 の実装パターン拡張
 
 ### パターン 13: 親 PR の auto-carveable concern を統合チケットとして起票する
 <!-- llm-context: KMD-55 (PR #65) のレビューで残った 2 件の改善を、別個の小チケットではなく 1 つの統合チケット (KMD-144) として起票したケースの判断条件。 -->
@@ -211,17 +239,63 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 
 **出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
 
+### パターン 21: scope shift を発見したら「4 点 justify」を Linear コメントに残す
+<!-- llm-context: 着手中に当初 AC を阻害する事象を発見して scope を変更するとき、PR / Linear コメントで根拠を明示する 4 点テンプレ。KMD-154 で「2 経路差分検証」→「先にバグ修正 + 残差 carve」とシフトしたケースから抽出。 -->
+
+**問題**: 着手中に当初 AC の達成を阻害する事象（依存先のバグ・観測機構の不在・環境制約など）を発見し、scope を変更する判断はパイプラインで頻繁に発生する。しかし scope shift を Linear / PR description で透明に正当化しないと、レビュー側は「AC 未達」「責務逃れ」と読みかねず、Reviewed 直行が阻害される。KMD-154 では当初 AC「2 経路の判定差分を数値化」を着手中に「subagent 経路が壊れている」と発見し、「先にバグ修正 + 残差を別チケット carve」へ shift したが、この経路がアドホックな判断に頼っており再現規約になっていなかった。
+
+**対策**: scope shift を発見した瞬間に、Linear コメント（または PR description 冒頭）に **4 点 justify** を必ず書く:
+
+1. **(a) 当初 AC**: PRD / 起票時に合意した AC を 1〜2 行で再掲
+2. **(b) 着手中に発見した阻害要因**: 何が AC 達成を阻んでいるか（依存先のバグ・環境制約・前提の崩れ等）を具体的に
+3. **(c) シフト後 scope**: 本 PR で実際にやること（最小単位に絞ることが多い）
+4. **(d) 残差の処理計画**: AC のうち本 PR でカバーできない部分をどう拾うか（別チケット carve、後続 PR、人間判断待ち等）
+
+KMD-154 の実例:
+
+> (a) 「2 経路（legacy / subagent）の判定差分を数値化」/ (b) subagent 経路が KMD-152 の最小権限化以降 CLI 引数バグで本番 0 件成功 / (c) 1 行 fix（stdin 経由化）+ subagent 経路 12/19 件で違反 0 を確認 / (d) 完全達成は KMD-173 へ carve、CI guard 不在は KMD-172 へ carve
+
+この 4 点を備えたコメントは `kobaamd_review_pr` が機械的にレビューを通過させやすい（影響範囲が明示され、残差処理計画もあるため auto-carveable 判定が成立しやすい）。
+
+**規約への落とし込み**: `kobaamd_implement_code` のプロンプトに「scope shift を発見したらまず 4 点 justify を Linear コメント or PR description に書く」を明示的に書く。`kobaamd_review_pr` 側にも「scope shift コメントの 4 点が揃っているか」を観点として加えると、shift の透明性がレビュー段階で担保される。
+
+**出所**: KMD-154 (PR #87)、Linear コメント `20cbc381-9048-46c3-b061-cdd83a6a0172`
+
+### パターン 22: 長文 prompt は stdin 経由化が CLI 引数 variadic バグの汎用予防策
+<!-- llm-context: claude -p / codex exec 等の subprocess CLI に長文 prompt を渡す際、`--allowedTools <tools...>` などの可変長オプション後置に踏まれる罠を恒久回避する規約。stdin 経由化が defense-in-depth の 1 段目。 -->
+
+**問題**: KMD-154 で subagent 経路が約 1 週間サイレント失敗した直接原因は、`claude -p --allowedTools <tools...> "$prompt"` で `$prompt` が `--allowedTools` の variadic option に貪欲取り込みされ、prompt が空になっていたこと。Commander.js 系 CLI の仕様としては既知だが、shell スクリプト diff 上の `claude -p --allowedTools "${allowed_tools[@]}" "$prompt"` を見て「これは prompt が空になる」と気付くのはコードレビューでは難しい。
+
+**対策**: shell から `claude -p` / `codex exec` / 同種の subprocess CLI に長文 prompt を渡すときは、**stdin 経由化を標準**とする:
+
+```bash
+# OK: stdin 経由なら variadic option 後置の罠を踏まない
+printf '%s' "$prompt" | claude -p \
+  --allowedTools "Read" "Bash(jq:*)" \
+  --output-format text \
+  --agent kobaamd_lint_section_context
+
+# NG: 位置引数として渡すと --allowedTools に取り込まれて prompt が空になる
+claude -p --allowedTools "Read" "Bash(jq:*)" "$prompt"
+```
+
+`printf '%s'` で書式文字列を静的化することで、prompt 内の `%`・`\n`・`\\` 等のフォーマットメタ文字も無害化される。`ps aux` の argv から prompt が消える副次的なプライバシー改善も得られる。
+
+詳細規約・canonical example・5 つの規約（stdin 経由化 / 順序入れ替え / `printf '%s'` / smoke test 同梱 / CI guard）は [[cli-argument-conventions]] に集約。新規 shell スクリプトで subprocess CLI を叩くときは必ず本記事 → cli-argument-conventions の順で参照すること。
+
+**出所**: KMD-154 (PR #87)、`scripts/wiki/lib/section-context-check.sh` の `run_subagent()` を canonical example として記録
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
 - [[prd-quality-cycle]] — パターン 1 / 7 / 15 の PRD への反映
 - [[security-hardening]] — シェル変数クォート等のセキュリティ視点の再発防止 / パターン 12 の「サイレント失敗パターン」表との接続
-- [[autonomous-pipeline-philosophy]] — パターン 13 / 14 の auto carve-out フローの設計意図
+- [[autonomous-pipeline-philosophy]] — パターン 13 / 14 の auto carve-out フローの設計意図 / パターン 21 の scope shift 透明化と Reviewed 直行の関係
 - [[wiki-reference-policy]] — wiki 経由で再発防止知見を引き継ぐ手順
 - [[dependency-inversion-guard]] — パターン 9 の詳細とテンプレート
-- [[autonomous-pipeline-philosophy]] — パターン 7 / 8 が機能する前提となるレビュー運用
 - [[subagent-prompt-design]] — パターン 15 / 16 / 17 の subagent プロンプト設計への反映（KMD-120）
 - [[role-dispatch]] — パターン 20 の shell script 小規模 fix 経路の SSOT（§4 近接ロールの境界）
+- [[cli-argument-conventions]] — パターン 22 の詳細規約 / canonical example / 三層 defense-in-depth（stdin / smoke test / CI guard）
 
 ## Sources
 
@@ -233,3 +307,4 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-09-KMD-154.md
