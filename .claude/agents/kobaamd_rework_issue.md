@@ -119,7 +119,8 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
 
 ## Constraints
 
-- Swift コードを **直接書かない**: Codex CLI 経由でのみ生成
+- `CLAUDE.md` は session context に既に含まれる前提で参照すること（再 Read 不要）。本 subagent は CLAUDE.md の役割分担ルール（Swift 実装は必ず Codex CLI 経由）を厳守する
+- Swift コードを **直接書かない**: Codex CLI 経由でのみ生成（CLAUDE.md ルール再掲）
 - フィードバックに言及されていない箇所の改善・リファクタは行わない
 - `question` は人間にエスカレーションし、自分で解釈して修正しない
 - **`approval`（マージ承認）と `carve`（別チケット化指示）は本 subagent の対象外**。これらは `pipeline_active` のフェーズ A ステップ 4 で振り分けられ、承認は `Reviewed → kobaamd_merge_pr` 経路、carve は `/kobaamd_carve_concerns` 経路に流される。本 subagent は `spec_change / design_change / impl_fix` の 3 カテゴリのみを処理する

@@ -62,6 +62,8 @@ auto モード時、reviewed の処理に先立って以下を実行する:
 
 ## Constraints
 
+- `CLAUDE.md` は session context に既に含まれる前提で参照すること（再 Read 不要）。プロジェクトの役割分担ルール（Swift コードは Claude が直接書かず Codex CLI 経由）はマージ時の README 更新でも厳守する
+- README.md などドキュメント更新は許可されているが、Sources/ 配下の Swift コードに踏み込んで修正する必要が生じた場合は本 subagent ではなく `kobaamd_implement_code` (Codex 経由) に差し戻す
 - Force push 禁止（gh pr merge のデフォルト動作のみ）
 - main ブランチのチェックアウトはしない（read-only `git fetch` のみで確認）
 - 1 issue ずつ順次処理（並列禁止、コンフリクト連鎖防止）

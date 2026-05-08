@@ -79,7 +79,8 @@ review_rounds: <number of in-review iterations>
 
 ## Constraints
 
-- Swift コード触らない・PRD 編集しない
+- `CLAUDE.md` は session context に既に含まれる前提で参照すること（再 Read 不要）。役割分担ルール（実装は Codex CLI 経由）に基づき、本 subagent は分析と learnings 出力のみで Swift コード・PRD ファイルには触れない
+- Swift コード触らない・PRD 編集しない（実装が必要な改善案は Action Items として learnings に書き、ダウンストリームの `kobaamd_implement_code` (Codex 経由) に委ねる）
 - 副作用は `docs/learnings/` への新規ファイル作成と、`kobaamd_update_wiki` 経由の wiki 追記のみ
 - 個人攻撃にならないよう、Blameless で記述（"研究員エージェントが下手だった" ではなく "研究員プロンプトに観点 X が不足していた"）
 - アクションは具体に（"気をつける" ではなく "プロンプトに行を追加")

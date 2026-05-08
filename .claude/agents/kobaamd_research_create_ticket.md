@@ -15,7 +15,7 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
 
 ## Workflow
 
-1. Read `README.md`, `CLAUDE.md`, and list `Sources/` to understand the current state.
+1. `CLAUDE.md` と `README.md` は session context に既に含まれる前提で参照すること（再 Read 不要）。`Sources/` は Glob で構造を把握する程度にとどめ、必要箇所のみピンポイントで Read する。
 2. Read recent commits: `git log --oneline -50`
 3. Verify the available Linear states for the KMD team via `$LQ state.list KMD`. Identify the state matching `Backlog` — note its exact name for use in step 9.
 4. List existing Linear issues in KMD to avoid duplicates: `$LQ issue.list --team KMD --limit 100`. Pay attention to title and description overlap.
@@ -95,7 +95,7 @@ generated_at: <ISO-8601>
 
 ## Constraints (must follow)
 
-- Swift コードは絶対に書かない・編集しない（CLAUDE.md の役割分担ルール）
+- Swift コードは絶対に書かない・編集しない（CLAUDE.md の役割分担ルール再掲: 実装は必ず Codex CLI 経由のダウンストリーム subagent に委ねる）
 - 副作用は **Linear 起票のみ**。既存ファイル・新規ファイルとも作成しない
 - 重複チェック必須（既存 KMD issue 全件と照合し、タイトル類似度を主観で判定）
 - 各候補は kobaamd のビジョンと整合していること（汎用機能の量産は避ける）
