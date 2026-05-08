@@ -135,28 +135,44 @@ run_subagent() {
   # `--output-format text` keeps stdout clean for NDJSON consumers.
   # We explicitly disallow tools that could leak external context: only Read +
   # Bash are needed by the agent.
-  local out_tmp rc
+  local out_tmp rc attempt success
   out_tmp=$(mktemp)
-  set +e
-  claude -p \
-    --agent kobaamd_lint_section_context \
-    --output-format text \
-    --permission-mode bypassPermissions \
-    "$prompt" \
-    >"$out_tmp" 2>&1
-  rc=$?
-  set -e
+  attempt=0
+  success=0
+  while [ "$attempt" -lt "$retries" ]; do
+    attempt=$((attempt + 1))
+    : >"$out_tmp"
+    set +e
+    claude -p \
+      --agent kobaamd_lint_section_context \
+      --output-format text \
+      --permission-mode bypassPermissions \
+      "$prompt" \
+      >"$out_tmp" 2>&1
+    rc=$?
+    set -e
+
+    if [ "$rc" -eq 0 ]; then
+      success=1
+      break
+    fi
+
+    err "WARN: subagent attempt ${attempt}/${retries} failed (exit=$rc) for $relative_path"
+    head -c 2048 "$out_tmp" >&2 || true
+    printf '\n' >&2
+
+    if [ "$attempt" -lt "$retries" ]; then
+      sleep_for=$((1 << attempt))
+      sleep "$sleep_for"
+    fi
+  done
 
   # The agent is supposed to write NDJSON to stdout only, but `claude -p` can
   # mix prose around the agent's output. We salvage by extracting any line that
   # looks like a JSON object with the expected `rule` field.
-  if [ "$rc" -ne 0 ]; then
-    err "WARN: subagent exit=$rc for $relative_path"
-    head -c 2048 "$out_tmp" >&2 || true
-    printf '\n' >&2
+  if [ "$success" -ne 1 ]; then
+    err "WARN: all ${retries} subagent attempts failed for $relative_path — skipping"
     rm -f "$out_tmp"
-    # Mirror the legacy behaviour: a failed run is non-fatal so that lint.sh
-    # can keep going for the remaining files.
     return 0
   fi
 
