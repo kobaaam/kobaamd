@@ -106,11 +106,10 @@ LQ_DRY_RUN=0 ./scripts/recovery/recover_halted.sh --auto
    a. `/kobaamd_review_pr --auto` ← in-review の issue を全件レビュー（クリーン APPROVE → Reviewed 直行 / [BREAKING] or concern>0 → Human in Review / fail>0 → In Progress）
    b. REQUEST_CHANGES が出た場合: `/kobaamd_fix_pr_comments --auto` ← 指摘を修正して in-review に戻す
    c. in-progress（REQUEST_CHANGES 起因）が 0 件になったらループ終了
-   d. **3回繰り返しても in-progress が残る場合**: 同じ指摘で修正が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える:
+   d. **3回繰り返しても in-progress が残る場合**: 同じ指摘で修正が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える。複数 issue が残っている場合は for ループで全件処理する:
 
       ```bash
       # 残っている in-progress（REQUEST_CHANGES 起因）の各 KMD-XX について
-      $LQ issue.transition KMD-XX "Human in Review"
       cat > /tmp/escalation_comment.md <<'EOF'
       [PIPELINE_ACTIVE] Auto-rework 3 連続失敗、人間判断に切り替え
 
@@ -122,7 +121,11 @@ LQ_DRY_RUN=0 ./scripts/recovery/recover_halted.sh --auto
       - PR の最新コメント / レビュー指摘を読み直し、必要なら PRD / 仕様を見直す
       - 人間が Linear コメントで具体的な修正方針を返すと、次回起動時の「人間フィードバック対応」（フェーズ A ステップ 4）が `rework_issue` を起動して再開します
       EOF
-      $LQ comment.add KMD-XX @/tmp/escalation_comment.md
+
+      for KMD_XX in $STUCK_ISSUES; do
+        ./scripts/linear/lq.sh issue.transition "$KMD_XX" "Human in Review"
+        ./scripts/linear/lq.sh comment.add "$KMD_XX" @/tmp/escalation_comment.md
+      done
       ```
 
       その後、ループを抜けて残件を最終レポートに記載する。
@@ -177,10 +180,9 @@ end while
    b. PASS → ループ終了、次のステップへ
    c. REQUEST_REVISION → `/kobaamd_create_prd <KMD-XX>` で PRD を修正（backlog 状態のまま再実行、レビュー指摘コメントを自動読み取り）
    d. 修正完了後、a に戻って再レビュー
-   e. **3回繰り返しても PASS しない場合**: 同じ指摘で PRD が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える:
+   e. **3回繰り返しても PASS しない場合**: 同じ指摘で PRD が収束しない病的ループと判断し、対象 issue を Human in Review に遷移して人間判断に切り替える。複数 issue が残っている場合は for ループで全件処理する:
 
       ```bash
-      $LQ issue.transition KMD-XX "Human in Review"
       cat > /tmp/escalation_comment.md <<'EOF'
       [PIPELINE_ACTIVE] Auto-rework 3 連続失敗、人間判断に切り替え
 
@@ -192,7 +194,11 @@ end while
       - 直近の review_prd コメントと PRD 本体を読み比べ、要件定義レベルで合意が取れているか確認
       - 人間が Linear コメントで方針を返すと、次回起動時の「人間フィードバック対応」（フェーズ A ステップ 4）が `rework_issue` を起動して再開します
       EOF
-      $LQ comment.add KMD-XX @/tmp/escalation_comment.md
+
+      for KMD_XX in $STUCK_PRD_ISSUES; do
+        ./scripts/linear/lq.sh issue.transition "$KMD_XX" "Human in Review"
+        ./scripts/linear/lq.sh comment.add "$KMD_XX" @/tmp/escalation_comment.md
+      done
       ```
 
       その後、ループを抜けて当該 issue は次のステップに進めず、最終レポートに残件として記載する。

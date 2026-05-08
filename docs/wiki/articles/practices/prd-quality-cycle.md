@@ -32,10 +32,17 @@ updated: 2026-05-08
 
 ### レビュー↔修正ループ
 
-`pipeline_active` ステップ 6 で自動実行:
+`pipeline_active` ステップ 6 / 7 で自動実行:
 1. `review_prd` が PASS / REQUEST_REVISION を判定
 2. REQUEST_REVISION → `create_prd` が修正モードで再実行（レビューコメントを読み取り）
-3. 最大5回ループ、超過時は人間エスカレーション
+3. **同一チケット内のループは最大 3 回**、超過時は当該 issue を `Human in Review` に遷移して人間判断にエスカレーション
+
+> **数値の意味区別（重要）**: pipeline_active には 2 種類の上限値があり混同しないこと。
+>
+> - **3 回ループ** = 同一チケット内の review ↔ rework retry cap（review_prd ↔ create_prd / review_pr ↔ fix_pr_comments の各ペア）。同じ指摘で 3 回連続収束しなければ病的ループと判断して人間エスカレーション。
+> - **5 サイクル** = フェーズ B `MAX_CYCLES`、つまり 1 回の pipeline_active 起動で扱う **異なる 5 チケット分の完全サイクル**（PRD → 実装 → 検証 → レビュー → マージ → 振り返り）の上限。
+>
+> 「同じチケットで 3 回以上回すのは割に合わない、ただし 1 回の起動で 5 チケット分は処理してほしい」という運用思想に対応する。
 
 ### KMD-4/6 の教訓
 
