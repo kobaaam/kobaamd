@@ -11,7 +11,7 @@ KMD team の各ステータスを横断して、N日以上更新されていな�
 - 注: 人間が滞留している `Human in Review` には **時間単位の追加警告**（デフォルト 24h）を別途適用する
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む
+- `LINEAR_API_KEY` が環境にロード済みであること。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - `LQ=./scripts/linear/lq.sh`
 
 実行手順:

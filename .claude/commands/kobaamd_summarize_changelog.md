@@ -10,7 +10,7 @@ model: sonnet
 - 引数なしなら直近のリリースタグから今日まで
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む
+- `LINEAR_API_KEY` が環境にロード済みであること。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - リポジトリの git tag を確認できること
 
 実行手順:

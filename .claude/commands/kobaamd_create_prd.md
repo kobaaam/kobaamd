@@ -11,7 +11,7 @@ Agent tool で起動する際は `subagent_type: "kobaamd_create_prd"` を指定
 - 引数が空の場合は、KMD team の draft にある issue 一覧を表示し、どれを処理するか案内するだけで終了する（無断で処理を進めない）
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（`./scripts/linear/lq.sh team.get KMD` で疎通確認）
+- `LINEAR_API_KEY` / `GEMINI_API_KEY` が環境にロード済みであること（`./scripts/linear/lq.sh team.get KMD` で疎通確認、Gemini は PRD 内の UI/UX リサーチで利用）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - 対象 issue が現在 draft ステータスにあること
 
 実行手順:

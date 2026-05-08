@@ -11,9 +11,8 @@ Agent tool で起動する際は `subagent_type: "kobaamd_fix_pr_comments"` を�
 - 引数が空の場合: in-progress かつ REQUEST_CHANGES 済みの PR 一覧を表示して終了
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（Linear I/O は `./scripts/linear/lq.sh` 経由）
+- `LINEAR_API_KEY` / `OPENAI_API_KEY` が環境にロード済みであること（Linear I/O は `./scripts/linear/lq.sh` 経由、Codex CLI は OPENAI_API_KEY が必要）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - `gh` CLI 認証済みであること
-- `~/.zshrc` で OPENAI_API_KEY が設定済みであること
 
 実行手順:
 1. `kobaamd_fix_pr_comments` subagent を起動

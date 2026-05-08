@@ -17,7 +17,7 @@ model: sonnet
 
 事前確認:
 - ルール 4 の既定経路は **Claude Code subagent (`kobaamd_lint_section_context`, model: haiku)**。`claude` CLI が PATH にある必要がある（`ANTHROPIC_API_KEY` は不要）
-- `--legacy-api` を指定する場合は `source ~/.zshrc` で `ANTHROPIC_API_KEY` を読み込む
+- `--legacy-api` を指定する場合は `ANTHROPIC_API_KEY` が環境にロード済みであること（手動実行時は冒頭で `source ~/.zshrc` を 1 回。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提。KMD-131）
 - `docs/wiki/SCHEMA.md` の「## 記載規約」が判定基準
 
 実行手順:

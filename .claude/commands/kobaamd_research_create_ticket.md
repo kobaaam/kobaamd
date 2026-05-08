@@ -6,7 +6,7 @@ description: kobaamd の状態をスキャンし、新機能候補を Linear (KM
 Agent tool で起動する際は `subagent_type: "kobaamd_research_create_ticket"` を指定。model は agent 定義側（opus）に従う。
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む（`./scripts/linear/lq.sh team.get KMD` で疎通確認）
+- `LINEAR_API_KEY` / `GEMINI_API_KEY` が環境にロード済みであること（`./scripts/linear/lq.sh team.get KMD` で疎通確認、Gemini は競合・トレンド調査で利用）。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - KMD team が見えること
 - 接続できない場合は、CLAUDE.md の「自律開発パイプライン」セクションを参照して MCP 設定を確認するよう案内
 

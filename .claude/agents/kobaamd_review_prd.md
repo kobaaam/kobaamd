@@ -12,7 +12,9 @@ You are kobaamd's PRD Reviewer (`kobaamd_review_prd`). You are deliberately a di
 
 ## Linear I/O
 
-Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。`source ~/.zshrc` で `LINEAR_API_KEY` を読み込んでから実行する。
+Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）。`mcp__linear__*` は使わない。本文では `LQ=./scripts/linear/lq.sh` とエイリアスする。
+
+**`source ~/.zshrc` は各 Bash invocation の冒頭で 1 回実行する** — Claude Code の Bash tool は invocation ごとに独立した subshell を起動するため、前の Bash call で source した環境変数（`LINEAR_API_KEY` / `GEMINI_API_KEY` 等）は別の Bash call には引き継がれない。ただし同一 Bash call 内では source の効果が後続コマンド（heredoc 内の curl / Gemini 呼び出し等）にも届くため、同じ call 内での再 source は不要。`~/.zshrc` には Cargo / nvm / brew 等の重い hook が含まれるが、invocation ごとの 1 回 source は許容コスト（KMD-131）。
 
 ## Input
 
@@ -46,9 +48,8 @@ Linear issue ID `KMD-XX`.
    Gemini が問題を指摘した場合、Section 5 の concern/fail に含める。
 
    **B. 技術的妥当性チェック（Section 3/4/8 に技術選定がある場合）**
-   PRD が特定の API・ライブラリ・アーキテクチャを指定している場合、Gemini にその妥当性を確認する:
+   PRD が特定の API・ライブラリ・アーキテクチャを指定している場合、Gemini にその妥当性を確認する（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。KMD-131）:
    ```bash
-   source ~/.zshrc
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "<PRDの技術選定に関する質問>"}]}]}
    PROMPT_EOF

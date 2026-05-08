@@ -10,7 +10,7 @@ KMD team の done にあるチケットを一括でアーカイブしてくだ�
 - デフォルト: 7日（引数なし時）
 
 事前確認:
-- `source ~/.zshrc` で `LINEAR_API_KEY` を読み込む
+- `LINEAR_API_KEY` が環境にロード済みであること。手動実行時は冒頭で `source ~/.zshrc` を 1 回実行すれば足りる。subagent / pipeline 経由で呼ばれる場合は親プロセスが既に source 済みであることが前提（KMD-131）
 - `LQ=./scripts/linear/lq.sh` をエイリアスに設定
 
 実行手順:
