@@ -9,15 +9,16 @@ sources:
   - docs/learnings/2026-04-28-KMD-22.md
   - docs/learnings/2026-05-05-KMD-54.md
   - docs/learnings/2026-05-06-KMD-144.md
+  - docs/learnings/2026-05-08-KMD-120.md
 created: 2026-04-30
-updated: 2026-05-06
+updated: 2026-05-08
 ---
 
 # ポストモーテムから学ぶ実装パターン
 
 ## Summary
 
-KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
+KMD-4/6/20/22/120/144 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
 
 ## Content
 
@@ -140,15 +141,43 @@ KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集�
 
 **出所**: KMD-144 (PR #70) review_pr 判定経路
 
+### パターン 15: AC は「観測 → 文言」の順で書く
+<!-- llm-context: PRD AC で「対象ファイルから X を削除」のような実測前提項目を書く前に、必ず grep で実在件数を確認してから AC を確定する規約。KMD-120 で「5 ファイル中 2 ファイルしか該当しない」と実装段階で判明したケースの再発防止。 -->
+
+**問題**: KMD-120 の PRD AC は「5 subagent から `Read CLAUDE.md` 行を削除」と仮説前提で書かれていたが、実装段階で grep すると該当行が実在したのは 2 ファイルのみ（残り 3 は元々 no-op）と判明した。実装側は「2/5 のみ該当・残り 3 は session-context 前提の文言追加 + Constraints 補強で対応」と PR / Linear に透明開示するコメントを残す追加コストが発生した。
+
+**対策**: PRD 作成時、AC で「対象ファイル群から X を削除 / 変更」のような実測前提の項目を書く前に、`grep -rn 'pattern' <files>` で実在件数を確認し、AC に **件数または「該当箇所のみ」** を明記する。`kobaamd_create_prd` の Workflow に「AC 中に実測前提項目があれば、PRD 確定前に grep で対象ファイル群への該当件数を確認する」ステップを追加することで再発防止できる。
+
+**出所**: KMD-120 (PR #76)
+
+### パターン 16: subagent MD 編集時の frontmatter 整合チェック
+<!-- llm-context: .claude/agents/*.md は frontmatter（description / tools / model）と本文（Workflow / Constraints / Final Report Format）の二重構造。本文だけ更新して frontmatter が取り残されると lint で検出されにくく auto-carve に頼ることになる。 -->
+
+**問題**: KMD-120 で 5 subagent ファイルの本文（Workflow / Constraints）を更新したが、frontmatter `description:` フィールドの整合まで行き届かず、auto-carve（KMD-156）対象になった。subagent ファイルの構造に対する「変更時の整合性チェックリスト」が implement_code プロンプトに無いため、本文更新時に frontmatter が取り残されやすい。
+
+**対策**: `kobaamd_implement_code` の Constraints / Workflow に「subagent 定義 MD（`.claude/agents/*.md`）を変更する場合、frontmatter `description:` フィールドと本文の整合をセットでチェックすること」を追記。auto-carve に頼らないチェックリスト化。詳細は [[subagent-prompt-design]] §4 を参照。
+
+**出所**: KMD-120 (PR #76) → KMD-156 (auto-carved-out)
+
+### パターン 17: 観測前提の AC は観測手段もセットで設計する
+<!-- llm-context: 「次回 postmortem で X を確認」のような観測前提 AC は、観測手段（集計スクリプト・ログ抽出方法）が未整備だと検証不能になる。観測手段の整備を同 PR か別チケットでセットにする運用。 -->
+
+**問題**: KMD-120 PRD AC 4 項目目「次回 postmortem で Karpathy Guidelines / 命名規則違反が発生していないことを確認」「input token 数の削減を観測」は観測前提だが、launchd ログから input token を集計するスクリプトは未整備。本 postmortem 時点でも定量検証ができていない（~480k tokens/日 削減は推算止まり）。
+
+**対策**: 観測前提の AC を含む PRD は、観測手段（集計スクリプト・ログ抽出方法）の整備を **同 PR の影響範囲または別チケット** として明記する。`kobaamd_research_create_ticket` / `kobaamd_create_prd` のプロンプトに「観測前提 AC を検出した場合、観測手段の起票も併せて提案」を追加。観測手段が未整備なら AC 自体を「次回 postmortem で観測する（観測手段は KMD-XX で整備）」と書き換える運用に倒す。
+
+**出所**: KMD-120 (PR #76)
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
-- [[prd-quality-cycle]] — パターン 1 / 7 の PRD への反映
+- [[prd-quality-cycle]] — パターン 1 / 7 / 15 の PRD への反映
 - [[security-hardening]] — シェル変数クォート等のセキュリティ視点の再発防止 / パターン 12 の「サイレント失敗パターン」表との接続
 - [[autonomous-pipeline-philosophy]] — パターン 13 / 14 の auto carve-out フローの設計意図
 - [[wiki-reference-policy]] — wiki 経由で再発防止知見を引き継ぐ手順
 - [[dependency-inversion-guard]] — パターン 9 の詳細とテンプレート
 - [[autonomous-pipeline-philosophy]] — パターン 7 / 8 が機能する前提となるレビュー運用
+- [[subagent-prompt-design]] — パターン 15 / 16 / 17 の subagent プロンプト設計への反映（KMD-120）
 
 ## Sources
 
@@ -158,3 +187,4 @@ KMD-4/6/20/22/144 の振り返りから抽出した再発防止パターン集�
 - docs/learnings/2026-04-28-KMD-22.md
 - docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
+- docs/learnings/2026-05-08-KMD-120.md

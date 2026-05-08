@@ -69,3 +69,20 @@
 - skipped sources（理由付き）: なし
 - lint: pass (./scripts/wiki/lint.sh --no-llm exit=0, violations=0)
 - ingest history: ok (status=pass, consecutive=0/threshold=5)
+
+## [2026-05-08] Wiki ingest（--source docs/learnings/2026-05-08-KMD-120.md）
+
+KMD-120 (subagent から CLAUDE.md 明示 Read を削除) の postmortem を取り込み、subagent プロンプト設計の境界判定ルールを新規記事として確立。あわせて Action Item「concern 三分類判定基準を docs/wiki/articles/practices/ 系記事として明文化」を autonomous-pipeline-philosophy.md に補完して、PR レベル（Reviewed 直行 3 条件）と concern レベル（auto-carveable 3 条件）を分けて記述。
+
+- sources:
+  - docs/learnings/2026-05-08-KMD-120.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 15「AC は観測 → 文言の順」/ パターン 16「subagent MD 編集時 frontmatter 整合チェック」/ パターン 17「観測前提 AC は観測手段セット」を追加。Related に [[subagent-prompt-design]] 追加）
+  - articles/practices/prd-quality-cycle.md（「KMD-120 で見えた『観測 → 文言』AC の重要性」節を追加。観測前提 AC の観測手段セット起票規約も併記。Related に [[subagent-prompt-design]] 追加）
+  - articles/decisions/autonomous-pipeline-philosophy.md（「concern を auto-carveable と判定する 3 条件」節を新設: 動作影響なし / AC 範囲外 / 独立修正可。KMD-120 (PR #76) frontmatter `description:` concern が KMD-156 に auto-carve された経路を参照実例として収録。sources に KMD-120 追加、Related に [[subagent-prompt-design]] 追加）
+- new articles:
+  - articles/practices/subagent-prompt-design.md（subagent プロンプト設計（Claude Code 暗黙注入を踏まえた）。境界判定ルール / 削除と残しの基準 / Constraints 格上げによる defense-in-depth / observation-driven AC / KMD-120 運用結果を集約。Related: [[postmortem-patterns]] / [[prd-quality-cycle]] / [[autonomous-pipeline-philosophy]]）
+- skipped sources（理由付き）: なし
+- 注記: 影響範囲は 1 新規 + 3 更新の 4 記事で、kobaamd_update_wiki の「1 ソース → 最大 3 記事」ソフトキャップを 1 記事超過している。autonomous-pipeline-philosophy.md は本ソースの Action Item「concern 三分類判定基準を docs/wiki/articles/practices/ 系記事として明文化」に直接対応するため、3 件枠から外せなかった（前回 ingest 中断分の継承も兼ねる）
+- lint: fail (./scripts/wiki/lint.sh --no-llm exit=1, violations=15)。**全 15 件は KMD-120 ingest と独立した既存違反**（external-teams 4 / role-dispatch 7 / team-structure 4 の Related 非対称 + `[[concern-carve-out]]` broken-link）。本 ingest 対象 4 ファイル（subagent-prompt-design / postmortem-patterns / prd-quality-cycle / autonomous-pipeline-philosophy）からの新規違反は 0 件。既存違反は別タスクで扱う（commit は中止、working tree に差分を残す）
+- ingest history: ok (status=fail, consecutive=0/threshold=5)
