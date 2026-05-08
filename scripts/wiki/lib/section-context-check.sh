@@ -159,22 +159,35 @@ run_subagent() {
     "Bash(awk:*)"
     "Bash(sed:*)"
   )
-  local out_tmp rc attempt success
+  # KMD-153: capture stdout / stderr separately so the agent's per-section
+  # WARN / progress logs are relayed to the caller's stderr instead of being
+  # silently dropped by the NDJSON filter below. Previously we used `2>&1`,
+  # which routed stderr into `$out_tmp` where every non-JSON line was
+  # discarded (`jq -e .` reject) — making lint skips invisible.
+  local out_tmp err_tmp rc attempt success
   out_tmp=$(mktemp)
+  err_tmp=$(mktemp)
   attempt=0
   success=0
   while [ "$attempt" -lt "$retries" ]; do
     attempt=$((attempt + 1))
     : >"$out_tmp"
+    : >"$err_tmp"
     set +e
     claude -p \
       --agent kobaamd_lint_section_context \
       --output-format text \
       --allowedTools "${allowed_tools[@]}" \
       "$prompt" \
-      >"$out_tmp" 2>&1
+      >"$out_tmp" 2>"$err_tmp"
     rc=$?
     set -e
+
+    # Relay the agent's stderr to our own stderr regardless of success, so
+    # that per-section WARN messages remain observable for debugging.
+    if [ -s "$err_tmp" ]; then
+      cat "$err_tmp" >&2
+    fi
 
     if [ "$rc" -eq 0 ]; then
       success=1
@@ -182,6 +195,7 @@ run_subagent() {
     fi
 
     err "WARN: subagent attempt ${attempt}/${retries} failed (exit=$rc) for $relative_path"
+    # Dump head of stdout for failure context (existing behaviour preserved).
     head -c 2048 "$out_tmp" >&2 || true
     printf '\n' >&2
 
@@ -190,6 +204,7 @@ run_subagent() {
       sleep "$sleep_for"
     fi
   done
+  rm -f "$err_tmp"
 
   # The agent is supposed to write NDJSON to stdout only, but `claude -p` can
   # mix prose around the agent's output. We salvage by extracting any line that
