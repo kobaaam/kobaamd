@@ -2,9 +2,9 @@
 title: ロールディスパッチ（タスク → ペルソナ → モデル → フォールバック）
 category: practices
 tags: [dispatch, persona, model-selection, halted-recovery, cost-optimization, prompt-caching, ssot]
-sources: [docs/wiki/articles/practices/team-structure.md, docs/wiki/articles/practices/wiki-reference-policy.md, docs/wiki/articles/practices/external-teams.md, docs/wiki/articles/decisions/multi-llm-persona.md, .claude/commands/kobaamd_pipeline_active.md, scripts/recovery/recover_halted.sh, KMD-117, KMD-118, KMD-119, KMD-120, KMD-121, KMD-122, KMD-123, KMD-128]
+sources: [docs/wiki/articles/practices/team-structure.md, docs/wiki/articles/practices/wiki-reference-policy.md, docs/wiki/articles/practices/external-teams.md, docs/wiki/articles/decisions/multi-llm-persona.md, .claude/commands/kobaamd_pipeline_active.md, scripts/recovery/recover_halted.sh, docs/learnings/2026-05-08-KMD-153.md, KMD-117, KMD-118, KMD-119, KMD-120, KMD-121, KMD-122, KMD-123, KMD-128]
 created: 2026-05-06
-updated: 2026-05-06
+updated: 2026-05-08
 ---
 
 # ロールディスパッチ（タスク → ペルソナ → モデル → フォールバック）
@@ -66,6 +66,7 @@ updated: 2026-05-06
 | 「ビルド通った？」「テスト走らせて」 | `kobaamd_validate_build` | Sonnet | — |
 | 「なぜこの設計？」「どう思う？」 | メインセッション直で議論 | Opus | 設計判断は委譲しない |
 | 「実装して」「この機能を追加」 | `kobaamd_implement_code` | Opus + Codex | Codex 不可: メインセッションが Codex プロンプト案だけ提示し人間着手依頼 |
+| 「この shell スクリプトを 30 行未満で直して」 | メインセッション直で Edit | Opus | 30 行超 / 構造変更 → `kobaamd_implement_code` 経由（§4 行参照） |
 | 「ドキュメント書いて」「ADR 作って」 | Gemini 経由 | Gemini | Gemini 不可: メインセッションが下書き → 人間レビュー |
 | 緊急 hotfix（infra / 起動不能等） | メインセッション直で PR | Opus | 即応性優先 |
 | 「振り返って」「learnings 書いて」 | `kobaamd_review_postmortem` | Opus | — |
@@ -92,6 +93,7 @@ updated: 2026-05-06
 | `kobaamd_rework_issue` vs `kobaamd_fix_pr_comments` | **仕様変更を含むなら rework**、コードレベルの修正のみなら fix_pr_comments。人間コメント駆動なら rework、自動レビュー駆動なら fix_pr_comments |
 | `kobaamd_create_prd` vs `kobaamd_research_create_ticket` | 入力ステータスで分岐: draft → backlog なら create_prd、新規発掘 → backlog なら research_create_ticket |
 | メインセッション直 vs `kobaamd_implement_code` | 緊急 hotfix / 設定 1 ファイル変更はメインセッション直。複数ファイル / SwiftUI コア変更は implement_code 経由（Codex に依頼） |
+| **shell script (`*.sh`) 小規模 fix vs Codex CLI** | **30 行未満 / 構造変更なし**（surgical fix）はメインセッション直で Edit 可。30 行超 / 関数構造の大幅変更 / 複数 shell ファイル横断はは `kobaamd_implement_code` 経由（Codex CLI）。CLAUDE.md 役割分担表は「`.swift` は Codex」と書いているがこれを `*.sh` には機械適用しない。実例: KMD-153（`scripts/wiki/lib/section-context-check.sh` で 17 行追加 / 2 行変更の stdout/stderr 分離）はメインセッション直で 23 分の能動フェーズで完了 |
 | `kobaamd_review_pr` vs メインセッション直 | 自律パイプライン PR は review_pr。メインセッションが手動で出した PR は **どちらでもよいが、結果として Human in Review を経由** |
 | `kobaamd_health_check` vs `kobaamd_report_status` | 死活監視（即時検知）は health_check（daily）、傾向分析（俯瞰）は report_status（weekly） |
 
@@ -234,3 +236,4 @@ KMD-118 配下の 5 案は本辞書のディスパッチに直接効く（実装
 - `scripts/recovery/recover_halted.sh`（PR #59 で実装）
 - KMD-117（epic）、KMD-118（PR-A 親）、KMD-119〜123（Phase A 子チケット）、KMD-128（PR-B4 事前 usage チェック）
 - `docs/handoff/2026-05-06-cost-optimization-prompt.md`
+- docs/learnings/2026-05-08-KMD-153.md（shell script 小規模 fix の経路、実例: PR #84）

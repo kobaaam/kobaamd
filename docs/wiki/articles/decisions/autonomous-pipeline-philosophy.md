@@ -8,6 +8,7 @@ sources:
   - docs/learnings/2026-05-05-KMD-54.md
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
+  - docs/learnings/2026-05-08-KMD-153.md
 created: 2026-04-30
 updated: 2026-05-08
 ---
@@ -96,14 +97,40 @@ KMD-144 (PR #70) はこの 3 条件を満たし、in Review → Reviewed → Don
 
 KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 投稿失敗 observability）を起票してクリーン APPROVE 直行し、Reviewed → Done が約 4 分で完了した。carve-out 先 issue 本文には「親 KMD-XX (auto-carved-out by kobaamd_review_pr)」と「人間が本 PR で対応すべきと判断した場合は本チケットを close/revert して親を re-open する」手順を必ず含める規約になっており、carve-out のリカバリ経路が運用上担保されている（[[postmortem-patterns]] パターン 8 を参照）。
 
+### 多段 auto carve-out 連鎖（親 PR → 子 → 孫）
+<!-- llm-context: KMD-150 → KMD-153 → KMD-171 のように、親 PR から carve-out された子チケットの PR がさらに孫チケットを carve する二段以上の連鎖。各 PR が surgical な範囲を保つことで成立する。 -->
+
+`kobaamd_review_pr` の auto carve-out は 1 段で止まらず、carve された子チケット自身が新しい PR を出した時点で再度 review_pr を通り、そこからさらに孫チケットが carve されることがある。これは設計どおりの挙動で、各 PR が surgical な範囲（影響範囲が PRD section 8 で明示され、AC が 3 件以下に絞られた状態）を保てる限り破綻しない。
+
+実例: **KMD-150 → KMD-153 → KMD-171** の二段 carve（2026-05-08）
+
+- 親 KMD-150（PR #74）の review_pr が「観測性回復は本 PR の goal と独立」と判断 → KMD-153 に auto-carve、親はクリーン APPROVE で Reviewed 直行
+- 子 KMD-153（PR #84、`section-context-check.sh` で stdout/stderr を分離する 17 行追加 / 2 行変更）が独立サイクルで完了。review_pr が「smoke test 自動化は本 PR の影響範囲外」と判断 → KMD-171 に再 auto-carve、KMD-153 自身もクリーン APPROVE 直行
+- 孫 KMD-171 は smoke test 整備として独立 Backlog で待機
+
+各段の carve-out 先 issue 本文には「親 KMD-XX (auto-carved-out by kobaamd_review_pr)」と re-open 手順を含めるルール（[[postmortem-patterns]] パターン 8）により、二段以上の連鎖でもリカバリ経路が担保される。
+
+### フェーズ B 最短サイクルの参考値
+<!-- llm-context: pipeline_active のフェーズ B（PRD → 実装 → 検証 → レビュー → マージ → 振り返り）を 1 サイクル分 1 チケットで完走したときの最短実績値。小規模案件のリードタイム下限の目安として参照する。 -->
+
+`pipeline_active` のフェーズ B は **最大 5 サイクル**（異なる 5 チケット分の完全サイクル）まで回す設計だが、1 サイクル分（1 チケットの PRD → 実装 → 検証 → レビュー → マージ）が現実にどれだけ速く完走できるかの参考値:
+
+- **小規模 surgical 案件の能動フェーズ最短: 約 23 分**（KMD-153 / PR #84）
+  - Todo 入場 → Done までの **能動フェーズ**で計測。Backlog 滞留時間（11h30m、サイクル間隔起因）は含まない
+  - 内訳: In Progress 5 分（main session が直接 Edit）+ In Review 13 分（validate_build → review_pr + review_security 並行 → クリーン APPROVE → Reviewed → 自動マージ）
+  - 成立条件: PRD AC が 3 件以下に絞られた surgical 案件 / 影響範囲が単一ファイル / `[BREAKING]` なし / concern 0（または auto-carveable のみ）
+
+この参考値は「フェーズ B が 1 サイクルで完走できる下限」の目安であり、複数ファイルにまたがる案件・Codex 経由の SwiftUI 実装などはこれより長くなる。Backlog 滞留時間は含まれていないため、auto-carve された priority Low / `Improvement` ラベル issue の優先度運用は別途観察対象（[[role-dispatch]] §6 halted リカバリと並ぶ運用観点）。
+
 ## Related
 
 - [[multi-llm-persona]] — LLM ペルソナの役割分担
 - [[prd-quality-cycle]] — PRD の品質サイクル
 - [[security-hardening]] — パイプラインに組み込む多層防御の運用
-- [[postmortem-patterns]] — クリーン APPROVE 直行 4 条件、auto carve-out 規約、auto carve-out フローのパターン化（パターン 13 / 14）
+- [[postmortem-patterns]] — クリーン APPROVE 直行 4 条件、auto carve-out 規約、auto carve-out フローのパターン化（パターン 13 / 14 / 18 / 19 / 20）
 - [[dependency-inversion-guard]] — pipeline_weekly が依存逆順でも落ちないためのガードパターン
 - [[subagent-prompt-design]] — KMD-120 で concern auto-carveable 3 条件が機能した参照実例
+- [[role-dispatch]] — フェーズ B 最短サイクル参考値の運用観点 / shell script 小規模 fix の経路
 
 ## Sources
 
@@ -112,3 +139,4 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - docs/learnings/2026-05-05-KMD-54.md
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
+- docs/learnings/2026-05-08-KMD-153.md
