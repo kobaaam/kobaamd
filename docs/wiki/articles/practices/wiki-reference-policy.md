@@ -2,9 +2,9 @@
 title: Wiki 参照ポリシー（Prompt Caching 標準運用）
 category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
-sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150, KMD-152]
+sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150, KMD-152, KMD-154]
 created: 2026-05-04
-updated: 2026-05-08
+updated: 2026-05-09
 ---
 
 # Wiki 参照ポリシー（Prompt Caching 標準運用）
@@ -100,6 +100,45 @@ ask.sh 経由を標準とする理由:
 
 Phase 移行のトリガー条件・運用手順は次節と共通。
 
+#### 1.3 2 経路（legacy / subagent）の判定差分検証（KMD-154）
+
+**結論**: KMD-150 で導入された subagent 経路は、KMD-152 の最小権限化以降 **本番で一度も成功していなかった**（CLI 引数解釈バグで全呼び出しが失敗）。KMD-154 でこのバグを発見・修正し、subagent 経路が現実に動くようになった上で、両経路の判定差分検証を行った。
+
+**実証データ（subagent 経路、2026-05-09、cache 空）**:
+
+- 対象: `docs/wiki/articles/**/*.md` 全 19 件
+- ルール 4（section-context-missing）の violation: **0 件**
+- 1 件あたり所要時間: 約 3〜5 分（Haiku セッションの起動 + 推論）
+- 全件処理時間: 約 60 分
+
+実証の制約:
+
+- 本検証マシンは `ANTHROPIC_API_KEY` を持たないため、**legacy 経路（直接 API 経路）の同条件実行は不可能**
+- 代わりに 2 経路のソースコード差分を理論分析し、判定ブレを生む構造的要因を `.logs/KMD-154/diff-analysis.md` に記録した
+- 完全な対照実験（両経路で同じ violation 集合になるか）は ANTHROPIC_API_KEY を持つ環境での後続検証に委ねる（KMD-154 follow-up）
+
+**理論的差分要因（コードレビューで特定）**:
+
+| 観点 | legacy 経路 | subagent 経路 | リスク |
+|---|---|---|---|
+| セクション抽出 | 固定 python ロジック (`run_legacy()` 内 `py_extract`) | エージェント定義 prompt で「同等の python ロジックを再利用」と指示 | エージェントの解釈次第でセクション境界がブレる |
+| 入力 hash 計算式 | shell 側で `sha256("<rel_path>\|H<level>\|<title>\|<body>")` | エージェント定義 prompt 内に式を記述、実装は agent 側 | 入力前後空白・改行コードの正規化差がヒット率を下げる |
+| Cache 構造 | `{"section_context": {hash: verdict}, "version": 1}` 仕様 | 同一仕様を prompt で指示 | 仕様一致だが実装責任が agent 側にあり再現性は弱い |
+| 推論コンテキスト | 記事全文 + 質問セクションのみ（API 直叩き） | エージェント定義 + Read 取得記事 + Claude Code の dynamic system prompt（cwd / env / memory 等） | dynamic system prompt が判定再現性に影響しうる |
+| 出力境界 | API レスポンス 1 つ = `YES` または `NO: <理由>` | エージェントが NDJSON を組み立てる複合タスク | 組み立て中に判定が変化する可能性 |
+
+**運用上の判断**:
+
+- KMD-152 で「最小権限の allowlist 化」を入れた際、`claude -p --allowedTools <tools...> "$prompt"` の引数順序が `--allowedTools` の variadic option に prompt まで貪欲に取られる Commander.js の挙動に踏まれていた。これは KMD-150 → KMD-152 の流れの中で **CI / 統合テストが無いため検出できなかった**バグであり、subagent 経路は 5 月初頭以降ずっと壊れていた。KMD-154 のスモーク実行で初めて顕在化
+- 修正は 1 行（`printf '%s' "$prompt" | claude -p ...` で stdin に逃がす）。今後 `--allowedTools` を含む CLI 呼び出しを書く際は **可変長オプションの後に位置引数を置かない / stdin で受け渡す** を規約化する
+- subagent 経路の cache file は 1 セッション内で正しく書き込まれることを確認済み（25 entries / 12 件の article 完走時点）
+
+**section-context-missing 0 件の解釈**:
+
+- すべての article が H2/H3 セクション単独で文脈を成すよう書かれている、と Haiku が判定した
+- ただし Haiku の判断ブレ幅は単独試行では計測できないため、`--exclude-dynamic-system-prompt-sections` 利用や複数試行の median を取るなどの安定化は別チケット（後続検証）で扱う
+- 2 経路の絶対一致（一致率 100%）は理論上保証されていないが、本 wiki の現在の文体では両経路とも違反 0 が想定される（差分検証の必要性が下がる方向）
+
 ### 2. Phase 移行のトリガー
 
 | Phase | 状態 | トリガー |
@@ -180,3 +219,4 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 - KMD-49（[KB1] CLAUDE.md / SCHEMA.md に運用方針を明記）
 - KMD-150（[KB2] section-context-missing lint を Claude Code subagent (Haiku) 経由に置換）
 - KMD-152（[KB2-followup] section-context-check の subagent を最小権限 allowlist 化）
+- KMD-154（[KB2-followup] 2 経路の判定差分検証 + subagent 経路の CLI 引数バグ修正）
