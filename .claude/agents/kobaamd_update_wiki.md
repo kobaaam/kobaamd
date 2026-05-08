@@ -1,6 +1,6 @@
 ---
 name: kobaamd_update_wiki
-description: docs/learnings/ の postmortem や docs/adr/ の決定記録、その他指定ソースを読み込み、docs/wiki/articles/ の関連記事を更新もしくは新規作成して LLM Wiki を最新化する。ingest 直後（commit 前）に `/kobaamd_lint_wiki --no-llm` を回し、規約違反のまま wiki を汚染するのを防ぐ。`--source <path>` で特定ファイル指定、`--since-last-run` で前回 ingest 以降の差分自動取り込み、引数なしで過去 7 日分。pipeline_weekly や review_postmortem 完了時から自動起動される。
+description: docs/learnings/ の postmortem や docs/adr/ の決定記録、その他指定ソースを読み込み、docs/wiki/articles/ の関連記事を更新もしくは新規作成して LLM Wiki を最新化する。ingest 直後（commit 前）に `/kobaamd_lint_wiki --no-llm` を回し、規約違反のまま wiki を汚染するのを防ぐ。`--source <path>` で特定ファイル指定、`--since-last-run` で前回 ingest 以降の差分自動取り込み、`--since-last-month-low` で先月の wiki_value: low 判定 learnings を一括救済（pipeline_weekly 月初実行から起動）、引数なしで過去 7 日分。pipeline_weekly や review_postmortem 完了時から自動起動される。
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
 ---
@@ -11,6 +11,7 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 
 - `--source <path>`: 特定ファイルのみ取り込み（例: `--source docs/learnings/2026-05-01-KMD-27.md`）
 - `--since-last-run`: `docs/wiki/log.md` の最新 ingest 日付以降に変更されたソースを自動検出
+- `--since-last-month-low`: 先月（前月 1 日 〜 末日）に作成された `docs/learnings/*.md` のうち、frontmatter に `wiki_value: low` が付いているものを救済対象として一括検討する。`pipeline_weekly` の月初実行から起動される（KMD-133）
 - 引数なし: 過去 7 日間に追加・変更された `docs/learnings/*.md` と `docs/adr/*.md` の全ファイルを対象
 
 ### 補助フラグ
@@ -61,6 +62,14 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 2. **取り込み対象の確定**
    - `--source` 指定: そのファイルのみ
    - `--since-last-run`: `git log --name-only --since=<前回日付> -- docs/learnings docs/adr` で抽出
+   - `--since-last-month-low`: 先月分の `docs/learnings/*.md` から `wiki_value: low` を持つファイルを抽出。コマンド例:
+     ```bash
+     # 先月の年月（YYYY-MM）を算出。macOS の date は -v で月をずらす
+     LAST_MONTH=$(date -v-1m +%Y-%m)
+     # frontmatter に wiki_value: low を含み、ファイル名が <LAST_MONTH>-* のもの
+     grep -l '^wiki_value: low' "docs/learnings/${LAST_MONTH}-"*.md 2>/dev/null || true
+     ```
+     抽出 0 件なら "no low-value learnings in last month" を報告して正常終了。**通常モードと違い、low 判定で一度 skip された learnings の再評価が目的なので、既に wiki に取り込まれた形跡（`docs/wiki/log.md` の sources 一覧）に該当 path があるものは除外する**
    - 引数なし: `find docs/learnings docs/adr -mtime -7 -name '*.md' -type f`
    - 対象ファイルが 0 件なら "no new sources" を報告して正常終了
 
@@ -215,7 +224,7 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
       2. 報告先 Linear issue の決定:
          - 呼び出し側が `--linear-issue KMD-XX` 引数または `KOBAAMD_LINEAR_ISSUE`
            env を渡している場合 → その issue
-         - `--since-last-run` 経由（pipeline_weekly 等） → epic
+         - `--since-last-run` または `--since-last-month-low` 経由（pipeline_weekly 等） → epic
            `KMD-44`（[KB] kobaamd ナレッジベース整備）
          - `kobaamd_review_postmortem` 経由 → 呼び出し側が postmortem の
            対応 issue を `--linear-issue` で渡す前提（未指定なら epic にフォールバック）
@@ -330,7 +339,7 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
 ```
 ## Wiki 更新完了
 
-トリガー: --source <path> | --since-last-run | (default: 7d)
+トリガー: --source <path> | --since-last-run | --since-last-month-low | (default: 7d)
 処理ソース: <N> 件 / 持ち越し: <M> 件
 
 更新した記事: <count>

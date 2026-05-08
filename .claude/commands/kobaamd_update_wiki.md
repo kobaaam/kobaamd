@@ -11,6 +11,7 @@ Agent tool で起動する際は `subagent_type: "kobaamd_update_wiki"` を指�
 |---|---|
 | `--source <path>` | 特定ファイルのみ取り込み（例: `--source docs/learnings/2026-05-01-KMD-27.md`） |
 | `--since-last-run` | `docs/wiki/log.md` の最終 ingest 以降に変更されたソースを自動検出 |
+| `--since-last-month-low` | 先月作成された learnings のうち `wiki_value: low` を救済対象として一括検討（pipeline_weekly 月初から起動。KMD-133） |
 | 引数なし | 過去 7 日間に変更された `docs/learnings/*.md` と `docs/adr/*.md` 全件 |
 
 事前確認:

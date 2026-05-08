@@ -54,7 +54,26 @@ Optional Linear issue ID `KMD-XX`. If absent, pick the most recently moved-to-do
    - 改善点（What didn't）: 詰まった箇所、リワークの根本原因
    - 教訓（Learnings）: 他チケットに転用できる知見
    - アクション（Action items）: プロンプト改善・プロセス変更の提案
-5. Write to `docs/learnings/<YYYY-MM-DD>-<KMD-XX>.md`:
+5. **wiki 取り込み価値の判定（必須）**
+
+   `docs/learnings/` に書き出すファイルの frontmatter に `wiki_value: high|medium|low` を必ず付ける。判定基準は以下:
+
+   | 値 | 基準 | 例 |
+   |---|---|---|
+   | `high` | 過去に類似の learnings がない、新パターンの発見 | 新しいリスク類型、未知の根本原因、独自の運用パターンの確立 |
+   | `medium` | 既存パターンの強化 / バリエーション | 既知の落とし穴の再発（強化材料）、既存ベストプラクティスの新適用例 |
+   | `low` | 小規模修正、典型的事例（典型既出） | typo 修正、Codex プロンプトの軽微な調整、既出 incident の単純再発 |
+
+   判定手順:
+   1. 既存 `docs/wiki/articles/**/*.md` を Grep で検索し、本 issue の主要キーワード（タイトル / 教訓中の固有名）が複数記事にヒットするか確認
+   2. ヒット 0 件 + 新概念あり → `high`
+   3. 既存記事に部分一致あり、追記で強化できる → `medium`
+   4. 影響範囲が極小（typo / 軽微調整 / 既出事例の単なる再発）→ `low`
+   5. 判断に迷う場合は **safer 側（より高い value）に倒す**（low と確信できないものは medium にする）
+
+   学んだ知見が抽象化困難で wiki 化しても価値がない場合（PR 固有の細部のみ）は `low` を選んで構わない。
+
+6. Write to `docs/learnings/<YYYY-MM-DD>-<KMD-XX>.md`:
 
 ```markdown
 ---
@@ -63,6 +82,7 @@ title: <issue title>
 done_at: <YYYY-MM-DD>
 leadtime_days: <draft→done>
 review_rounds: <number of in-review iterations>
+wiki_value: <high|medium|low>
 ---
 
 # Postmortem: KMD-XX
@@ -91,19 +111,30 @@ review_rounds: <number of in-review iterations>
 - [ ] 新しい subagent kobaamd_yyy_zzz を検討
 ```
 
-6. **LLM Wiki への自動取り込み**
-   - 5 で書いた `docs/learnings/<date>-<KMD-XX>.md` をソースに、`kobaamd_update_wiki` subagent を起動する
-   - Agent tool で `subagent_type: "kobaamd_update_wiki"` / 引数: `--source docs/learnings/<date>-<KMD-XX>.md --no-pr`（`--no-pr` は親（本 subagent）が PR を作る前提で update_wiki 側の PR 作成をスキップさせる）
-   - 失敗しても本タスク（postmortem）は成功扱い。wiki 更新失敗は Final Report の特記事項として残す
+7. **LLM Wiki への自動取り込み（wiki_value gate）**
 
-7. **commit + push + PR 化（必須）**
+   step 5 で判定した `wiki_value` に応じて分岐する:
 
-   step 0 で確保した feature branch 上で、step 5 / 6 の出力を必ず PR 化する。
+   - `wiki_value: high` または `wiki_value: medium` の場合:
+     - step 6 で書いた `docs/learnings/<date>-<KMD-XX>.md` をソースに `kobaamd_update_wiki` subagent を起動する
+     - Agent tool で `subagent_type: "kobaamd_update_wiki"` / 引数: `--source docs/learnings/<date>-<KMD-XX>.md --no-pr`（`--no-pr` は親（本 subagent）が PR を作る前提で update_wiki 側の PR 作成をスキップさせる）
+     - 失敗しても本タスク（postmortem）は成功扱い。wiki 更新失敗は Final Report の特記事項として残す
+   - `wiki_value: low` の場合:
+     - **`update_wiki` を起動しない**（learnings ファイルだけ残す）
+     - 起動コスト（〜5k tokens）を節約する。低価値 learnings は `pipeline_weekly` 月初の救済ジョブ（`/kobaamd_update_wiki --since-last-month-low`）でまとめて再検討される
+     - Final Report に "wiki ingest skipped: wiki_value=low" を明記する
+
+   **判定漏れ防止**: `wiki_value` フィールドが frontmatter に欠落している場合は本 step を実行せず、Final Report の特記事項に "wiki_value missing in frontmatter — ingest skipped" を明記する（人間判断に委ねる）。
+
+8. **commit + push + PR 化（必須）**
+
+   step 0 で確保した feature branch 上で、step 6 / 7 の出力を必ず PR 化する。
    main の working tree に dirty 差分が残ることを構造的に禁止する。
 
    ```bash
-   # 5 で書いた learnings ファイル + 6 で update_wiki が変更した
+   # 6 で書いた learnings ファイル + 7 で update_wiki が変更した
    # docs/wiki/articles/* / docs/wiki/index.md / docs/wiki/log.md を一括 stage
+   # （wiki_value=low の場合は docs/wiki/ には diff が無い想定。空 stage は無害）
    git add docs/learnings/ docs/wiki/
 
    # 何も変更がなければ skip（update_wiki が "no new sources" 等で no-op だった場合）
@@ -135,13 +166,13 @@ EOF
    commit / push / PR 作成のいずれかで失敗した場合は、working tree の差分を
    そのまま残して Final Report に明記する（人間が後続でリカバリできるように）。
 
-8. Report.
+9. Report.
 
 ## Constraints
 
 - `CLAUDE.md` は session context に既に含まれる前提で参照すること（再 Read 不要）。役割分担ルール（実装は Codex CLI 経由）に基づき、本 subagent は分析と learnings 出力のみで Swift コード・PRD ファイルには触れない
 - Swift コード触らない・PRD 編集しない（実装が必要な改善案は Action Items として learnings に書き、ダウンストリームの `kobaamd_implement_code` (Codex 経由) に委ねる）
-- 副作用は `docs/learnings/` への新規ファイル作成、`kobaamd_update_wiki` 経由の wiki 追記、および専用 feature branch 上での commit / push / PR 作成のみ。**main の working tree には絶対に直書きしない**（step 0 / 7 を遵守）
+- 副作用は `docs/learnings/` への新規ファイル作成、`kobaamd_update_wiki` 経由の wiki 追記（`wiki_value=high|medium` 時のみ）、および専用 feature branch 上での commit / push / PR 作成のみ。**main の working tree には絶対に直書きしない**（step 0 / 8 を遵守）
 - 個人攻撃にならないよう、Blameless で記述（"研究員エージェントが下手だった" ではなく "研究員プロンプトに観点 X が不足していた"）
 - アクションは具体に（"気をつける" ではなく "プロンプトに行を追加")
 
@@ -154,6 +185,8 @@ issue: KMD-XX
 出力先: docs/learnings/<file>
 リードタイム: <N日>
 リワーク回数: <N回>
+wiki_value: <high|medium|low>
+wiki ingest: <triggered | skipped (low) | skipped (missing frontmatter) | failed>
 
 主要な学び（3つまで）:
 - ...
@@ -162,3 +195,10 @@ issue: KMD-XX
 特に重要なアクション:
 - ...
 ```
+
+**`wiki_value` 行と `wiki ingest` 行は必ず含めること**。`wiki_value` は frontmatter と一致させる。`wiki ingest` の値は以下のいずれか:
+
+- `triggered`: `wiki_value=high|medium` で `kobaamd_update_wiki --source ... --no-pr` を起動した
+- `skipped (low)`: `wiki_value=low` のため update_wiki を起動しなかった（コスト削減）
+- `skipped (missing frontmatter)`: `wiki_value` が frontmatter に欠落していて起動を見送った
+- `failed`: 起動したが失敗した（特記事項に詳細）
