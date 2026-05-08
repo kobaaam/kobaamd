@@ -11,7 +11,9 @@ set -euo pipefail
 #   2. broken-link     — [[wikilink]] target does not exist
 #   3. stale           — `updated` older than 60 days AND newer source files exist
 #   4. section-context-missing — H2/H3 section unclear without article title
-#                        (Anthropic Haiku, mandatory unless --no-llm)
+#                        (Claude Code subagent `kobaamd_lint_section_context`,
+#                        model: haiku. Mandatory unless --no-llm. Use
+#                        --legacy-api to fall back to direct Anthropic API.)
 #   5. frontmatter     — required field missing / tag naming / Related symmetry
 #
 # Output: NDJSON to stdout, one violation per line:
@@ -31,8 +33,11 @@ set -euo pipefail
 #                    frontmatter fields. Edits files in-place.
 #   --cache <path>   Path for the section-context content_hash cache.
 #                    Default: .cache/wiki-lint.json (under repo root)
-#   --model <id>     Haiku model id (default: claude-haiku-4-5)
+#   --model <id>     Haiku model id (legacy path only; default: claude-haiku-4-5)
 #   --retries <n>    Retry count for Haiku calls (default: 3)
+#   --legacy-api     Use direct Anthropic API for rule 4 (requires
+#                    ANTHROPIC_API_KEY). Default route is the
+#                    `kobaamd_lint_section_context` Claude Code subagent.
 #   -h, --help       Show this help and exit
 
 err() { printf 'lint.sh: %s\n' "$*" >&2; }
@@ -56,8 +61,10 @@ Options:
   --no-llm         Skip rule 4 (Haiku-based section context check)
   --fix            Apply auto-fixes (tag normalization, frontmatter defaults)
   --cache <path>   Section-context cache file (default: .cache/wiki-lint.json)
-  --model <id>     Haiku model id (default: claude-haiku-4-5)
+  --model <id>     Haiku model id (legacy path only; default: claude-haiku-4-5)
   --retries <n>    Retry count for Haiku calls (default: 3)
+  --legacy-api     Use direct Anthropic API (requires ANTHROPIC_API_KEY).
+                   Default route is the kobaamd_lint_section_context subagent.
   -h, --help       Show this help
 
 Output: NDJSON on stdout (1 violation = 1 line).
@@ -72,6 +79,7 @@ do_fix=0
 cache_path=""
 model="${ANTHROPIC_HAIKU_MODEL:-claude-haiku-4-5}"
 retries=3
+legacy_api=0
 paths=()
 
 while [ "$#" -gt 0 ]; do
@@ -87,6 +95,7 @@ while [ "$#" -gt 0 ]; do
     --retries)
       [ "$#" -ge 2 ] || { usage; exit 2; }
       retries="$2"; shift 2 ;;
+    --legacy-api) legacy_api=1; shift ;;
     -h|--help) usage; exit 0 ;;
     --) shift; while [ "$#" -gt 0 ]; do paths+=("$1"); shift; done ;;
     -*) err "unknown option: $1"; usage; exit 2 ;;
@@ -142,7 +151,7 @@ if [ "${#target_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
-log "targets=${#target_files[@]} no_llm=$no_llm fix=$do_fix cache=$cache_path"
+log "targets=${#target_files[@]} no_llm=$no_llm fix=$do_fix cache=$cache_path legacy_api=$legacy_api"
 
 # --- All articles (for cross-file checks: orphan / broken-link / Related) ---
 
@@ -631,11 +640,16 @@ check_section_context() {
   local tmp
   tmp=$(mktemp)
   local rc=0
+  local extra_args=()
+  if [ "$legacy_api" -eq 1 ]; then
+    extra_args+=(--legacy-api)
+  fi
   "$SECTION_CHECK" \
     --file "$f" \
     --cache "$cache_path" \
     --model "$model" \
-    --retries "$retries" >"$tmp" 2>>/dev/stderr || rc=$?
+    --retries "$retries" \
+    "${extra_args[@]}" >"$tmp" 2>>/dev/stderr || rc=$?
   if [ "$rc" -ne 0 ]; then
     err "WARN: section-context-check failed (rc=$rc) for $f — skipping that rule"
     rm -f "$tmp"
