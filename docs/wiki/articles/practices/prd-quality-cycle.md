@@ -21,6 +21,7 @@ updated: 2026-05-08
 ## Content
 
 ### 10セクション品質バー
+<!-- llm-context: kobaamd の PRD テンプレート（`docs/prd/<KMD-XX>-<slug>.md`）が持つ 10 セクション構成のうち、`review_prd` が REQUEST_REVISION を出す代表的な不合格条件を 4 セクション分まとめた品質バー。 -->
 
 | セクション | 不合格条件 |
 |-----------|-----------|

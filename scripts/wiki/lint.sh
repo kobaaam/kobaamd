@@ -649,7 +649,7 @@ check_section_context() {
     --cache "$cache_path" \
     --model "$model" \
     --retries "$retries" \
-    "${extra_args[@]}" >"$tmp" 2>>/dev/stderr || rc=$?
+    ${extra_args[@]+"${extra_args[@]}"} >"$tmp" 2>>/dev/stderr || rc=$?
   if [ "$rc" -ne 0 ]; then
     err "WARN: section-context-check failed (rc=$rc) for $f — skipping that rule"
     rm -f "$tmp"
