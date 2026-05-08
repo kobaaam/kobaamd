@@ -27,18 +27,14 @@ Linear issue ID `KMD-XX`.
 
    PRD が過去の意思決定や運用パターンと矛盾していないかを確認する。
 
-   - `docs/wiki/index.md` を Read してカタログ確認
-   - 必ず Read する記事:
-     - `docs/wiki/articles/decisions/autonomous-pipeline-philosophy.md`（パイプラインの設計思想）
-     - `docs/wiki/articles/decisions/multi-llm-persona.md`（LLM 役割分担方針）
-   - 該当する場合に Read（PRD のスコープに応じて）:
-     - `decisions/<関連>.md`（その他過去の決定）
-     - `practices/postmortem-patterns.md`（過去の轍に再び当たろうとしていないか）
-     - `practices/security-hardening.md`（PRD の非機能要件にセキュリティ抜けがないか）
+   - PRD のスコープ（対象領域・触る予定のファイル種別）を抽出する
+   - `./scripts/wiki/ask.sh "次の PRD（タイトル: <...>、スコープ: <...>）が、過去の decisions（自律パイプライン哲学・マルチ LLM ペルソナ・その他関連）および practices（security-hardening・postmortem-patterns・該当領域）と矛盾していないかチェックしてください。矛盾候補・参照漏れ候補・新規 ADR 候補をそれぞれ挙げ、article path を必ず付けてください。"` を実行する
+   - ask.sh の出力に列挙された article path のうち、矛盾の根拠確認が必要な記事だけを **0〜2 件** Read で精読する
    - チェック観点:
      1. **decisions との矛盾**: PRD が過去の意思決定（例: "MVVM 境界を維持する" "AI 生成コードは Codex 経由のみ" "シェルクォートは必ず明示" 等）と矛盾していないか
      2. **practices の参照漏れ**: 該当 wiki 記事に明記された注意点が PRD の Section 4（非機能）/ Section 6（AC）/ Section 8（リスク）に反映されているか
      3. **新規 decision の必要性**: PRD が wiki にない新しい設計判断を含むなら、Section 1 で「これは新規決定であり ADR 候補」と明示されているか
+   - ask.sh の指摘 + 精読の結果を、後段ステップ 5 の観点マトリクスに反映する
    - 矛盾を発見したら、観点マトリクス（ステップ 5）の「セクション 1（背景・目的）」または「セクション 8（リスク）」に `concern` 以上で記録する
    - wiki に該当記事が 0 件なら、Final Report に "wiki: no relevant articles" と明記して進む
 

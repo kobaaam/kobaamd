@@ -39,13 +39,13 @@ A Linear issue identifier (e.g., `KMD-12`) is provided as the first argument. If
 
    過去の知見を再発掘せず、過去の決定や轍を踏まないために LLM Wiki を必ず参照する。
 
-   - `docs/wiki/index.md` を Read してカタログを把握
-   - issue タイトル・description のキーワード（機能名・触る予定のファイル名など）を抽出し、`Grep -r 'keyword' docs/wiki/articles/` で関連記事を探す
-   - 以下の優先度で **2〜4 記事** を選んで Read:
-     1. `practices/postmortem-patterns.md`（常に読む。過去の轍 13 パターンが入っている）
-     2. `practices/<該当領域>.md`（security / sparkle-release / prd-quality-cycle / concern-carve-out など、該当する場合のみ）
-     3. `decisions/<関連>.md`（過去の意思決定との整合確認用）
-     4. `components/<該当>.md`（実装領域のコンポーネント知識、ある場合のみ）
+   - issue タイトル・description からキーワード（機能名・触る予定のファイル名・領域名）を抽出する
+   - まず `./scripts/wiki/ask.sh "<観点質問>"` を実行して、wiki 全件から relevant な観点と article path を抽出する
+   - 実行時は stderr の `ask.sh usage: input=… output=… cache_create=… cache_read=…` を観測し、同一サイクル内で `cache_read` が増えていることを確認する
+   - 観点質問の例:
+     - `KMD-XX (タイトル: ...) の PRD を作る前に踏まえるべき過去の決定・轍・実装パターンを practices/postmortem-patterns・関連 decisions・関連 components から抽出してください。article path も付与してください。`
+     - `<該当領域> に関わる既存の設計判断と運用上の禁則を全て挙げてください。article path 必須。`
+   - ask.sh の出力に列挙された `<!-- file: ... -->` パスのうち、深く読む必要がある記事だけを **0〜2 件** Read で精読する
    - 読んだ wiki 記事の内容を、PRD の以下セクションに反映する:
      - Section 1（背景・目的）: 関連 decisions の文脈を踏まえる
      - Section 6（受け入れ条件）: practices/postmortem-patterns の該当パターンを AC として組み込む（例: "Info.plist 直書きしない" のような過去の禁則）
