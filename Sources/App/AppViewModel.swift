@@ -61,6 +61,7 @@ final class AppViewModel {
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
     let tagsViewModel = TagsViewModel()
     let aiChatViewModel = AIChatViewModel()
+    let searchIndexService = WikiIndexService()
     var isChatSidebarVisible: Bool = false
 
     // MARK: - Template Picker
@@ -110,6 +111,7 @@ final class AppViewModel {
         // Folder スコープの対象は「最初に開いたワークスペースフォルダ」（PRD §2）
         todoViewModel.updateFolderRoot(folderURLs.first)
         tagsViewModel.updateWorkspaceRoots(folderURLs)
+        searchIndexService.setRoot(folderURLs.first)
     }
 
     @MainActor
