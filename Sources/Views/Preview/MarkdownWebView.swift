@@ -37,7 +37,7 @@ struct MarkdownWebView: NSViewRepresentable {
             coord.pendingScrollRatio = scrollRatio
             injectBody(bodyHTML, into: webView, scrollRatio: scrollRatio)
         } else {
-            syncScroll(webView: webView, ratio: scrollRatio)
+            coord.scheduleSyncScroll(webView: webView, ratio: scrollRatio)
         }
     }
 
@@ -73,19 +73,18 @@ struct MarkdownWebView: NSViewRepresentable {
         ) { _ in }
     }
 
-    private func syncScroll(webView: WKWebView, ratio: Double) {
-        let js = "window.scrollTo(0, \(ratio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));"
-        webView.evaluateJavaScript(js, completionHandler: nil)
-    }
-
-    class Coordinator: NSObject, WKNavigationDelegate {
+    @MainActor class Coordinator: NSObject, WKNavigationDelegate {
         var isLoaded = false
         var lastShellHTML: String = ""
         var lastBodyHTML: String = ""
         var pendingScrollRatio: Double = 0
+        var lastSyncAt: ContinuousClock.Instant = .now
+        var pendingSyncRatio: Double? = nil
+        var syncTask: Task<Void, Never>? = nil
         weak var webView: WKWebView?
         private var blockObserver: Any?
         private var pdfObserver: Any?
+        private let syncClock = ContinuousClock()
 
         override init() {
             super.init()
@@ -94,30 +93,67 @@ struct MarkdownWebView: NSViewRepresentable {
                 object: nil,
                 queue: .main
             ) { [weak self] note in
-                guard let self,
-                      let line = note.userInfo?["sourceLine"] as? Int,
-                      let wv = self.webView else { return }
-                self.highlightBySourceLine(line, in: wv)
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let line = note.userInfo?["sourceLine"] as? Int,
+                          let wv = self.webView else { return }
+                    self.highlightBySourceLine(line, in: wv)
+                }
             }
             pdfObserver = NotificationCenter.default.addObserver(
                 forName: .exportPDFWithURL,
                 object: nil,
                 queue: .main
             ) { [weak self] note in
-                guard let self,
-                      let url = note.object as? URL else { return }
-                self.exportPDF(to: url) { result in
-                    NotificationCenter.default.post(
-                        name: .exportPDFCompleted,
-                        object: result as AnyObject
-                    )
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let url = note.object as? URL else { return }
+                    self.exportPDF(to: url) { result in
+                        NotificationCenter.default.post(
+                            name: .exportPDFCompleted,
+                            object: result as AnyObject
+                        )
+                    }
                 }
             }
         }
 
         deinit {
+            syncTask?.cancel()
             if let blockObserver { NotificationCenter.default.removeObserver(blockObserver) }
             if let pdfObserver { NotificationCenter.default.removeObserver(pdfObserver) }
+        }
+
+        func scheduleSyncScroll(webView: WKWebView, ratio: Double) {
+            let now = syncClock.now
+            let frameInterval: Duration = .milliseconds(16)
+            let elapsed = lastSyncAt.duration(to: now)
+
+            if elapsed >= frameInterval {
+                flushSyncScroll(webView: webView, ratio: ratio, at: now)
+                return
+            }
+
+            pendingSyncRatio = ratio
+            guard syncTask == nil else { return }
+
+            let delay = frameInterval - elapsed
+            syncTask = Task { [weak self, weak webView] in
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled,
+                      let self,
+                      let webView,
+                      let ratio = self.pendingSyncRatio else { return }
+                self.pendingSyncRatio = nil
+                self.syncTask = nil
+                self.flushSyncScroll(webView: webView, ratio: ratio, at: self.syncClock.now)
+            }
+        }
+
+        private func flushSyncScroll(webView: WKWebView, ratio: Double, at instant: ContinuousClock.Instant) {
+            lastSyncAt = instant
+            let js = "window.scrollTo(0, \(ratio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));"
+            webView.evaluateJavaScript(js, completionHandler: nil)
         }
 
         func exportPDF(to url: URL, completion: @escaping (Result<Void, Error>) -> Void) {

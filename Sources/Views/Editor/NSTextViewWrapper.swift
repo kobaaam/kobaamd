@@ -144,7 +144,12 @@ struct EditorObserver: NSViewRepresentable {
                 let maxScroll = max(docHeight - visHeight, 1)
                 let r = sv.contentView.bounds.origin.y / maxScroll
                 ratio.wrappedValue = max(0, min(1, r))
-                if let self, let textView = self.textViewRef {
+                if let self,
+                   let textView = self.textViewRef,
+                   let appViewModel = self.appViewModel,
+                   MainActor.assumeIsolated({
+                       appViewModel.isAIInlinePromptVisible || appViewModel.isAIGenerating || !appViewModel.pendingAIText.isEmpty
+                   }) {
                     MainActor.assumeIsolated {
                         self.updateAIOverlayPosition(in: textView)
                     }
