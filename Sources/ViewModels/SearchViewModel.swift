@@ -5,7 +5,7 @@ struct SearchResult: Identifiable {
     let fileURL: URL
     let fileName: String
     let matchLine: String
-    let lineNumber: Int
+    let lineNumber: Int?
 }
 
 @Observable
@@ -42,8 +42,10 @@ final class SearchViewModel {
                         id: hit.id,
                         fileURL: hit.fileURL,
                         fileName: hit.fileName,
-                        matchLine: hit.snippet,
-                        lineNumber: 1
+                        matchLine: hit.snippet
+                            .replacingOccurrences(of: "<<", with: "")
+                            .replacingOccurrences(of: ">>", with: ""),
+                        lineNumber: nil
                     )
                 }
             } else {
