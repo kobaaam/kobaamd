@@ -1,11 +1,14 @@
 import SwiftUI
 import WebKit
 
+/// `interval` 間隔の **throttle**（leading + trailing edge）。
+///
+/// 連続スクロール中も `interval` ごとに flush するため preview 側がスムーズに追従する。
+/// 名前を `Debouncer` から `Throttle` に変更したのは、debounce（最後の入力から N ms 静止
+/// するまで遅延）ではなく throttle（N ms ごとに最新値を出力）が実装の正しい意味だから。
+/// init 引数名 `delay` は呼び出し側互換のため残してある。
 @MainActor
-final class ScrollSyncDebouncer {
-    /// `interval` 間隔の throttle (leading + trailing)。
-    /// 連続スクロール中も `interval` ごとに flush するため、preview 側がスムーズに追従する。
-    /// `delay` は後方互換用エイリアス（コンストラクタ引数として保持）。
+final class ScrollSyncThrottle {
     private let interval: Duration
     private let onFlush: @MainActor (Double, String) -> Void
     private var pendingRatio: Double?
@@ -34,8 +37,14 @@ final class ScrollSyncDebouncer {
                 let interval = interval
                 trailingTask = Task { [weak self] in
                     try? await Task.sleep(for: interval)
-                    guard !Task.isCancelled else { return }
-                    await MainActor.run { self?.flushPending() }
+                    if Task.isCancelled { return }
+                    await MainActor.run {
+                        // sleep 後と MainActor スイッチ後の double-check で
+                        // schedule(...) 中の cancel と interleave しても誤発火しないように。
+                        guard let self else { return }
+                        if Task.isCancelled { return }
+                        self.flushPending()
+                    }
                 }
             }
             return
@@ -150,7 +159,7 @@ struct MarkdownWebView: NSViewRepresentable {
         private var previewScrollObserver: Any?
         private var blockObserver: Any?
         private var pdfObserver: Any?
-        private lazy var scrollSyncDebouncer = ScrollSyncDebouncer { [weak self] ratio, source in
+        private lazy var scrollSyncThrottle = ScrollSyncThrottle { [weak self] ratio, source in
             self?.flushSyncScroll(ratio: ratio, source: source)
         }
 
@@ -209,7 +218,7 @@ struct MarkdownWebView: NSViewRepresentable {
         }
 
         func scheduleSyncScroll(ratio: Double, source: String) {
-            scrollSyncDebouncer.schedule(ratio: ratio, source: source)
+            scrollSyncThrottle.schedule(ratio: ratio, source: source)
         }
 
         private func flushSyncScroll(ratio: Double, source: String) {
