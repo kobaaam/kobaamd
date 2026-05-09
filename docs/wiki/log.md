@@ -102,3 +102,25 @@ KMD-153（`section-context-check.sh` の stdout/stderr 分離 17 行追加 / 2 �
 - 注記: 「観測機構変更時の smoke test」と「review_security のゲート観点選択」は新規パターンとして wiki 化に値したが、postmortem-patterns.md の §パターン群に追加するだけで足りたため新規記事は作成せず。shell script 小規模 fix の SSOT は role-dispatch §4 に置き、postmortem-patterns パターン 20 はそこを参照する形にした
 - lint: 未実行（Final Report で警告として申告）
 - ingest history: 未記録（lint.sh / ingest_history.sh の状態に依存）
+
+## [2026-05-09] Wiki KB2 lint zero（KMD-50）
+
+KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations を 13 → 0 にした。新規記事 1 / Related 双方向化 5 / index 更新 / log 追記 の構成。
+
+- sources:
+  - .claude/commands/kobaamd_carve_concerns.md
+  - docs/wiki/articles/practices/postmortem-patterns.md（パターン 7 / 13 / 18 / 19 / 20）
+  - docs/wiki/articles/practices/role-dispatch.md（§3, §10）
+  - docs/wiki/articles/decisions/autonomous-pipeline-philosophy.md（APPROVE 直行 4 条件）
+- new articles:
+  - articles/practices/concern-carve-out.md（concern 3 分類 + auto-carveable 3 条件 + APPROVE 直行 4 条件 + 運用上の罠の SSOT）
+- updated articles（Related 双方向化のみ、本文は無変更）:
+  - articles/decisions/autonomous-pipeline-philosophy.md（[[external-teams]], [[team-structure]] 追加）
+  - articles/decisions/multi-llm-persona.md（[[role-dispatch]], [[team-structure]] 追加）
+  - articles/practices/wiki-reference-policy.md（[[external-teams]], [[role-dispatch]], [[team-structure]] 追加）
+  - articles/practices/sparkle-release.md（[[external-teams]] 追加）
+  - articles/practices/security-hardening.md（[[external-teams]] 追加）
+- skipped sources（理由付き）: なし
+- 注記: 本タスクは broken-link 4 件と related-asymmetric 9 件のうち、broken-link を新規記事 1 本で一括解消し、related-asymmetric を双方向化で解消した。既存記事の本文（Summary / Content / Sources）には触れていない
+- lint: pass を確認すること（本作業の AC）
+- ingest history: 別タスクとして扱う（本タスクは KB2 残作業に焦点）
