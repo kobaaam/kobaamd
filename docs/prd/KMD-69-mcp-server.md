@@ -31,8 +31,8 @@ Clearly が `clearly mcp` で vault を外部 AI (Claude Desktop / Cursor) に�
   5. `get_backlinks(path: string)` — linked + unlinked mentions（`[{sourcePath, line, snippet, kind}]`）
   6. `get_tags(tag?: string)` — `tag` 未指定: 全タグ + frequency / 指定時: そのタグを持つノート path のリスト
 - 各ツールの `inputSchema` を JSON Schema として宣言（`tools/list` レスポンスに含める）
-- `protocolVersion: "2025-06-18"` 以降を返す（互換のため `2024-11-05` も許容）
-- vault ルート外のファイルアクセスを禁止（path traversal 対策: `..` / 絶対パス検証）
+- **protocolVersion ネゴシエーション** (2026-05-09 KMD-69 rework で確定): `initialize` リクエストの `params.protocolVersion` を読み取り、サーバ側がサポートする `["2025-06-18", "2024-11-05"]` のうち **クライアントが要求したバージョンと一致するもの** を返す。一致しない場合は最新サポート (`2025-06-18`) を返す。`params.protocolVersion` 不在の場合も最新サポートを返す。これにより Claude Desktop の古いビルド (2024-11-05) と新しいビルド (2025-06-18) の両方と互換になる
+- vault ルート外のファイルアクセスを禁止（path traversal 対策: `..` / 絶対パス検証 + symlink 解決）
 
 ### オプション要件
 - 起動時のログを `stderr` に出力（`stdout` は MCP プロトコル専用）
@@ -65,9 +65,21 @@ CLI なので UI なし。クライアント側の `mcp.json` 設定例を `docs
 
 - [ ] `kobaamd mcp <vault-root>` で stdio MCP server が起動する（無引数 GUI 起動に影響なし）
 - [ ] `initialize` リクエストに `serverInfo` / `capabilities.tools` を含む応答を返す
+- [ ] **`initialize.params.protocolVersion` が `2024-11-05` の場合 `2024-11-05` を返す**（バージョンネゴシエーション、KMD-69 rework）
+- [ ] **`initialize.params.protocolVersion` が `2025-06-18` の場合 `2025-06-18` を返す**
+- [ ] **`initialize.params.protocolVersion` が未対応バージョン or 不在の場合 `2025-06-18` (最新) を返す**
 - [ ] `tools/list` で 6 ツールが JSON Schema 付きで返る
 - [ ] `tools/call` で各ツールが期待値を返す（最低 search_notes / read_note / list_notes は手動 echo テストで動作確認）
+- [ ] **`search_notes` が SQLite FTS5 + BM25 ランクで検索する**（KMD-69 rework: CLI 専用 SQLite アクセス層 `WikiSearchIndex` を実装。`@MainActor` の `WikiIndexService` とは独立）
+  - 結果は `[{path, title, snippet, rank}]` 形式
+  - インデックスが未構築なら `kobaamd mcp` 起動時に自動構築
+  - SQLite が利用不能な場合（権限エラー等）はファイル走査フォールバックではなくエラーで応答
 - [ ] vault ルート外への path traversal が拒否される（エラーで応答）
+- [ ] **回帰テスト: symlink で vault 外を指す candidate を `VaultPath.resolve` が `outsideVault` で拒否する**（KMD-69 rework）
+- [ ] **回帰テスト: `listMarkdownFiles` が vault 内 symlink を skip する**
+- [ ] **回帰テスト: `read_note` の `isRegularFileKey` チェックが directory / FIFO / symlink を拒否する**
+- [ ] **回帰テスト: protocolVersion ネゴシエーションが期待通り動作する**
+- [ ] **回帰テスト: `search_notes` が SQLite FTS5 経由で BM25 ランクを返す**
 - [ ] `swift build` が成功
 - [ ] `swift test` で既存テストが pass
 - [ ] 新規ユニットテスト: 各ツールの引数バリデーション + path traversal 防止
@@ -94,7 +106,8 @@ CLI なので UI なし。クライアント側の `mcp.json` 設定例を `docs
 | `Sources/CLI/MCPProtocol.swift` | 追加 | JSON-RPC 2.0 リクエスト/レスポンス型 (Codable + JSON Schema 構造体) |
 | `Sources/CLI/Tools/MCPToolRegistry.swift` | 追加 | 6 ツールの登録・スキーマ定義 |
 | `Sources/CLI/Tools/MCPToolSupport.swift` | 追加（実装時に必要だった共通ヘルパー） | parseArguments / requireString / listMarkdownFiles / extractHeadings / textContent / encodeJSONString。各 Tool 間の重複を吸収するために実装中に追加 |
-| `Sources/CLI/Tools/SearchNotesTool.swift` | 追加 | SQLite WikiIndexService をシン化したスタンドアロン検索 |
+| `Sources/CLI/Tools/SearchNotesTool.swift` | 追加 | **CLI 専用 `WikiSearchIndex` を呼んで SQLite FTS5 + BM25 検索を行う**（KMD-69 rework で再実装） |
+| `Sources/CLI/WikiSearchIndex.swift` | 追加（rework） | CLI 専用の SQLite FTS5 アクセス層。`@MainActor` 制約のない `final class`。`WikiIndexService` の nonisolated static ロジックを実質的に再利用するが GUI コードへの結合なし |
 | `Sources/CLI/Tools/ReadNoteTool.swift` | 追加 | frontmatter + body + headings 統合 |
 | `Sources/CLI/Tools/ListNotesTool.swift` | 追加 | vault 内 Markdown 列挙 |
 | `Sources/CLI/Tools/GetHeadingsTool.swift` | 追加 | 既存 OutlineParser ロジック流用（簡易版を CLI 内に）|
@@ -110,7 +123,7 @@ CLI なので UI なし。クライアント側の `mcp.json` 設定例を `docs
 
 - `Sources/App/kobaamdApp.swift` を変更するが、**SwiftUI Scene 構造 (WindowGroup / Settings / Help) は一切変更しない**。`@main` 属性のみ移動して `KobaamdEntryPoint` から `kobaamdApp().main()` 相当を呼ぶ
 - 既存 ViewModel / Service / View ファイルには一切手を入れない（CLI 専用ロジックは `Sources/CLI/` 配下に閉じる）
-- `BacklinksScanner` は @MainActor 不要の Sendable struct なので CLI からも呼べる。`WikiIndexService` は `@MainActor` クラスなので CLI からは呼ばず、CLI 用に SQLite アクセスを別途実装する（コードを最小限に複製、共通テンプレ抽出は将来）
+- `BacklinksScanner` は @MainActor 不要の Sendable struct なので CLI からも呼べる。`WikiIndexService` は `@MainActor` クラスなので CLI からは呼ばず、CLI 用に SQLite アクセス層 `WikiSearchIndex` を別途実装する（コードを最小限に複製、共通テンプレ抽出は将来）。**KMD-69 rework で実装** — `WikiIndexService` の private nonisolated static ロジックは将来共通モジュール化候補だが、本 PR では CLI 側に独立クラスとして再実装する（GUI 側に変更を入れず、blast radius を CLI 内に閉じるため）
 - 既存テスト (`Tests/*.swift`) は触らない
 
 **変更してはいけない箇所**:
