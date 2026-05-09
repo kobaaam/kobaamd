@@ -10,11 +10,11 @@ actor MCPServer {
     }
 
     func run() async {
-        FileHandle.standardError.write(Data("kobaamd mcp server starting (vault=\(vaultRoot.path))\n".utf8))
+        FileHandle.standardError.write(Data("kobaamd mcp server starting (vault=\(vaultRoot.lastPathComponent))\n".utf8))
 
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: vaultRoot.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            FileHandle.standardError.write(Data("invalid vault root: \(vaultRoot.path)\n".utf8))
+            FileHandle.standardError.write(Data("invalid vault root: \(vaultRoot.lastPathComponent)\n".utf8))
             return
         }
 

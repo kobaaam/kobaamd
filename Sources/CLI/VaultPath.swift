@@ -14,13 +14,14 @@ struct VaultPath: Sendable {
             throw Error.invalid
         }
 
-        let root = vaultRoot.standardizedFileURL
+        // Resolve symlinks in vault root to get canonical path
+        let root = vaultRoot.standardizedFileURL.resolvingSymlinksInPath()
         let candidate: URL
 
         if trimmed.hasPrefix("/") {
-            candidate = URL(fileURLWithPath: trimmed).standardizedFileURL
+            candidate = URL(fileURLWithPath: trimmed).standardizedFileURL.resolvingSymlinksInPath()
         } else {
-            candidate = root.appendingPathComponent(trimmed).standardizedFileURL
+            candidate = root.appendingPathComponent(trimmed).standardizedFileURL.resolvingSymlinksInPath()
         }
 
         let rootPath = root.path

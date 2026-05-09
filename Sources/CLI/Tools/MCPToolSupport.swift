@@ -60,16 +60,21 @@ enum MCPToolSupport {
 
         guard let enumerator = FileManager.default.enumerator(
             at: baseURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles]
         ) else {
             return []
         }
 
+        let vaultPath = VaultPath(vaultRoot: root)
         var files: [URL] = []
         for case let fileURL as URL in enumerator {
-            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            // Skip symlinks to avoid traversal outside vault
+            guard values?.isSymbolicLink != true else { continue }
             guard values?.isRegularFile == true else { continue }
+            // Re-validate each path through VaultPath
+            guard (try? vaultPath.resolve(fileURL.path)) != nil else { continue }
             guard markdownExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
             files.append(fileURL)
         }

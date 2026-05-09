@@ -28,6 +28,11 @@ struct ReadNoteTool {
         let object = try MCPToolSupport.parseArguments(args)
         let path = try MCPToolSupport.requiredString("path", from: object)
         let resolvedURL = try VaultPath(vaultRoot: vaultRoot).resolve(path)
+        // Ensure path is a regular file (reject device files, FIFOs, symlinks, etc.)
+        let resourceValues = try? resolvedURL.resourceValues(forKeys: [.isRegularFileKey])
+        guard resourceValues?.isRegularFile == true else {
+            throw MCPToolError.invalidArguments("Invalid params: path is not a regular file")
+        }
         let note = try MCPToolSupport.loadNote(at: resolvedURL)
 
         let headings = MCPToolSupport.extractHeadings(from: note.body, lineOffset: note.bodyStartLine - 1)

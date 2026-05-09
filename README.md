@@ -32,8 +32,6 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
 - **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
-- **Frontmatter editor / Frontmatter エディタ** — Structured YAML/TOML frontmatter recognized and editable via a dedicated inline panel / YAML/TOML の frontmatter を認識し、専用インラインパネルで編集可能
-- **Backlinks pane / Backlinks ペイン** — See which files link to or mention the current file; convert unlinked mentions to wikilinks / 現在のファイルを参照しているファイルを一覧表示し、unlinked mention を wikilink に変換可能
 
 ---
 
@@ -91,17 +89,17 @@ kobaamd/
 ├── Sources/
 │   ├── App/                    # Entry point, AppViewModel, commands
 │   │                           # エントリポイント・グローバル状態・コマンド
-│   ├── Models/                 # FileNode, EditorTab, DocumentTemplate, ColorTheme, Frontmatter, Backlink
+│   ├── Models/                 # FileNode, EditorTab, DocumentTemplate, ColorTheme
 │   ├── Views/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
-│   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView, BacklinksView
-│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView, FrontmatterEditor
+│   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView
+│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView
 │   │   ├── Diff/                  # DiffView, rendered Markdown diff (WKWebView-based)
 │   │   ├── Help/                  # HelpWindowView, HelpContentView (in-app help)
 │   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
 │   │   └── AI/                    # AI assist panel, AIChatView (multi-turn chat)
-│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel, DiffViewModel, FrontmatterViewModel, BacklinksViewModel
-│   ├── Services/               # FileService, MarkdownService, AIService, GitService, BacklinksScanner, BacklinkContextChecker, BacklinkContextCache
+│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel, DiffViewModel
+│   ├── Services/               # FileService, MarkdownService, AIService, GitService
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/ (AI presets)
 ├── scripts/
 │   └── post-build.sh           # Bundles binary + resources → .app

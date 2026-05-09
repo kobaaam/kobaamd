@@ -3,7 +3,7 @@ import Foundation
 struct GetBacklinksTool {
     static let description: JSONValue = .object([
         "name": .string("get_backlinks"),
-        "description": .string("Return linked and unlinked mentions of a note across the vault."),
+        "description": .string("Return linked and unlinked mentions of a note across the vault. Each result includes kind: \"linked\" or \"unlinked\"."),
         "inputSchema": .object([
             "type": .string("object"),
             "properties": .object([
@@ -22,35 +22,31 @@ struct GetBacklinksTool {
         let targetURL = try VaultPath(vaultRoot: vaultRoot).resolve(path)
         let files = try MCPToolSupport.listMarkdownFiles(in: vaultRoot)
 
-        var linked: [JSONValue] = []
-        var unlinked: [JSONValue] = []
+        var results: [JSONValue] = []
 
         for sourceURL in files {
             let content = try String(contentsOf: sourceURL, encoding: .utf8)
             let scanned = BacklinksScanner.scan(sourceURL: sourceURL, sourceContent: content, targetURL: targetURL)
 
-            linked.append(contentsOf: scanned.linked.map {
+            results.append(contentsOf: scanned.linked.map {
                 .object([
                     "sourcePath": .string(MCPToolSupport.relativePath(for: $0.sourceURL, root: vaultRoot)),
                     "line": .int($0.line),
-                    "snippet": .string($0.snippet)
+                    "snippet": .string($0.snippet),
+                    "kind": .string("linked")
                 ])
             })
 
-            unlinked.append(contentsOf: scanned.unlinked.map {
+            results.append(contentsOf: scanned.unlinked.map {
                 .object([
                     "sourcePath": .string(MCPToolSupport.relativePath(for: $0.sourceURL, root: vaultRoot)),
                     "line": .int($0.line),
-                    "snippet": .string($0.snippet)
+                    "snippet": .string($0.snippet),
+                    "kind": .string("unlinked")
                 ])
             })
         }
 
-        let payload: JSONValue = .object([
-            "linked": .array(linked),
-            "unlinked": .array(unlinked)
-        ])
-
-        return .array([MCPToolSupport.textContent(try MCPToolSupport.encodeJSONString(payload))])
+        return .array([MCPToolSupport.textContent(try MCPToolSupport.encodeJSONString(.array(results)))])
     }
 }
