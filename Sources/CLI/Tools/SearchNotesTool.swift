@@ -3,13 +3,13 @@ import Foundation
 struct SearchNotesTool {
     static let description: JSONValue = .object([
         "name": .string("search_notes"),
-        "description": .string("Search Markdown notes in the vault and return matching lines."),
+        "description": .string("Search Markdown notes in the vault with SQLite FTS5 and BM25 ranking."),
         "inputSchema": .object([
             "type": .string("object"),
             "properties": .object([
                 "query": .object([
                     "type": .string("string"),
-                    "description": .string("Case-insensitive text query.")
+                    "description": .string("Full-text query.")
                 ]),
                 "limit": .object([
                     "type": .string("integer"),
@@ -29,32 +29,22 @@ struct SearchNotesTool {
         }
 
         let limit = min(requestedLimit, 100)
-        let files = try MCPToolSupport.listMarkdownFiles(in: vaultRoot)
-        var results: [JSONValue] = []
-        results.reserveCapacity(limit)
-
-        for fileURL in files {
-            if results.count >= limit { break }
-
-            let note = try MCPToolSupport.loadNote(at: fileURL)
-            let lines = note.body.components(separatedBy: .newlines)
-
-            for (index, line) in lines.enumerated() {
-                if results.count >= limit { break }
-                guard line.range(of: query, options: .caseInsensitive) != nil else { continue }
-
-                results.append(
-                    .object([
-                        "path": .string(MCPToolSupport.relativePath(for: fileURL, root: vaultRoot)),
-                        "title": .string(note.title),
-                        "snippetLine": .string(MCPToolSupport.makeSnippet(from: line)),
-                        "lineNumber": .int(index + note.bodyStartLine)
-                    ])
-                )
+        do {
+            let index = try WikiSearchIndex(vaultRoot: vaultRoot)
+            try index.rebuildIfNeeded()
+            let hits = try index.search(query: query, limit: limit)
+            let results = hits.map { hit in
+                JSONValue.object([
+                    "path": .string(hit.path),
+                    "title": .string(hit.title),
+                    "snippet": .string(hit.snippet),
+                    "rank": .double(hit.bm25Rank)
+                ])
             }
+            let payload = try MCPToolSupport.encodeJSONString(.array(results))
+            return .array([MCPToolSupport.textContent(payload)])
+        } catch {
+            throw MCPToolError.invalidArguments("search index unavailable: \(error.localizedDescription)")
         }
-
-        let payload = try MCPToolSupport.encodeJSONString(.array(results))
-        return .array([MCPToolSupport.textContent(payload)])
     }
 }

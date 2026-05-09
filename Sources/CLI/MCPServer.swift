@@ -1,6 +1,9 @@
 import Foundation
 
 actor MCPServer {
+    static let supportedProtocolVersions = ["2025-06-18", "2024-11-05"]
+    static let latestProtocolVersion = "2025-06-18"
+
     let vaultRoot: URL
     let registry: MCPToolRegistry
 
@@ -65,8 +68,16 @@ actor MCPServer {
 
         switch request.method {
         case "initialize":
+            let requestedProtocolVersion: String?
+            if case let .object(params) = request.params ?? .null,
+               case let .string(version) = params["protocolVersion"] ?? .null {
+                requestedProtocolVersion = version
+            } else {
+                requestedProtocolVersion = nil
+            }
+
             let result: JSONValue = .object([
-                "protocolVersion": .string("2025-06-18"),
+                "protocolVersion": .string(Self.negotiateProtocolVersion(requested: requestedProtocolVersion)),
                 "capabilities": .object([
                     "tools": .object([:])
                 ]),
@@ -156,5 +167,9 @@ actor MCPServer {
         guard let data = try? encoder.encode(response) else { return }
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
+    static func negotiateProtocolVersion(requested: String?) -> String {
+        (requested.flatMap { supportedProtocolVersions.contains($0) ? $0 : nil }) ?? latestProtocolVersion
     }
 }

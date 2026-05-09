@@ -69,7 +69,11 @@ enum MCPToolSupport {
         let vaultPath = VaultPath(vaultRoot: root)
         var files: [URL] = []
         for case let fileURL as URL in enumerator {
-            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey])
+            if values?.isSymbolicLink == true, values?.isDirectory == true {
+                enumerator.skipDescendants()
+                continue
+            }
             // Skip symlinks to avoid traversal outside vault
             guard values?.isSymbolicLink != true else { continue }
             guard values?.isRegularFile == true else { continue }
