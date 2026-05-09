@@ -16,9 +16,10 @@ struct PreviewView: View {
                 ZStack {
                     if isReady {
                         MarkdownWebView(
+                            appViewModel: appViewModel,
                             shellHTML: previewViewModel.shellHTML,
-                            bodyHTML: previewViewModel.bodyHTML,
-                            scrollRatio: appViewModel.previewScrollRatio
+                            shellVersion: previewViewModel.shellVersion,
+                            bodyHTML: previewViewModel.bodyHTML
                         )
                     } else {
                         Color.kobaSurface
@@ -32,6 +33,8 @@ struct PreviewView: View {
                                     .progressViewStyle(.circular)
                                     .scaleEffect(0.7)
                                     .padding(10)
+                                    .onAppear { PerfLogger.event("ProgressView(Preview).visible", "isRendering=\(previewViewModel.isRendering) hasFirst=\(hasReceivedFirstRender)") }
+                                    .onDisappear { PerfLogger.event("ProgressView(Preview).hidden", "isRendering=\(previewViewModel.isRendering) hasFirst=\(hasReceivedFirstRender)") }
                             }
                         }
                     }
@@ -39,10 +42,20 @@ struct PreviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: appViewModel.editorText) { _, newValue in
+        .onChange(of: appViewModel.editorText) { oldValue, newValue in
+            PerfLogger.event("PreviewView.editorTextChanged", "old=\(oldValue.count) new=\(newValue.count) isReady=\(isReady) hasFirst=\(hasReceivedFirstRender)")
             guard !isD2File else { return }
             if !isReady && !newValue.isEmpty { isReady = true }
             previewViewModel.update(text: newValue, viewerMode: appViewModel.previewMode == .viewer)
+        }
+        .onChange(of: appViewModel.selectedFileURL) { _, newURL in
+            // ファイル切替直後は debounce を飛ばして即時 render（preview の stale 表示回避）
+            PerfLogger.event("PreviewView.selectedFileURLChanged", "url=\(newURL?.lastPathComponent ?? "nil")")
+            guard !isD2File else { return }
+            if !appViewModel.editorText.isEmpty {
+                isReady = true
+                previewViewModel.updateImmediate(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+            }
         }
         .onChange(of: appViewModel.previewMode) { _, _ in
             guard !isD2File else { return }
@@ -53,11 +66,13 @@ struct PreviewView: View {
             previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: previewViewModel.bodyHTML) { _, newValue in
+            PerfLogger.event("PreviewView.bodyHTMLChanged", "newLen=\(newValue.count) hasFirst=\(hasReceivedFirstRender)")
             if !newValue.isEmpty {
                 hasReceivedFirstRender = true
             }
         }
         .onAppear {
+            PerfLogger.event("PreviewView.onAppear", "isD2=\(isD2File) hasFirst=\(hasReceivedFirstRender) textLen=\(appViewModel.editorText.count)")
             guard !isD2File else { return }
             if !appViewModel.editorText.isEmpty {
                 isReady = true

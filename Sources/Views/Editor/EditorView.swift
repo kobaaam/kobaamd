@@ -96,7 +96,7 @@ struct EditorView: View {
             }
         }
         .onChange(of: scrollRatio) { _, r in
-            appViewModel.previewScrollRatio = r
+            appViewModel.setPreviewScrollRatio(r, source: "EditorView.onChange")
         }
         .onChange(of: vm.editorText) { _, newValue in
             appViewModel.outlineViewModel.update(text: newValue)

@@ -15,6 +15,13 @@ final class BacklinksViewModel {
     private var refreshTask: Task<Void, Never>? = nil
     private var currentTargetURL: URL? = nil
 
+    // ワークスペース内ファイル一覧のキャッシュ。folder set が変わらない限り再列挙を抑止する。
+    // FileManager.enumerator は 9000 ファイル規模で 1.5 秒以上かかるためファイル切替の度に走らせない。
+    @ObservationIgnored
+    private static var fileListCache: (folderKey: String, urls: [URL])? = nil
+    @ObservationIgnored
+    private static let fileListCacheLock = NSLock()
+
     init(
         checker: BacklinkContextCheckerProtocol = BacklinkContextChecker(),
         cache: BacklinkContextCache = BacklinkContextCache()
@@ -24,23 +31,41 @@ final class BacklinksViewModel {
     }
 
     func refresh(currentURL: URL?, workspaceFolders: [URL]) {
+        PerfLogger.event("Backlinks.refresh", "url=\(currentURL?.lastPathComponent ?? "nil") folders=\(workspaceFolders.count)")
         refreshTask?.cancel()
-        isLoading = true
+        // isLoading は 200ms 以上かかる場合のみ立てる（短時間完了の flash を抑止）。
+        // ファイル切替直後の "loading" 体感を消すためのキー変更。
+        let loadingFlashTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                self.isLoading = true
+            }
+        }
 
         let checker = self.checker
         let cache = self.cache
+        PerfLogger.begin("Backlinks.APIKeyStore.load")
         let hasKey = {
             guard let key = APIKeyStore.load(for: .anthropic) else { return false }
             return !key.isEmpty
         }()
+        PerfLogger.end("Backlinks.APIKeyStore.load")
         currentTargetURL = currentURL
         hasAnthropicKey = hasKey
 
         refreshTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
+            // 800ms 待機: ファイル切替直後はエディタ・プレビューのスクロール／編集体験を優先。
+            // この間に他の操作で再度 refresh が走れば cancel されるので無駄な scan も抑制される。
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else {
+                loadingFlashTask.cancel()
+                return
+            }
 
             guard let targetURL = currentURL else {
+                loadingFlashTask.cancel()
                 await MainActor.run {
                     guard let self else { return }
                     self.linked = []
@@ -50,7 +75,9 @@ final class BacklinksViewModel {
                 return
             }
 
-            let result = await Task.detached(priority: .userInitiated) {
+            PerfLogger.begin("Backlinks.scanWorkspace")
+            // .utility priority: ユーザー操作（スクロール / 編集）を優先するため低めに。
+            let result = await Task.detached(priority: .utility) {
                 await Self.scanWorkspace(
                     targetURL: targetURL,
                     workspaceFolders: workspaceFolders,
@@ -59,8 +86,13 @@ final class BacklinksViewModel {
                     cache: cache
                 )
             }.value
+            PerfLogger.end("Backlinks.scanWorkspace")
 
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                loadingFlashTask.cancel()
+                return
+            }
+            loadingFlashTask.cancel()
             await MainActor.run {
                 guard let self else { return }
                 self.linked = result.linked
@@ -106,42 +138,113 @@ final class BacklinksViewModel {
             let backlink: Backlink
             let sourceContent: String
         }
+        struct FileScanResult: Sendable {
+            let linked: [Backlink]
+            let unlinked: [UnlinkedCandidate]
+        }
 
         let fileManager = FileManager.default
         let targetBasename = targetURL.deletingPathExtension().lastPathComponent
         var linkedResults: [Backlink] = []
         var unlinkedCandidates: [UnlinkedCandidate] = []
 
-        for folder in workspaceFolders {
-            guard let enumerator = fileManager.enumerator(
-                at: folder,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else {
-                continue
+        // ファイル一覧キャッシュ: folder set のキー（path 連結）が一致すれば前回の列挙結果を再利用。
+        // 9000 ファイル超のワークスペースで FileManager.enumerator が 1.5s 以上かかる問題を回避。
+        let folderKey = workspaceFolders.map { $0.path }.sorted().joined(separator: "\n")
+        let cachedURLs: [URL]? = fileListCacheLock.withLock {
+            if let cache = fileListCache, cache.folderKey == folderKey {
+                return cache.urls
             }
+            return nil
+        }
 
-            // 直接 enumerator を for-in すると Swift 6 で makeIterator が
-            // async コンテキスト不可になる警告が出るため、compactMap で snapshot にする
-            let allURLs = enumerator.compactMap { $0 as? URL }
-            for fileURL in allURLs {
-                guard fileURL != targetURL else { continue }
-                guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
-
-                guard let content = try? FileService().readFile(at: fileURL) else { continue }
-                let result = BacklinksScanner.scan(
-                    sourceURL: fileURL,
-                    sourceContent: content,
-                    targetURL: targetURL
-                )
-
-                linkedResults.append(contentsOf: result.linked)
-                if hasAnthropicKey {
-                    unlinkedCandidates.append(contentsOf: result.unlinked.map {
-                        UnlinkedCandidate(backlink: $0, sourceContent: content)
-                    })
+        var allFileURLs: [URL]
+        if let cachedURLs {
+            PerfLogger.event("Backlinks.scanWorkspace.fileList", "source=cache count=\(cachedURLs.count)")
+            allFileURLs = cachedURLs.filter { $0 != targetURL }
+        } else {
+            PerfLogger.begin("Backlinks.scanWorkspace.enumerate")
+            var collected: [URL] = []
+            for folder in workspaceFolders {
+                // includingPropertiesForKeys: nil で attribute prefetch を抑止。
+                // .isRegularFileKey の prefetch は inode 読み込みを発生させ 9000 ファイルで 1s 超かかる。
+                guard let enumerator = fileManager.enumerator(
+                    at: folder,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                ) else {
+                    continue
+                }
+                while let fileURL = enumerator.nextObject() as? URL {
+                    guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
+                    collected.append(fileURL)
                 }
             }
+            PerfLogger.end("Backlinks.scanWorkspace.enumerate")
+
+            fileListCacheLock.withLock {
+                fileListCache = (folderKey: folderKey, urls: collected)
+            }
+
+            PerfLogger.event("Backlinks.scanWorkspace.fileList", "source=fresh count=\(collected.count)")
+            allFileURLs = collected.filter { $0 != targetURL }
+        }
+
+        PerfLogger.event("Backlinks.scanWorkspace.files", "count=\(allFileURLs.count)")
+
+        // 並列 file read + scan（最大 8 並列に制限してリソース消費を抑える）
+        let perFileResults: [FileScanResult] = await withTaskGroup(of: FileScanResult?.self) { group in
+            let parallelism = min(8, max(1, allFileURLs.count))
+            var iterator = allFileURLs.makeIterator()
+
+            // 初期に parallelism 個タスク起動
+            for _ in 0..<parallelism {
+                guard let fileURL = iterator.next() else { break }
+                group.addTask {
+                    guard let content = try? FileService().readFile(at: fileURL) else { return nil }
+                    let scan = BacklinksScanner.scan(
+                        sourceURL: fileURL,
+                        sourceContent: content,
+                        targetURL: targetURL
+                    )
+                    return FileScanResult(
+                        linked: scan.linked,
+                        unlinked: hasAnthropicKey
+                            ? scan.unlinked.map { UnlinkedCandidate(backlink: $0, sourceContent: content) }
+                            : []
+                    )
+                }
+            }
+
+            // 完了を 1 件受けたら次を投入する drain
+            var collected: [FileScanResult] = []
+            while let result = await group.next() {
+                if let result {
+                    collected.append(result)
+                }
+                if let fileURL = iterator.next() {
+                    group.addTask {
+                        guard let content = try? FileService().readFile(at: fileURL) else { return nil }
+                        let scan = BacklinksScanner.scan(
+                            sourceURL: fileURL,
+                            sourceContent: content,
+                            targetURL: targetURL
+                        )
+                        return FileScanResult(
+                            linked: scan.linked,
+                            unlinked: hasAnthropicKey
+                                ? scan.unlinked.map { UnlinkedCandidate(backlink: $0, sourceContent: content) }
+                                : []
+                        )
+                    }
+                }
+            }
+            return collected
+        }
+
+        for r in perFileResults {
+            linkedResults.append(contentsOf: r.linked)
+            unlinkedCandidates.append(contentsOf: r.unlinked)
         }
 
         linkedResults.sort(by: backlinksSort)
