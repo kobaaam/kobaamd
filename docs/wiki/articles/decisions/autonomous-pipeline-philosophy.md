@@ -10,7 +10,7 @@ sources:
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-09
 ---
 
 # AI 自律開発パイプラインの設計思想
@@ -131,6 +131,9 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - [[dependency-inversion-guard]] — pipeline_weekly が依存逆順でも落ちないためのガードパターン
 - [[subagent-prompt-design]] — KMD-120 で concern auto-carveable 3 条件が機能した参照実例
 - [[role-dispatch]] — フェーズ B 最短サイクル参考値の運用観点 / shell script 小規模 fix の経路
+- [[external-teams]] — 外部依存と halted 経験の集約（パイプラインの外周）
+- [[team-structure]] — コアチーム組織図（パイプラインを構成する subagent / slash 群）
+- [[concern-carve-out]] — review_pr concern の 3 分類と別チケット退避の SSOT
 
 ## Sources
 

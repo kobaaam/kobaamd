@@ -208,6 +208,9 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 
 - [[postmortem-patterns]]
 - [[prd-quality-cycle]]
+- [[external-teams]] — Anthropic API を含む外部依存の運用ポリシー
+- [[role-dispatch]] — Wiki 参照経路（ask.sh）と Phase 移行の連動軸
+- [[team-structure]] — wiki query を担うコアチーム
 
 ## Sources
 
