@@ -27,7 +27,9 @@ struct SearchView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(result.fileName).bold()
-                        Text("L\(result.lineNumber)").foregroundStyle(.secondary)
+                        if let lineNumber = result.lineNumber {
+                            Text("L\(lineNumber)").foregroundStyle(.secondary)
+                        }
                     }
                     Text(result.matchLine)
                         .font(.caption)
@@ -57,6 +59,10 @@ struct SearchView: View {
                     searchViewModel.search(in: fileTreeViewModel.rootURL)
                 }
             }
+        }
+        .onAppear {
+            searchViewModel.indexService = appViewModel.searchIndexService
+            searchViewModel.setRoot(fileTreeViewModel.rootURL)
         }
     }
 }
