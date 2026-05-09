@@ -15,6 +15,9 @@ struct EditorView: View {
     var body: some View {
         @Bindable var vm = appViewModel
         VStack(spacing: 0) {
+            if appViewModel.previewMode != .viewer {
+                FrontmatterEditor(text: $vm.editorText)
+            }
             ZStack {
                 NSTextViewWrapper(binding: $vm.editorText, scrollRatio: $scrollRatio)
                     .background(Color(appState.selectedTheme.editorBackground))
