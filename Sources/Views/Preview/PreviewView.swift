@@ -6,6 +6,7 @@ struct PreviewView: View {
     @State private var previewViewModel = PreviewViewModel()
     // Delay WKWebView creation until there's actual content — saves ~50MB at cold start
     @State private var isReady = false
+    @State private var hasReceivedFirstRender: Bool = false
 
     var body: some View {
         Group {
@@ -22,7 +23,7 @@ struct PreviewView: View {
                     } else {
                         Color.kobaSurface
                     }
-                    if previewViewModel.isRendering {
+                    if previewViewModel.isRendering && !hasReceivedFirstRender {
                         VStack {
                             Spacer()
                             HStack {
@@ -50,6 +51,11 @@ struct PreviewView: View {
         .onChange(of: appState.selectedTheme) { _, _ in
             guard !isD2File else { return }
             previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+        }
+        .onChange(of: previewViewModel.bodyHTML) { _, newValue in
+            if !newValue.isEmpty {
+                hasReceivedFirstRender = true
+            }
         }
         .onAppear {
             guard !isD2File else { return }
