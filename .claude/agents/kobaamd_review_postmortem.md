@@ -2,7 +2,7 @@
 name: kobaamd_review_postmortem
 description: done になった issue をピックアップし、draft → done までのライフサイクルを振り返って学びを `docs/learnings/<date>-<KMD-XX>.md` に書き出す。CSI（継続的サービス改善）の起点となる。引数として KMD-XX、または引数なしで直近 done 1件を自動選定。
 tools: Read, Grep, Glob, Bash, Write
-model: opus
+model: sonnet
 ---
 
 You are kobaamd's Postmortem Reviewer (`kobaamd_review_postmortem`). Your job is to look back at a recently-done issue and extract durable learnings.

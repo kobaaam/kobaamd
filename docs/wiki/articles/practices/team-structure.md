@@ -11,7 +11,7 @@ updated: 2026-05-06
 
 ## Summary
 
-kobaamd の開発体制を「組織図」として一覧化する。コアチームは人間 1 名（PM 兼アーキテクト）と AI ロール群（メインセッション + 各 subagent / slash）で構成。各ロールの責務・モデル・呼び出し元・成果物を一望できる参照点として機能する。LLM 割当ポリシー（Opus / Sonnet / Haiku の判断基準）の正本は [[wiki-reference-policy]]。「いつ誰が動くか」のディスパッチは [[role-dispatch]]。
+kobaamd の開発体制を「組織図」として一覧化する。コアチームは人間 1 名（PM 兼アーキテクト）と AI ロール群（メインセッション + 各 subagent / slash）で構成。各ロールの責務・モデル・呼び出し元・成果物を一望できる参照点として機能する。LLM 割当ポリシー（**Sonnet 中心** + Opus 例外 + Haiku バッチ）の正本は [[multi-llm-persona]]。「いつ誰が動くか」のディスパッチは [[role-dispatch]]。
 
 ## Content
 
@@ -21,22 +21,22 @@ kobaamd の開発体制を「組織図」として一覧化する。コアチー
 |---|---|---|---|---|
 | **人間 PM / Architect** | h.kobayashi02 | — | 要件発見、PRD 承認、Reviewed 遷移、`Human in Review` での仕様判断、緊急 hotfix の最終承認 | — |
 | **Orchestrator** | メインセッション (Claude) | **Opus** | 設計判断、subagent オーケストレーション、緊急 hotfix の手動 PR、Codex / Gemini への依頼設計 | 人間が直接対話 |
-| **リサーチャー** | `kobaamd_research_create_ticket` | **Opus** | 新機能候補の発掘、PRD-lite で backlog 起票（`ai-research` ラベル） | `pipeline_weekly` |
-| **PRD ライター** | `kobaamd_create_prd` | **Opus** | draft → backlog 昇格、10 セクション PRD 作成、AC 定義 | `pipeline_active` フェーズ B / 手動 |
-| **PRD レビュアー** | `kobaamd_review_prd` | **Opus** | PRD 品質バー検査（別人格）、AC 不足 / 影響範囲漏れ指摘 | `pipeline_active` フェーズ B / 手動 |
+| **リサーチャー** | `kobaamd_research_create_ticket` | **Opus**（例外: 創造性が必要な週次低頻度タスク） | 新機能候補の発掘、PRD-lite で backlog 起票（`ai-research` ラベル） | `pipeline_weekly` |
+| **PRD ライター** | `kobaamd_create_prd` | **Sonnet** | draft → backlog 昇格、10 セクション PRD 作成、AC 定義 | `pipeline_active` フェーズ B / 手動 |
+| **PRD レビュアー** | `kobaamd_review_prd` | **Sonnet** | PRD 品質バー検査（別人格）、AC 不足 / 影響範囲漏れ指摘 | `pipeline_active` フェーズ B / 手動 |
 | **WIP 制御** | `kobaamd_assign_work` | (slash) | todo から 1 件選定、WIP=1 制御 | `pipeline_active` フェーズ B |
-| **実装担当** | `kobaamd_implement_code` → Codex CLI | **Opus** + Codex (gpt-5.5) | Swift 実装、ブランチ作成、コミット、PR 作成。**WIP commit 義務化** | `assign_work` 経由 / 手動 |
+| **実装担当** | `kobaamd_implement_code` → Codex CLI | **Sonnet** + Codex (gpt-5.5) | Swift 実装、ブランチ作成、コミット、PR 作成。**WIP commit 義務化** | `assign_work` 経由 / 手動 |
 | **ビルド検証** | `kobaamd_validate_build` | **Sonnet** | `swift build` + `swift test` 実行、結果を Linear に記録 | `pipeline_active` ステップ 9 / 手動 |
-| **PR レビュアー（機能）** | `kobaamd_review_pr` | **Opus** | コード批判レビュー、PRD AC 整合、影響範囲整合、UI/UX (Gemini 連携)、サイレント失敗検出。concern を rework / auto-carveable / human-judgment に 3 分類 | `pipeline_active` ステップ 10a / 手動 |
-| **PR レビュアー（セキュリティ）** | `kobaamd_review_security` | **Opus** | サプライチェーン、シークレット、コード安全性、権限変更、ビルド改竄を検査 | `pipeline_active` ステップ 10a（review_pr と並行） |
+| **PR レビュアー（機能）** | `kobaamd_review_pr` | **Sonnet** | コード批判レビュー、PRD AC 整合、影響範囲整合、UI/UX (Gemini 連携)、サイレント失敗検出。concern を rework / auto-carveable / human-judgment に 3 分類 | `pipeline_active` ステップ 10a / 手動 |
+| **PR レビュアー（セキュリティ）** | `kobaamd_review_security` | **Opus**（例外: 誤判定の代償が大きい） | サプライチェーン、シークレット、コード安全性、権限変更、ビルド改竄を検査 | `pipeline_active` ステップ 10a（review_pr と並行） |
 | **PR コメント修正** | `kobaamd_fix_pr_comments` | **Sonnet** | REQUEST_CHANGES の指摘を Codex に修正依頼 → push → in-review 復帰。**WIP commit 義務化** | `pipeline_active` レビュー↔修正ループ / 手動 |
-| **リワーク担当** | `kobaamd_rework_issue` | **Opus** | `Human in Review` の人間コメントを 5 カテゴリ分類 → PRD 更新 → 再実装 → PR 更新。**WIP commit 義務化** | `pipeline_active` ステップ 4 / 手動 |
+| **リワーク担当** | `kobaamd_rework_issue` | **Sonnet** | `Human in Review` の人間コメントを 5 カテゴリ分類 → PRD 更新 → 再実装 → PR 更新。**WIP commit 義務化** | `pipeline_active` ステップ 4 / 手動 |
 | **carve-out 担当** | `kobaamd_carve_concerns` | (slash) | concern を別 issue に退避（draft / backlog 直入れ） | `rework_issue` の carve カテゴリ / 手動 |
 | **マージ担当** | `kobaamd_merge_pr` | **Sonnet** | `Reviewed` の issue を main に squash merge → done。`Human in Review` でマージ済みのクリーンアップも担当 | `pipeline_active` フェーズ A ステップ 5 / 手動 |
-| **postmortem ライター** | `kobaamd_review_postmortem` | **Opus** | done の振り返りを `docs/learnings/<date>-<KMD-XX>.md` に出力 | `pipeline_active` ステップ 11 / 手動 |
-| **wiki 担当** | `kobaamd_update_wiki` | **Opus** | learnings / ADR を articles に蒸留、矛盾検出、ingest 履歴を log.md に追記 | `review_postmortem` 完了時 / `pipeline_weekly` / 手動 |
+| **postmortem ライター** | `kobaamd_review_postmortem` | **Sonnet** | done の振り返りを `docs/learnings/<date>-<KMD-XX>.md` に出力 | `pipeline_active` ステップ 11 / 手動 |
+| **wiki 担当** | `kobaamd_update_wiki` | **Sonnet** | learnings / ADR を articles に蒸留、矛盾検出、ingest 履歴を log.md に追記 | `review_postmortem` 完了時 / `pipeline_weekly` / 手動 |
 | **wiki lint 担当** | `kobaamd_lint_wiki` | **Sonnet** | `docs/wiki/articles` を 5 観点（孤立 / リンク切れ / stale / セクション単独文脈 / frontmatter 整合）で lint | 手動 / `pipeline_weekly` |
-| **改善案ジェネレータ** | `kobaamd_improve_prompt` | **Opus** | learnings から各 subagent のプロンプト改善案を提案 | `pipeline_weekly` / 手動 |
+| **改善案ジェネレータ** | `kobaamd_improve_prompt` | **Opus**（例外: 深い推論が必要な週次低頻度タスク） | learnings から各 subagent のプロンプト改善案を提案 | `pipeline_weekly` / 手動 |
 | **リサーチャー / DocWriter** | Gemini API | gemini-3.1-pro-preview | 調査・ドキュメント生成・UI/UX 検証 | `review_pr` の UI/UX サブステップ / 手動 |
 
 ### 補助スラッシュ（運用ユーティリティ）

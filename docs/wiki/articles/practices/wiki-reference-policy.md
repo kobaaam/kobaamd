@@ -11,7 +11,7 @@ updated: 2026-05-09
 
 ## Summary
 
-kobaamd の subagent / scripts は `docs/wiki/` を一次資料として参照する。標準運用は **wiki 全件を Anthropic Prompt Caching でプロンプトに投入する Phase 1 方式**。RAG / 検索層は wiki 総量が 20 万トークンを超えるまで導入しない。あわせて Opus / Sonnet / Haiku の使い分け方針を Haiku 観点まで拡張して規定する。
+kobaamd の subagent / scripts は `docs/wiki/` を一次資料として参照する。標準運用は **wiki 全件を Anthropic Prompt Caching でプロンプトに投入する Phase 1 方式**。RAG / 検索層は wiki 総量が 20 万トークンを超えるまで導入しない。あわせて Sonnet 中心 + Opus 例外 + Haiku バッチの使い分け方針も規定する（正本は [[multi-llm-persona]]）。
 
 ## Content
 
@@ -150,14 +150,16 @@ Phase 移行のトリガー条件・運用手順は次節と共通。
 
 `scripts/wiki/load_all.sh` は出力末尾に `# Total: ~XXkB / ~XX,XXX tokens` を stderr に出すので、定期的に総量を観測し、15 万 / 20 万トークン到達前に Phase 移行を検討する。
 
-### 3. モデル割り当て方針（Opus / Sonnet / Haiku）
+### 3. モデル割り当て方針（Sonnet 中心）
+
+**Sonnet 中心**でパイプラインを回し、Opus は誤判定の代償が大きい / 創造性が必要 / 低頻度な subagent に絞り込む。詳細は [[multi-llm-persona]] が正本。
 
 | 分類 | モデル | 基準 |
 |---|---|---|
 | Orchestrator（メイン） | **Opus** | `~/.claude/settings.json` で設定 |
-| 判断・創造・分析系 subagent | **Opus** | 設計判断・コードレビュー・PRD 作成・振り返り分析・リサーチなど、深い推論が必要なタスク |
-| 機械的操作系 subagent | **Sonnet** | ビルド実行・マージ操作・定型的なコメント修正など、手順が明確で判断余地の少ないタスク |
-| 大量バッチ系 subagent / scripts | **Haiku** | 短い構造化タスクをバッチで大量に回す用途。下記の「Haiku の用途」を参照 |
+| 標準 subagent | **Sonnet** | パイプラインのほぼすべて（PRD 作成・PR レビュー・wiki ingest・rework・実装オーケストレーション・振り返り・ビルド検証・マージ・PR コメント修正） |
+| 例外 subagent | **Opus** | 誤判定の代償が大きい / 創造性が必要 / 週次低頻度のいずれかを満たすもの限定（`review_security` / `research_create_ticket` / `improve_prompt`） |
+| バッチ系 subagent / scripts | **Haiku** | 短い構造化タスクをバッチで大量に回す用途。下記の「Haiku の用途」を参照 |
 
 ### 4. Haiku の用途
 
