@@ -14,7 +14,16 @@ final class SearchViewModel {
     var query: String = ""
     var results: [SearchResult] = []
     var isSearching: Bool = false
+    var indexService: WikiIndexService
     private var searchTask: Task<Void, Never>? = nil
+
+    init(indexService: WikiIndexService? = nil) {
+        self.indexService = indexService ?? WikiIndexService()
+    }
+
+    func setRoot(_ url: URL?) {
+        indexService.setRoot(url)
+    }
 
     func search(in rootURL: URL?) {
         guard let rootURL, !query.isEmpty else {
@@ -26,7 +35,20 @@ final class SearchViewModel {
         results = []
         let q = query
         searchTask = Task {
-            let found = await performSearch(rootURL: rootURL, query: q)
+            let found: [SearchResult]
+            if let indexedHits = await indexService.search(query: q) {
+                found = indexedHits.map { hit in
+                    SearchResult(
+                        id: hit.id,
+                        fileURL: hit.fileURL,
+                        fileName: hit.fileName,
+                        matchLine: hit.snippet,
+                        lineNumber: 1
+                    )
+                }
+            } else {
+                found = await performSearch(rootURL: rootURL, query: q)
+            }
             guard !Task.isCancelled else { return }
             self.results = found
             self.isSearching = false

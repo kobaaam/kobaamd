@@ -58,5 +58,9 @@ struct SearchView: View {
                 }
             }
         }
+        .onAppear {
+            searchViewModel.indexService = appViewModel.searchIndexService
+            searchViewModel.setRoot(fileTreeViewModel.rootURL)
+        }
     }
 }
