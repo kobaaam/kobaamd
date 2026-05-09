@@ -73,7 +73,7 @@ struct MarkdownWebView: NSViewRepresentable {
         ) { _ in }
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate {
+    @MainActor class Coordinator: NSObject, WKNavigationDelegate {
         var isLoaded = false
         var lastShellHTML: String = ""
         var lastBodyHTML: String = ""
@@ -93,23 +93,27 @@ struct MarkdownWebView: NSViewRepresentable {
                 object: nil,
                 queue: .main
             ) { [weak self] note in
-                guard let self,
-                      let line = note.userInfo?["sourceLine"] as? Int,
-                      let wv = self.webView else { return }
-                self.highlightBySourceLine(line, in: wv)
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let line = note.userInfo?["sourceLine"] as? Int,
+                          let wv = self.webView else { return }
+                    self.highlightBySourceLine(line, in: wv)
+                }
             }
             pdfObserver = NotificationCenter.default.addObserver(
                 forName: .exportPDFWithURL,
                 object: nil,
                 queue: .main
             ) { [weak self] note in
-                guard let self,
-                      let url = note.object as? URL else { return }
-                self.exportPDF(to: url) { result in
-                    NotificationCenter.default.post(
-                        name: .exportPDFCompleted,
-                        object: result as AnyObject
-                    )
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let url = note.object as? URL else { return }
+                    self.exportPDF(to: url) { result in
+                        NotificationCenter.default.post(
+                            name: .exportPDFCompleted,
+                            object: result as AnyObject
+                        )
+                    }
                 }
             }
         }
