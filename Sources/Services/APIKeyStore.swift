@@ -39,7 +39,19 @@ final class APIKeyStore {
         }
     }
 
-    private static let service = "com.kobaamd.apikeys"
+    /// Production Keychain service identifier.
+    private static let productionService = "com.kobaamd.apikeys"
+
+    /// Overridable service identifier. Tests set this to a test-only value
+    /// so they never touch the production Keychain.
+    ///
+    /// `nonisolated(unsafe)` is safe here because mutations only happen
+    /// at test setUp, before any concurrent access begins.
+    nonisolated(unsafe) static var serviceOverride: String? = nil
+
+    private static var service: String {
+        serviceOverride ?? productionService
+    }
 
     // MARK: - In-process cache (KMD-187)
     //

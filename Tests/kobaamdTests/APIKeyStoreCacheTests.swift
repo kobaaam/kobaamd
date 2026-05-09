@@ -4,13 +4,21 @@ import Foundation
 
 /// KMD-187: verify that `APIKeyStore` caches lookups in-process and that the
 /// public API contract (save/load/clear + invalidate) behaves as expected.
-@Suite("APIKeyStoreCache")
+@Suite("APIKeyStoreCache", .serialized)
 struct APIKeyStoreCacheTests {
+
+    init() {
+        // Redirect Keychain operations to a test-only service identifier so
+        // this test suite never reads from or writes to the production Keychain.
+        APIKeyStore.serviceOverride = "com.kobaamd.apikeys.tests"
+        APIKeyStore.invalidateAll()
+    }
 
     /// Ensure each test starts from a clean state. We intentionally do this
     /// inline (rather than via shared setUp/tearDown) so the suite struct can
     /// stay value-typed under Swift Testing.
     private func reset() {
+        APIKeyStore.serviceOverride = "com.kobaamd.apikeys.tests"
         APIKeyStore.invalidateAll()
         for p in APIKeyStore.Provider.allCases {
             APIKeyStore.clear(for: p)
