@@ -57,6 +57,7 @@ final class AppViewModel {
     let fileTreeViewModel = FileTreeViewModel()
     let quickOpenViewModel = QuickOpenViewModel()
     let outlineViewModel = OutlineViewModel()
+    let backlinksViewModel = BacklinksViewModel()
     let todoViewModel = TodoViewModel()
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
     let tagsViewModel = TagsViewModel()
@@ -78,6 +79,7 @@ final class AppViewModel {
 
     init(aiService: AIServiceProtocol = AIService()) {
         self.aiService = aiService
+        backlinksViewModel.appViewModel = self
     }
 
     // MARK: - Tabs
@@ -182,6 +184,20 @@ final class AppViewModel {
         tabs[idx].url = selectedFileURL
     }
 
+    /// バックグラウンドでファイルが書き換えられた場合に、開いているタブの in-memory コンテンツを同期する。
+    /// アクティブタブの場合は editorText も更新する。
+    func syncTabContent(url: URL, updated: String) {
+        guard let idx = tabs.firstIndex(where: { $0.url == url }) else { return }
+        tabs[idx].content = updated
+        tabs[idx].isDirty = false
+        if activeTabID == tabs[idx].id {
+            editorText = updated
+            savedText = updated
+            isDirty = false
+            outlineViewModel.update(text: updated)
+        }
+    }
+
     // MARK: - Private Helpers
 
     /// エディタ状態をタブに同期する。nil を渡すとエディタをクリアする。
@@ -193,6 +209,7 @@ final class AppViewModel {
             isDirty = false
             savedText = ""
             outlineViewModel.update(text: "")
+            backlinksViewModel.refresh(currentURL: nil, workspaceFolders: [])
             return
         }
         activeTabID = tab.id
@@ -201,6 +218,10 @@ final class AppViewModel {
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
         outlineViewModel.update(text: tab.content)
+        backlinksViewModel.refresh(
+            currentURL: selectedFileURL,
+            workspaceFolders: fileTreeViewModel.folders.map(\.url)
+        )
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新
