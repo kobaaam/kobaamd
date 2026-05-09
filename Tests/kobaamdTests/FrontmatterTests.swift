@@ -74,7 +74,7 @@ struct FrontmatterTests {
 
     @Test("render_roundTrip")
     func renderRoundTrip() {
-        let source = Frontmatter.parse(yaml: """
+        let yaml = """
         title: Hello
         category: Notes
         tags:
@@ -84,9 +84,13 @@ struct FrontmatterTests {
         date: 2026-05-09T12:00:00Z
         description: "Hello World"
         priority: high
-        """)
+        """
+        let source = Frontmatter.parse(yaml: yaml)
+        let rendered = source.render()
+        let split = Frontmatter.split(text: rendered)
+        let reparsed = Frontmatter.parse(yaml: split.frontmatterText ?? "")
 
-        let reparsed = Frontmatter.parse(yaml: Frontmatter.split(text: source.render()).frontmatterText ?? "")
+        #expect(split.frontmatterText == yaml)
 
         #expect(reparsed.title == "Hello")
         #expect(reparsed.category == "Notes")
@@ -100,10 +104,11 @@ struct FrontmatterTests {
     @Test("render_blockListFormatForTags")
     func renderBlockListFormatForTags() {
         let rendered = Frontmatter(tags: ["swift", "ios"]).render()
-        let reparsed = Frontmatter.parse(yaml: Frontmatter.split(text: rendered).frontmatterText ?? "")
+        let split = Frontmatter.split(text: rendered)
+        let reparsed = Frontmatter.parse(yaml: split.frontmatterText ?? "")
 
         #expect(reparsed.tags == ["swift", "ios"])
-        #expect(rendered.contains("tags:\n  - swift\n  - ios"))
+        #expect(split.frontmatterText == "tags:\n  - swift\n  - ios")
     }
 
     @Test("split_noFrontmatter")
@@ -180,7 +185,163 @@ struct FrontmatterTests {
 
     @Test("compatibility_KMD66TagsExtraction")
     func compatibilityKMD66TagsExtraction() {
-        let rendered = Frontmatter(tags: ["swift", "ios"]).render() + "body"
+        let blockRendered = Frontmatter(tags: ["swift", "ios"]).render() + "body"
+        let inlineRendered = """
+        ---
+        tags: [swift, ios]
+        ---
+        body
+        """
+        let blockTags = TagsViewModel.extractTags(from: blockRendered)
+        let inlineTags = TagsViewModel.extractTags(from: inlineRendered)
+
+        #expect(blockTags == Set(["swift", "ios"]))
+        #expect(inlineTags == Set(["swift", "ios"]))
+    }
+
+    @Test("roundTrip_inlineListTags")
+    func roundTripInlineListTags() {
+        let source = "tags: [swift, ios]"
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_blockListTags")
+    func roundTripBlockListTags() {
+        let source = """
+        tags:
+          - swift
+          - ios
+        """
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_singleScalarTag")
+    func roundTripSingleScalarTag() {
+        let source = "tags: swift"
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_quotedTitle")
+    func roundTripQuotedTitle() {
+        let source = #"title: "Hello""#
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_unquotedTitle")
+    func roundTripUnquotedTitle() {
+        let source = "title: Hello"
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_singleQuotedTitle")
+    func roundTripSingleQuotedTitle() {
+        let source = "title: 'Hello'"
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("roundTrip_aliasesInline")
+    func roundTripAliasesInline() {
+        let source = "aliases: [kb, notes]"
+        let parsed = Frontmatter.parse(yaml: source)
+        let split = Frontmatter.split(text: parsed.render())
+
+        #expect(split.frontmatterText == source)
+    }
+
+    @Test("edit_inlineListPreservesFormat")
+    func editInlineListPreservesFormat() {
+        let parsed = Frontmatter.parse(yaml: "tags: [swift, ios]")
+        var edited = parsed
+        edited.tags = ["swift", "rust"]
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == "tags: [swift, rust]")
+    }
+
+    @Test("edit_blockListPreservesFormat")
+    func editBlockListPreservesFormat() {
+        let parsed = Frontmatter.parse(yaml: """
+        tags:
+          - swift
+          - ios
+        """)
+        var edited = parsed
+        edited.tags = ["swift", "rust"]
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == """
+        tags:
+          - swift
+          - rust
+        """)
+    }
+
+    @Test("edit_singleScalarPromotesToInline")
+    func editSingleScalarPromotesToInline() {
+        let parsed = Frontmatter.parse(yaml: "tags: swift")
+        var edited = parsed
+        edited.tags = ["swift", "ios"]
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == "tags: [swift, ios]")
+    }
+
+    @Test("edit_unquotedTitleStaysUnquoted")
+    func editUnquotedTitleStaysUnquoted() {
+        let parsed = Frontmatter.parse(yaml: "title: Hello")
+        var edited = parsed
+        edited.title = "Bye"
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == "title: Bye")
+    }
+
+    @Test("edit_quotedTitleStaysQuoted")
+    func editQuotedTitleStaysQuoted() {
+        let parsed = Frontmatter.parse(yaml: #"title: "Hello""#)
+        var edited = parsed
+        edited.title = "Bye"
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == #"title: "Bye""#)
+    }
+
+    @Test("edit_unquotedTitleWithSpecialCharForcesQuotes")
+    func editUnquotedTitleWithSpecialCharForcesQuotes() {
+        let parsed = Frontmatter.parse(yaml: "title: Hello")
+        var edited = parsed
+        edited.title = "Hello: World"
+        let split = Frontmatter.split(text: edited.render())
+
+        #expect(split.frontmatterText == #"title: "Hello: World""#)
+    }
+
+    @Test("roundTrip_blockListThenExtractTags")
+    func roundTripBlockListThenExtractTags() {
+        let parsed = Frontmatter.parse(yaml: """
+        tags:
+          - swift
+          - ios
+        """)
+        let rendered = parsed.render() + "body"
         let tags = TagsViewModel.extractTags(from: rendered)
 
         #expect(tags == Set(["swift", "ios"]))

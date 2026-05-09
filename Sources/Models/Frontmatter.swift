@@ -1,5 +1,18 @@
 import Foundation
 
+enum ListFormat: Equatable {
+    case blockList
+    case inlineList
+    case singleScalar
+    case empty
+}
+
+enum ScalarFormat: Equatable {
+    case unquoted
+    case doubleQuoted
+    case singleQuoted
+}
+
 struct Frontmatter: Equatable {
     var title: String? = nil
     var category: String? = nil
@@ -7,6 +20,12 @@ struct Frontmatter: Equatable {
     var aliases: [String] = []
     var date: String? = nil
     var description: String? = nil
+    var titleFormat: ScalarFormat? = nil
+    var categoryFormat: ScalarFormat? = nil
+    var dateFormat: ScalarFormat? = nil
+    var descriptionFormat: ScalarFormat? = nil
+    var tagsFormat: ListFormat? = nil
+    var aliasesFormat: ListFormat? = nil
     var extraLines: [String] = []
     var parseError: String? = nil
 
@@ -71,7 +90,9 @@ struct Frontmatter: Equatable {
             switch key {
             case "title":
                 if nestedBlock.lines.isEmpty {
-                    frontmatter.title = normalizedScalar(rawValue)
+                    let extracted = extractScalarFormat(rawValue: rawValue)
+                    frontmatter.title = normalizedScalar(extracted.value)
+                    frontmatter.titleFormat = frontmatter.title == nil ? nil : extracted.format
                     index += 1
                 } else {
                     frontmatter.recordNestedWarning()
@@ -82,7 +103,9 @@ struct Frontmatter: Equatable {
 
             case "category":
                 if nestedBlock.lines.isEmpty {
-                    frontmatter.category = normalizedScalar(rawValue)
+                    let extracted = extractScalarFormat(rawValue: rawValue)
+                    frontmatter.category = normalizedScalar(extracted.value)
+                    frontmatter.categoryFormat = frontmatter.category == nil ? nil : extracted.format
                     index += 1
                 } else {
                     frontmatter.recordNestedWarning()
@@ -93,7 +116,9 @@ struct Frontmatter: Equatable {
 
             case "date":
                 if nestedBlock.lines.isEmpty {
-                    frontmatter.date = normalizedScalar(rawValue)
+                    let extracted = extractScalarFormat(rawValue: rawValue)
+                    frontmatter.date = normalizedScalar(extracted.value)
+                    frontmatter.dateFormat = frontmatter.date == nil ? nil : extracted.format
                     index += 1
                 } else {
                     frontmatter.recordNestedWarning()
@@ -104,7 +129,9 @@ struct Frontmatter: Equatable {
 
             case "description":
                 if nestedBlock.lines.isEmpty {
-                    frontmatter.description = normalizedScalar(rawValue)
+                    let extracted = extractScalarFormat(rawValue: rawValue)
+                    frontmatter.description = normalizedScalar(extracted.value)
+                    frontmatter.descriptionFormat = frontmatter.description == nil ? nil : extracted.format
                     index += 1
                 } else {
                     frontmatter.recordNestedWarning()
@@ -117,6 +144,7 @@ struct Frontmatter: Equatable {
                 if !nestedBlock.lines.isEmpty {
                     if let parsedList = parseListBlock(nestedBlock.lines) {
                         frontmatter.tags = parsedList
+                        frontmatter.tagsFormat = .blockList
                     } else {
                         frontmatter.recordNestedWarning()
                         frontmatter.extraLines.append(rawLine)
@@ -125,6 +153,7 @@ struct Frontmatter: Equatable {
                     index = nestedBlock.nextIndex
                 } else {
                     frontmatter.tags = parseInlineListOrScalar(rawValue)
+                    frontmatter.tagsFormat = listFormat(rawValue: rawValue, values: frontmatter.tags)
                     index += 1
                 }
 
@@ -132,6 +161,7 @@ struct Frontmatter: Equatable {
                 if !nestedBlock.lines.isEmpty {
                     if let parsedList = parseListBlock(nestedBlock.lines) {
                         frontmatter.aliases = parsedList
+                        frontmatter.aliasesFormat = .blockList
                     } else {
                         frontmatter.recordNestedWarning()
                         frontmatter.extraLines.append(rawLine)
@@ -140,6 +170,7 @@ struct Frontmatter: Equatable {
                     index = nestedBlock.nextIndex
                 } else {
                     frontmatter.aliases = parseInlineListOrScalar(rawValue)
+                    frontmatter.aliasesFormat = listFormat(rawValue: rawValue, values: frontmatter.aliases)
                     index += 1
                 }
 
@@ -163,32 +194,22 @@ struct Frontmatter: Equatable {
         var lines: [String] = []
 
         if let title = Self.normalizedOutput(title) {
-            lines.append("title: \(Self.yamlScalar(title))")
+            lines.append("title: \(Self.yamlScalar(title, format: titleFormat))")
         }
         if let category = Self.normalizedOutput(category) {
-            lines.append("category: \(Self.yamlScalar(category))")
+            lines.append("category: \(Self.yamlScalar(category, format: categoryFormat))")
         }
-        let renderedTags = tags.compactMap { item -> String? in
-            guard let value = Self.normalizedOutput(item) else { return nil }
-            return "  - \(Self.yamlScalar(value))"
-        }
-        if !renderedTags.isEmpty {
-            lines.append("tags:")
+        if let renderedTags = Self.renderListField(key: "tags", values: tags, format: tagsFormat) {
             lines.append(contentsOf: renderedTags)
         }
-        let renderedAliases = aliases.compactMap { item -> String? in
-            guard let value = Self.normalizedOutput(item) else { return nil }
-            return "  - \(Self.yamlScalar(value))"
-        }
-        if !renderedAliases.isEmpty {
-            lines.append("aliases:")
+        if let renderedAliases = Self.renderListField(key: "aliases", values: aliases, format: aliasesFormat) {
             lines.append(contentsOf: renderedAliases)
         }
         if let date = Self.normalizedOutput(date) {
-            lines.append("date: \(Self.yamlScalar(date))")
+            lines.append("date: \(Self.yamlScalar(date, format: dateFormat))")
         }
         if let description = Self.normalizedOutput(description) {
-            lines.append("description: \(Self.yamlScalar(description))")
+            lines.append("description: \(Self.yamlScalar(description, format: descriptionFormat))")
         }
 
         lines.append(contentsOf: extraLines)
@@ -234,7 +255,7 @@ struct Frontmatter: Equatable {
     private static func normalizedScalar(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
-        return unquote(trimmed)
+        return trimmed
     }
 
     private static func normalizedOutput(_ value: String?) -> String? {
@@ -251,13 +272,13 @@ struct Frontmatter: Equatable {
             let inner = String(trimmed.dropFirst().dropLast())
             return inner
                 .split(separator: ",", omittingEmptySubsequences: false)
-                .map { unquote(String($0).trimmingCharacters(in: .whitespaces)) }
+                .map { extractScalarFormat(rawValue: String($0).trimmingCharacters(in: .whitespaces)).value }
                 .filter { !$0.isEmpty }
         }
 
         return trimmed
             .split(separator: ",", omittingEmptySubsequences: false)
-            .map { unquote(String($0).trimmingCharacters(in: .whitespaces)) }
+            .map { extractScalarFormat(rawValue: String($0).trimmingCharacters(in: .whitespaces)).value }
             .filter { !$0.isEmpty }
     }
 
@@ -272,7 +293,7 @@ struct Frontmatter: Equatable {
             guard trimmed.hasPrefix("- ") else {
                 return nil
             }
-            let value = unquote(String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces))
+            let value = extractScalarFormat(rawValue: String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)).value
             if !value.isEmpty {
                 items.append(value)
             }
@@ -321,35 +342,104 @@ struct Frontmatter: Equatable {
         return (collected, index)
     }
 
-    private static func unquote(_ value: String) -> String {
-        guard value.count >= 2 else { return value }
-        if (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
-            return String(value.dropFirst().dropLast())
+    private static func extractScalarFormat(rawValue: String) -> (value: String, format: ScalarFormat) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else {
+            return (trimmed, .unquoted)
         }
-        return value
+
+        if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") {
+            return (String(trimmed.dropFirst().dropLast()), .doubleQuoted)
+        }
+
+        if trimmed.hasPrefix("'") && trimmed.hasSuffix("'") {
+            return (String(trimmed.dropFirst().dropLast()), .singleQuoted)
+        }
+
+        return (trimmed, .unquoted)
     }
 
-    private static func yamlScalar(_ value: String) -> String {
+    private static func listFormat(rawValue: String, values: [String]) -> ListFormat {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return .empty }
+
+        if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
+            return .inlineList
+        }
+
+        if values.count == 1 && !trimmed.contains(",") {
+            return .singleScalar
+        }
+
+        return .inlineList
+    }
+
+    private static func renderListField(key: String, values: [String], format: ListFormat?) -> [String]? {
+        let normalizedValues = values.compactMap(normalizedOutput)
+        guard !normalizedValues.isEmpty else { return nil }
+
+        switch format ?? .blockList {
+        case .blockList:
+            return [key + ":"] + normalizedValues.map { "  - \(yamlScalar($0))" }
+        case .inlineList:
+            let renderedValues = normalizedValues.map { yamlScalar($0) }
+            return ["\(key): [\(renderedValues.joined(separator: ", "))]"]
+        case .singleScalar:
+            if normalizedValues.count == 1, let onlyValue = normalizedValues.first {
+                return ["\(key): \(yamlScalar(onlyValue))"]
+            }
+            let renderedValues = normalizedValues.map { yamlScalar($0) }
+            return ["\(key): [\(renderedValues.joined(separator: ", "))]"]
+        case .empty:
+            return [key + ":"] + normalizedValues.map { "  - \(yamlScalar($0))" }
+        }
+    }
+
+    private static func yamlScalar(_ value: String, format: ScalarFormat? = nil) -> String {
         if value.isEmpty {
             return "\"\""
         }
 
-        let needsQuotes =
-            value != value.trimmingCharacters(in: .whitespaces) ||
-            value.contains(":") ||
-            value.contains("#") ||
-            value.contains("[") ||
-            value.contains("]") ||
-            value.contains("{") ||
-            value.contains("}") ||
-            value.contains(",") ||
-            value.contains("\"")
+        let effectiveFormat: ScalarFormat
+        if format == .unquoted && disallowsUnquotedHint(value) {
+            effectiveFormat = .doubleQuoted
+        } else {
+            effectiveFormat = format ?? (requiresQuotedScalar(value) ? .doubleQuoted : .unquoted)
+        }
 
-        guard needsQuotes else { return value }
+        switch effectiveFormat {
+        case .unquoted:
+            return value
+        case .doubleQuoted:
+            let escaped = value
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            return "\"\(escaped)\""
+        case .singleQuoted:
+            return "'\(value.replacingOccurrences(of: "'", with: "''"))'"
+        }
+    }
 
-        let escaped = value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        return "\"\(escaped)\""
+    private static func requiresQuotedScalar(_ value: String) -> Bool {
+        value != value.trimmingCharacters(in: .whitespaces) ||
+        value.contains(":") ||
+        value.contains("#") ||
+        value.contains("[") ||
+        value.contains("]") ||
+        value.contains("{") ||
+        value.contains("}") ||
+        value.contains(",") ||
+        value.contains("\"")
+    }
+
+    private static func disallowsUnquotedHint(_ value: String) -> Bool {
+        value.contains(": ") ||
+        value.contains("#") ||
+        value.contains("[") ||
+        value.contains("]") ||
+        value.contains("{") ||
+        value.contains("}") ||
+        value.contains(",") ||
+        value.contains("\"")
     }
 }
