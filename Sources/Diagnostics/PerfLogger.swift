@@ -1,15 +1,18 @@
 import Foundation
+import os
 
-/// パフォーマンス計測ロガー（コンソール出力）。
-/// begin/end の name を一致させて使う。同名の計測が重複しないこと。
+/// パフォーマンス計測ロガー。
+/// `os.Logger` を使うので `log stream --predicate 'subsystem == "com.kobaamd.app" AND category == "PerfLogger"'`
+/// または `--predicate 'category == "PerfLogger"'` で確実にキャプチャできる。
 enum PerfLogger {
 
+    private static let logger = Logger(subsystem: "com.kobaamd.app", category: "PerfLogger")
     private static var starts = [String: CFAbsoluteTime]()
     private static let lock = NSLock()
 
     static func begin(_ name: String) {
         lock.withLock { starts[name] = CFAbsoluteTimeGetCurrent() }
-        NSLog("[PERF] ▶ \(name)")
+        logger.notice("▶ \(name, privacy: .public)")
     }
 
     static func end(_ name: String) {
@@ -19,10 +22,11 @@ enum PerfLogger {
             return CFAbsoluteTimeGetCurrent() - t
         }
         guard elapsed >= 0 else { return }
-        NSLog(String(format: "[PERF] ◼ \(name)  %.1f ms", elapsed * 1000))
+        let ms = elapsed * 1000
+        logger.notice("◼ \(name, privacy: .public)  \(ms, format: .fixed(precision: 1)) ms")
     }
 
     static func event(_ name: String, _ message: String = "") {
-        NSLog("[PERF] ● \(name) \(message)")
+        logger.notice("● \(name, privacy: .public) \(message, privacy: .public)")
     }
 }

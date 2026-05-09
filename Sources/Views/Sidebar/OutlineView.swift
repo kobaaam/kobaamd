@@ -64,7 +64,10 @@ struct OutlineView: View {
         }
         .onTapGesture {
             if outlineViewModel.totalLines > 1 {
-                appViewModel.previewScrollRatio = Double(item.line - 1) / Double(outlineViewModel.totalLines - 1)
+                appViewModel.setPreviewScrollRatio(
+                    Double(item.line - 1) / Double(outlineViewModel.totalLines - 1),
+                    source: "OutlineView.onTapGesture"
+                )
             }
             NotificationCenter.default.post(
                 name: .jumpToLine,

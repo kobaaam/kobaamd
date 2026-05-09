@@ -25,6 +25,7 @@ final class AppViewModel {
     var isDirty: Bool = false
     /// 最後に保存した時点の editorText。未保存の変更検知に使用。
     var savedText: String = ""
+    @ObservationIgnored
     var previewScrollRatio: Double = 0
     var errorMessage: String? = nil
     var showError: Bool = false
@@ -82,6 +83,16 @@ final class AppViewModel {
         backlinksViewModel.appViewModel = self
     }
 
+    func setPreviewScrollRatio(_ ratio: Double, source: String) {
+        let clampedRatio = max(0, min(1, ratio))
+        previewScrollRatio = clampedRatio
+        NotificationCenter.default.post(
+            name: .previewScrollRatioChanged,
+            object: nil,
+            userInfo: ["ratio": clampedRatio, "source": source]
+        )
+    }
+
     // MARK: - Tabs
     var tabs: [EditorTab] = []
     var activeTabID: UUID? = nil
@@ -118,11 +129,15 @@ final class AppViewModel {
 
     @MainActor
     func openFile(url: URL) async {
+        PerfLogger.begin("openFile(\(url.lastPathComponent))")
+        defer { PerfLogger.end("openFile(\(url.lastPathComponent))") }
         guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
         do {
+            PerfLogger.begin("openFile.readFile")
             let content = try await Task.detached(priority: .userInitiated) {
                 try FileService().readFile(at: url)
             }.value
+            PerfLogger.end("openFile.readFile")
             openInTab(url: url, content: content)
         } catch {
             showAppError(.fileReadFailed(url: url, underlying: error))
@@ -202,6 +217,8 @@ final class AppViewModel {
 
     /// エディタ状態をタブに同期する。nil を渡すとエディタをクリアする。
     private func activate(tab: EditorTab?) {
+        PerfLogger.begin("AppViewModel.activate")
+        defer { PerfLogger.end("AppViewModel.activate") }
         guard let tab else {
             activeTabID = nil
             editorText = ""
@@ -212,16 +229,23 @@ final class AppViewModel {
             backlinksViewModel.refresh(currentURL: nil, workspaceFolders: [])
             return
         }
+        PerfLogger.event("AppViewModel.activate", "url=\(tab.url?.lastPathComponent ?? "nil") textLen=\(tab.content.count)")
         activeTabID = tab.id
+        PerfLogger.begin("AppViewModel.activate.editorText=")
         editorText = tab.content
+        PerfLogger.end("AppViewModel.activate.editorText=")
         selectedFileURL = tab.url
         isDirty = tab.isDirty
         savedText = tab.isDirty ? "" : tab.content
+        PerfLogger.begin("AppViewModel.activate.outline.update")
         outlineViewModel.update(text: tab.content)
+        PerfLogger.end("AppViewModel.activate.outline.update")
+        PerfLogger.begin("AppViewModel.activate.backlinks.refresh")
         backlinksViewModel.refresh(
             currentURL: selectedFileURL,
             workspaceFolders: fileTreeViewModel.folders.map(\.url)
         )
+        PerfLogger.end("AppViewModel.activate.backlinks.refresh")
     }
 
     // キャッシュ済みカウント — editorText 変更後に非同期で更新

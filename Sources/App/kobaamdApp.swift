@@ -130,6 +130,7 @@ extension Notification.Name {
     static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
     static let aiInlineSpaceRequested = Notification.Name("kobaamd.aiInlineSpaceRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
+    static let previewScrollRatioChanged = Notification.Name("kobaamd.previewScrollRatioChanged")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")

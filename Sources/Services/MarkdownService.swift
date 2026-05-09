@@ -3,22 +3,27 @@ import Markdown
 
 final class MarkdownService {
 
-    /// ボディのコンテンツだけ返す（WKWebView の差分更新用）。
-    func toBodyHTML(_ text: String) -> String {
-        let document = Markdown.Document(parsing: text)
-        return renderChildren(of: document)
-    }
+    // MARK: - Shell head cache (perf probe finding)
+    //
+    // mermaid.min.js (3 MB) を含む HTML head 部分の文字列補間が cold start で
+    // ~8 秒かかり loading 表示の主因になっていた。head のうち変動するのは
+    // theme.previewCSS のみなので、theme ごとにキャッシュして再利用する。
+    private static var shellHeadCache: [String: String] = [:]
+    private static let shellHeadLock = NSLock()
 
-    /// 初回ロード用のフル HTML（シェル＋スタイル＋mermaid.js 込み）。
-    func toHTML(_ text: String) -> String {
-        let document = Markdown.Document(parsing: text)
-        let bodyContent = renderChildren(of: document)
-        // Inline the bundled mermaid.min.js so preview works offline.
-        // BundledJS.mermaid is empty only if the resource is missing (build error).
+    private static func shellHead(themeKey: String, previewCSS: String) -> String {
+        shellHeadLock.lock()
+        if let cached = shellHeadCache[themeKey] {
+            shellHeadLock.unlock()
+            return cached
+        }
+        shellHeadLock.unlock()
+
+        PerfLogger.begin("MarkdownService.shellHead.build(theme=\(themeKey))")
         let mermaidScript = BundledJS.mermaid.isEmpty
             ? "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
             : "<script>\(BundledJS.mermaid)</script>"
-        return """
+        let head = """
         <!DOCTYPE html>
         <html>
         <head>
@@ -27,7 +32,6 @@ final class MarkdownService {
             \(mermaidScript)
             <script>
             document.addEventListener('DOMContentLoaded', function() {
-              // Convert <pre><code class="language-mermaid"> to <div class="mermaid">
               document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
                 var div = document.createElement('div');
                 div.className = 'mermaid';
@@ -41,14 +45,43 @@ final class MarkdownService {
             });
             </script>
             <style>
-            \(AppState.shared.selectedTheme.previewCSS)
+            \(previewCSS)
             </style>
         </head>
         <body>
-        \(bodyContent)
-        </body>
-        </html>
+
         """
+        PerfLogger.end("MarkdownService.shellHead.build(theme=\(themeKey))")
+
+        shellHeadLock.lock()
+        shellHeadCache[themeKey] = head
+        shellHeadLock.unlock()
+        return head
+    }
+
+    /// ボディのコンテンツだけ返す（WKWebView の差分更新用）。
+    func toBodyHTML(_ text: String) -> String {
+        PerfLogger.begin("MarkdownService.toBodyHTML(\(text.count))")
+        defer { PerfLogger.end("MarkdownService.toBodyHTML(\(text.count))") }
+        let document = Markdown.Document(parsing: text)
+        return renderChildren(of: document)
+    }
+
+    /// 初回ロード用のフル HTML（シェル＋スタイル＋mermaid.js 込み）。
+    /// `body` を渡すと markdown 再パースをスキップする。
+    func toHTML(_ text: String, body: String? = nil) -> String {
+        PerfLogger.begin("MarkdownService.toHTML(\(text.count) body=\(body == nil ? "nil" : "given"))")
+        defer { PerfLogger.end("MarkdownService.toHTML(\(text.count) body=\(body == nil ? "nil" : "given"))") }
+        let bodyContent: String
+        if let body {
+            bodyContent = body
+        } else {
+            let document = Markdown.Document(parsing: text)
+            bodyContent = renderChildren(of: document)
+        }
+        let theme = AppState.shared.selectedTheme
+        let head = Self.shellHead(themeKey: theme.rawValue, previewCSS: theme.previewCSS)
+        return head + bodyContent + "\n</body>\n</html>"
     }
 
     private func render(_ markup: Markup) -> String {

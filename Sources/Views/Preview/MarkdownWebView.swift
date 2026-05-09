@@ -1,43 +1,110 @@
 import SwiftUI
 import WebKit
 
+@MainActor
+final class ScrollSyncDebouncer {
+    /// `interval` 間隔の throttle (leading + trailing)。
+    /// 連続スクロール中も `interval` ごとに flush するため、preview 側がスムーズに追従する。
+    /// `delay` は後方互換用エイリアス（コンストラクタ引数として保持）。
+    private let interval: Duration
+    private let onFlush: @MainActor (Double, String) -> Void
+    private var pendingRatio: Double?
+    private var pendingSource: String = "unknown"
+    private var trailingTask: Task<Void, Never>?
+    private var lastFlushed: ContinuousClock.Instant?
+    private let clock = ContinuousClock()
+
+    init(delay: Duration = .milliseconds(16), onFlush: @escaping @MainActor (Double, String) -> Void) {
+        self.interval = delay
+        self.onFlush = onFlush
+    }
+
+    deinit {
+        trailingTask?.cancel()
+    }
+
+    func schedule(ratio: Double, source: String) {
+        pendingRatio = ratio
+        pendingSource = source
+
+        let now = clock.now
+        if let last = lastFlushed, now - last < interval {
+            // interval 未満なら trailing flush だけ予約（既にあれば再利用）
+            if trailingTask == nil {
+                let interval = interval
+                trailingTask = Task { [weak self] in
+                    try? await Task.sleep(for: interval)
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run { self?.flushPending() }
+                }
+            }
+            return
+        }
+
+        // leading-edge 即時 flush
+        flushPending()
+    }
+
+    private func flushPending() {
+        trailingTask?.cancel()
+        trailingTask = nil
+        guard let ratio = pendingRatio else { return }
+        let source = pendingSource
+        pendingRatio = nil
+        lastFlushed = clock.now
+        onFlush(ratio, source)
+    }
+}
+
 struct MarkdownWebView: NSViewRepresentable {
+    let appViewModel: AppViewModel
     /// フル HTML（初回ロード用シェル）
     let shellHTML: String
+    /// 巨大な shellHTML の差し替え通知用バージョン
+    let shellVersion: Int
     /// ボディコンテンツのみ（差分更新用）
     let bodyHTML: String
-    let scrollRatio: Double
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(appViewModel: appViewModel)
     }
 
     func makeNSView(context: Context) -> WKWebView {
+        PerfLogger.begin("MarkdownWebView.makeNSView")
         let configuration = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
+        PerfLogger.end("MarkdownWebView.makeNSView")
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        PerfLogger.begin("MarkdownWebView.updateNSView.tick")
+        defer { PerfLogger.end("MarkdownWebView.updateNSView.tick") }
         let coord = context.coordinator
+        PerfLogger.event(
+            "MarkdownWebView.updateNSView",
+            "loaded=\(coord.isLoaded) shellVersion=\(shellVersion) lastShellVersion=\(coord.lastShellVersion) bodyLen=\(bodyHTML.count) scrollRatio=\(coord.latestScrollRatio)"
+        )
 
-        if (!coord.isLoaded || coord.lastShellHTML != shellHTML) && !shellHTML.isEmpty {
+        if (!coord.isLoaded || coord.lastShellVersion != shellVersion) && !shellHTML.isEmpty {
             // 初回 or CSS/シェル変更時：フル HTML をリロード
             coord.isLoaded = true
-            coord.lastShellHTML = shellHTML
+            coord.lastShellVersion = shellVersion
             coord.lastBodyHTML = bodyHTML
-            coord.pendingScrollRatio = scrollRatio
+            coord.pendingScrollRatio = coord.latestScrollRatio
             PerfLogger.begin("WebViewLoad")
+            PerfLogger.event("MarkdownWebView.loadHTMLString.begin", "shellLen=\(shellHTML.count) bodyLen=\(bodyHTML.count)")
             webView.loadHTMLString(shellHTML, baseURL: URL(string: "https://kobaamd-preview.local/"))
         } else if coord.lastBodyHTML != bodyHTML {
             // 差分更新：ページナビゲーションなしでボディだけ差し替え
             coord.lastBodyHTML = bodyHTML
-            coord.pendingScrollRatio = scrollRatio
-            injectBody(bodyHTML, into: webView, scrollRatio: scrollRatio)
-        } else {
-            coord.scheduleSyncScroll(webView: webView, ratio: scrollRatio)
+            coord.pendingScrollRatio = coord.latestScrollRatio
+            PerfLogger.begin("MarkdownWebView.injectBody")
+            PerfLogger.event("MarkdownWebView.injectBody.start", "bodyLen=\(bodyHTML.count)")
+            injectBody(bodyHTML, into: webView, scrollRatio: coord.latestScrollRatio)
+            PerfLogger.end("MarkdownWebView.injectBody")
         }
     }
 
@@ -75,19 +142,36 @@ struct MarkdownWebView: NSViewRepresentable {
 
     @MainActor class Coordinator: NSObject, WKNavigationDelegate {
         var isLoaded = false
-        var lastShellHTML: String = ""
+        var lastShellVersion: Int = 0
         var lastBodyHTML: String = ""
         var pendingScrollRatio: Double = 0
-        var lastSyncAt: ContinuousClock.Instant = .now
-        var pendingSyncRatio: Double? = nil
-        var syncTask: Task<Void, Never>? = nil
+        var latestScrollRatio: Double
         weak var webView: WKWebView?
+        private var previewScrollObserver: Any?
         private var blockObserver: Any?
         private var pdfObserver: Any?
-        private let syncClock = ContinuousClock()
+        private lazy var scrollSyncDebouncer = ScrollSyncDebouncer { [weak self] ratio, source in
+            self?.flushSyncScroll(ratio: ratio, source: source)
+        }
 
-        override init() {
+        init(appViewModel: AppViewModel) {
+            latestScrollRatio = appViewModel.previewScrollRatio
             super.init()
+            previewScrollObserver = NotificationCenter.default.addObserver(
+                forName: .previewScrollRatioChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let ratio = note.userInfo?["ratio"] as? Double else { return }
+                    let source = note.userInfo?["source"] as? String ?? "unknown"
+                    self.latestScrollRatio = ratio
+                    self.pendingScrollRatio = ratio
+                    guard self.isLoaded, self.webView != nil else { return }
+                    self.scheduleSyncScroll(ratio: ratio, source: source)
+                }
+            }
             blockObserver = NotificationCenter.default.addObserver(
                 forName: .cursorBlockChanged,
                 object: nil,
@@ -119,41 +203,30 @@ struct MarkdownWebView: NSViewRepresentable {
         }
 
         deinit {
-            syncTask?.cancel()
+            if let previewScrollObserver { NotificationCenter.default.removeObserver(previewScrollObserver) }
             if let blockObserver { NotificationCenter.default.removeObserver(blockObserver) }
             if let pdfObserver { NotificationCenter.default.removeObserver(pdfObserver) }
         }
 
-        func scheduleSyncScroll(webView: WKWebView, ratio: Double) {
-            let now = syncClock.now
-            let frameInterval: Duration = .milliseconds(16)
-            let elapsed = lastSyncAt.duration(to: now)
-
-            if elapsed >= frameInterval {
-                flushSyncScroll(webView: webView, ratio: ratio, at: now)
-                return
-            }
-
-            pendingSyncRatio = ratio
-            guard syncTask == nil else { return }
-
-            let delay = frameInterval - elapsed
-            syncTask = Task { [weak self, weak webView] in
-                try? await Task.sleep(for: delay)
-                guard !Task.isCancelled,
-                      let self,
-                      let webView,
-                      let ratio = self.pendingSyncRatio else { return }
-                self.pendingSyncRatio = nil
-                self.syncTask = nil
-                self.flushSyncScroll(webView: webView, ratio: ratio, at: self.syncClock.now)
-            }
+        func scheduleSyncScroll(ratio: Double, source: String) {
+            scrollSyncDebouncer.schedule(ratio: ratio, source: source)
         }
 
-        private func flushSyncScroll(webView: WKWebView, ratio: Double, at instant: ContinuousClock.Instant) {
-            lastSyncAt = instant
+        private func flushSyncScroll(ratio: Double, source: String) {
+            guard let webView else { return }
             let js = "window.scrollTo(0, \(ratio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));"
-            webView.evaluateJavaScript(js, completionHandler: nil)
+            webView.evaluateJavaScript(js) { _, error in
+                let detail: String
+                if let error {
+                    detail = "status=error error=\(error.localizedDescription)"
+                } else {
+                    detail = "status=applied"
+                }
+                PerfLogger.event(
+                    "MarkdownWebView.syncScroll",
+                    "source=\(source) ratio=\(ratio) \(detail)"
+                )
+            }
         }
 
         func exportPDF(to url: URL, completion: @escaping (Result<Void, Error>) -> Void) {
