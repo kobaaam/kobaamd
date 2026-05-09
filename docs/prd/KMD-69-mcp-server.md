@@ -93,6 +93,7 @@ CLI なので UI なし。クライアント側の `mcp.json` 設定例を `docs
 | `Sources/CLI/MCPServer.swift` | 追加 | JSON-RPC 2.0 over stdio のメインループ + ツールディスパッチ |
 | `Sources/CLI/MCPProtocol.swift` | 追加 | JSON-RPC 2.0 リクエスト/レスポンス型 (Codable + JSON Schema 構造体) |
 | `Sources/CLI/Tools/MCPToolRegistry.swift` | 追加 | 6 ツールの登録・スキーマ定義 |
+| `Sources/CLI/Tools/MCPToolSupport.swift` | 追加（実装時に必要だった共通ヘルパー） | parseArguments / requireString / listMarkdownFiles / extractHeadings / textContent / encodeJSONString。各 Tool 間の重複を吸収するために実装中に追加 |
 | `Sources/CLI/Tools/SearchNotesTool.swift` | 追加 | SQLite WikiIndexService をシン化したスタンドアロン検索 |
 | `Sources/CLI/Tools/ReadNoteTool.swift` | 追加 | frontmatter + body + headings 統合 |
 | `Sources/CLI/Tools/ListNotesTool.swift` | 追加 | vault 内 Markdown 列挙 |
@@ -100,7 +101,8 @@ CLI なので UI なし。クライアント側の `mcp.json` 設定例を `docs
 | `Sources/CLI/Tools/GetBacklinksTool.swift` | 追加 | BacklinksScanner を呼ぶ |
 | `Sources/CLI/Tools/GetTagsTool.swift` | 追加 | Frontmatter.parse でタグを抽出 |
 | `Sources/CLI/VaultPath.swift` | 追加 | path traversal バリデーション |
-| `Tests/MCPServerTests.swift` | 追加 | round-trip + 引数バリデーション + path traversal 防止 |
+| `Tests/kobaamdTests/MCPServerTests.swift` | 追加 | round-trip + 引数バリデーション + path traversal 防止 |
+| `Package.resolved` | 自動更新 | tree-sitter / tree-sitter-markdown の `branch` 値が SwiftPM resolver により補完追加された（依存追加・変更ではない） |
 | `docs/mcp-setup.md` | 追加 | Claude Desktop / Cursor 設定例 |
 | `Package.swift` | **変更しない** | 依存追加なし（Foundation のみ）|
 
