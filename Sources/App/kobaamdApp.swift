@@ -2,7 +2,6 @@ import SwiftUI
 import AppKit
 import Sparkle
 
-@main
 struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
