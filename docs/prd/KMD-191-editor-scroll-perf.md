@@ -57,7 +57,7 @@ KMD-184 で md スクロール中の loading 頻発は一旦解消したが、�
     │   └─ updateImmediate でファイル切替時 debounce 飛ばし即時 render
     │
     ├─④ MarkdownWebView IPC 削減
-    │   ├─ ScrollSyncDebouncer（leading + trailing 16ms throttle）
+    │   ├─ ScrollSyncThrottle（leading + trailing 16ms throttle）
     │   ├─ NotificationCenter ベース scroll sync（observation graph 経由廃止）
     │   └─ shellVersion: Int で 3MB 文字列比較を整数比較に
     │
@@ -77,11 +77,11 @@ KMD-184 で md スクロール中の loading 頻発は一旦解消したが、�
 - [x] SwiftUI observation graph 経由で 3MB の shellHTML が diff されない
 - [x] updateNSView がアイドル時に発火しない（NotificationCenter 経由）
 - [x] Backlinks ファイル列挙が 2 回目以降 cache hit する（`source=cache` がログに出る）
-- [x] ScrollSyncDebouncerTests が pass
+- [x] ScrollSyncThrottleTests が pass
 
 ## 7. テスト戦略
 
-- **単体テスト**: `Tests/kobaamdTests/ScrollSyncDebouncerTests.swift`（新規） — leading + trailing throttle 動作・separated updates の挙動を検証
+- **単体テスト**: `Tests/kobaamdTests/ScrollSyncThrottleTests.swift`（新規） — leading + trailing throttle 動作・separated updates・leading-edge 即時 flush の挙動を検証
 - **手動確認**: 9000+ ファイルの実 vault で連続ファイル切替してスクロール体感確認 + `log show` でメトリクス確認
 - **swift build / swift test**: `kobaamd_validate_build` 経由
 
@@ -93,13 +93,13 @@ KMD-184 で md スクロール中の loading 頻発は一旦解消したが、�
 | `Sources/Services/MarkdownService.swift` | 変更 | shellHead cache + toHTML(body:) overload |
 | `Sources/ViewModels/PreviewViewModel.swift` | 変更 | @ObservationIgnored + shellVersion + updateImmediate |
 | `Sources/ViewModels/BacklinksViewModel.swift` | 変更 | debounce + parallel scan + cache + nil prefetch |
-| `Sources/Views/Preview/MarkdownWebView.swift` | 変更 | ScrollSyncDebouncer + Notification ベース |
+| `Sources/Views/Preview/MarkdownWebView.swift` | 変更 | ScrollSyncThrottle + Notification ベース |
 | `Sources/Views/Preview/PreviewView.swift` | 変更 | selectedFileURL onChange immediate render |
 | `Sources/App/AppViewModel.swift` | 変更 | previewScrollRatio @ObservationIgnored + Notification |
 | `Sources/App/kobaamdApp.swift` | 変更 | .previewScrollRatioChanged Notification.Name |
 | `Sources/Views/Editor/EditorView.swift` | 変更 | setPreviewScrollRatio caller 更新 |
 | `Sources/Views/Sidebar/OutlineView.swift` | 変更 | setPreviewScrollRatio caller 更新 |
-| `Tests/kobaamdTests/ScrollSyncDebouncerTests.swift` | 追加 | ScrollSyncDebouncer の単体テスト |
+| `Tests/kobaamdTests/ScrollSyncThrottleTests.swift` | 追加 | ScrollSyncThrottle の単体テスト |
 
 **共有コンテナへの注意**:
 - `MarkdownService.shellHeadCache` は static dictionary。テスト時のテーマ切替で壊れないよう、キーはテーマ ID 含む文字列にする
