@@ -11,6 +11,7 @@ struct SidebarView: View {
     @State private var outlinePanelRatio: CGFloat = 0.35
     @State private var dragStartRatio: CGFloat = 0.35
     @State private var isTodoExpanded: Bool = false
+    @State private var isTagsExpanded: Bool = false
     @State private var isDraggingHandle: Bool = false
 
     var body: some View {
@@ -22,7 +23,9 @@ struct SidebarView: View {
             GeometryReader { geo in
                 let todoHeaderHeight: CGFloat = 28
                 let todoBodyHeight: CGFloat = isTodoExpanded ? min(240, geo.size.height * 0.35) : 0
-                let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight
+                let tagsHeaderHeight: CGFloat = 28
+                let tagsBodyHeight: CGFloat = isTagsExpanded ? min(280, geo.size.height * 0.4) : 0
+                let availableHeight = geo.size.height - todoHeaderHeight - todoBodyHeight - tagsHeaderHeight - tagsBodyHeight
                 let isOutlineEmpty = appViewModel.outlineViewModel.items.isEmpty
                 let outlineHeight: CGFloat = isOutlineEmpty ? 60 : max(60, availableHeight * outlinePanelRatio)
                 let fileHeight = max(60, availableHeight - outlineHeight)
@@ -52,6 +55,11 @@ struct SidebarView: View {
                             .accessibilityElement(children: .contain)
                             .accessibilityLabel("アウトライン")
                     }
+
+                    // ── TAGS collapsible area ──
+                    tagsSection
+                        .frame(height: tagsHeaderHeight + tagsBodyHeight)
+                        .clipped()
 
                     // ── TODO collapsible area ──
                     todoSection
@@ -133,6 +141,49 @@ struct SidebarView: View {
     }
 
     // MARK: - TODO collapsible section
+
+    private var tagsSection: some View {
+        let tagCount = appViewModel.tagsViewModel.tags.count
+        let headerColor: Color = tagCount > 0 ? .kobaInk : .kobaMute2
+
+        return VStack(spacing: 0) {
+            Color.kobaLine
+                .frame(height: 1)
+                .frame(maxWidth: .infinity)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isTagsExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isTagsExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("TAGS")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    if tagCount > 0 {
+                        Text("(\(tagCount))")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                    Spacer()
+                }
+                .foregroundStyle(headerColor)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.kobaSurface)
+            .accessibilityLabel("タグ一覧")
+            .accessibilityHint("クリックで展開・折り畳み")
+
+            if isTagsExpanded {
+                TagsView(tagsViewModel: appViewModel.tagsViewModel)
+                    .frame(maxHeight: 280)
+            }
+        }
+    }
 
     private var todoSection: some View {
         let todoCount = appViewModel.todoViewModel.items.count

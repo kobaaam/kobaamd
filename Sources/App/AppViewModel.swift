@@ -59,6 +59,7 @@ final class AppViewModel {
     let outlineViewModel = OutlineViewModel()
     let todoViewModel = TodoViewModel()
     let confluenceSyncViewModel = ConfluenceSyncViewModel()
+    let tagsViewModel = TagsViewModel()
     let aiChatViewModel = AIChatViewModel()
     var isChatSidebarVisible: Bool = false
 
@@ -108,6 +109,7 @@ final class AppViewModel {
         todoViewModel.updateWorkspaceRoots(folderURLs)
         // Folder スコープの対象は「最初に開いたワークスペースフォルダ」（PRD §2）
         todoViewModel.updateFolderRoot(folderURLs.first)
+        tagsViewModel.updateWorkspaceRoots(folderURLs)
     }
 
     @MainActor
@@ -267,6 +269,9 @@ final class AppViewModel {
         todoViewModel.update(text: editorText)
         if todoViewModel.scope != .file, let url = selectedFileURL {
             todoViewModel.updateFile(url, text: editorText)
+        }
+        if let url = selectedFileURL {
+            tagsViewModel.updateFile(url, text: editorText)
         }
     }
 
