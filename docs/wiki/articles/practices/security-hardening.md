@@ -4,7 +4,7 @@ category: practices
 tags: [security, supply-chain, secrets, pre-commit, pipeline, silent-failure]
 sources: [docs/adr/0009-security-hardening.md, docs/learnings/2026-05-01-KMD-26.md, docs/learnings/2026-05-01-KMD-27.md, docs/learnings/2026-05-06-KMD-144.md]
 created: 2026-04-29
-updated: 2026-05-06
+updated: 2026-05-09
 ---
 
 # セキュリティ・ハードニング（多層防御）
@@ -105,6 +105,7 @@ AI 自律パイプラインで生成されるシェルスクリプトには、�
 - [[postmortem-patterns]] — 過去の問題からの学び（パターン 8/9/11/12 が本記事と関連）
 - [[sparkle-release]] — KMD-27 で確立された多層防御の具体実装
 - [[dependency-inversion-guard]] — shell quoting / set -euo pipefail / trap cleanup を前提とした依存逆順ガードの shell パターン
+- [[external-teams]] — Sparkle / GitHub / launchd 等の外部依存に対する多層防御の運用集約
 
 ## Sources
 
