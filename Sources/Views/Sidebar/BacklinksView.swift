@@ -56,6 +56,10 @@ struct BacklinksView: View {
         .background(Color.kobaSidebar)
     }
 
+    private func isSourceTabDirty(_ url: URL) -> Bool {
+        appViewModel.tabs.contains { $0.url == url && $0.isDirty }
+    }
+
     private func subsectionHeader(_ title: String, count: Int) -> some View {
         HStack(spacing: 6) {
             Text(title)
@@ -108,7 +112,9 @@ struct BacklinksView: View {
     }
 
     private func unlinkedRow(_ backlink: Backlink) -> some View {
-        HStack(spacing: 0) {
+        let dirty = isSourceTabDirty(backlink.sourceURL)
+
+        return HStack(spacing: 0) {
             Button {
                 Task { @MainActor in
                     await appViewModel.openFileAndJump(url: backlink.sourceURL, line: backlink.line)
@@ -136,8 +142,11 @@ struct BacklinksView: View {
                         Capsule()
                             .fill(Color.kobaAccent.opacity(0.12))
                     )
+                    .opacity(dirty ? 0.4 : 1.0)
             }
             .buttonStyle(.plain)
+            .disabled(dirty)
+            .help(dirty ? "先に保存してから変換してください" : "Convert to link")
             .padding(.trailing, 10)
         }
         .background(
@@ -150,7 +159,7 @@ struct BacklinksView: View {
             hoveredID = hovering ? backlink.id : (hoveredID == backlink.id ? nil : hoveredID)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(backlink.sourceURL.lastPathComponent) \(backlink.line)行目 \(backlink.snippet) Convert to link ボタン付き")
+        .accessibilityLabel("\(backlink.sourceURL.lastPathComponent) \(backlink.line)行目 \(backlink.snippet) Convert to link\(dirty ? "（未保存編集あり、変換不可）" : "")")
     }
 
     private func rowContent(backlink: Backlink) -> some View {
@@ -169,7 +178,7 @@ struct BacklinksView: View {
             Text(backlink.snippet)
                 .font(.system(size: 11))
                 .foregroundStyle(Color.kobaMute)
-                .lineLimit(2)
+                .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

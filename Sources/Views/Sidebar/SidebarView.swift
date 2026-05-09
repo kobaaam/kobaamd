@@ -10,7 +10,7 @@ struct SidebarView: View {
 
     @State private var outlinePanelRatio: CGFloat = 0.35
     @State private var dragStartRatio: CGFloat = 0.35
-    @State private var isBacklinksExpanded: Bool = false
+    @State private var isBacklinksExpanded: Bool = true
     @State private var isTodoExpanded: Bool = false
     @State private var isTagsExpanded: Bool = false
     @State private var isDraggingHandle: Bool = false
