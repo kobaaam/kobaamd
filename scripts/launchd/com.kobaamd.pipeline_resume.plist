@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One-shot LaunchAgent: 毎週金曜 07:00 に kobaamd 自律パイプラインを再 install。
+  実行後は自分自身を bootout して 1 回限りで終了する（plist は残るので再インストール時のテンプレ）。
+
+  使い方:
+    1. このファイルを ~/Library/LaunchAgents/ にコピー
+    2. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kobaamd.pipeline_resume.plist
+    3. 金曜 07:00 になると pipeline_active / daily / weekly が再起動される
+
+  停止したい場合:
+    launchctl bootout gui/$(id -u)/com.kobaamd.pipeline_resume
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kobaamd.pipeline_resume</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-lc</string>
+        <!-- install.sh で 3 つの pipeline jobs を bootstrap、その後 自分自身を bootout して one-shot 化 -->
+        <string>cd "$HOME/atelier/kobaamd" &amp;&amp; ./scripts/launchd/install.sh &gt;&gt; .logs/pipeline_resume.log 2&gt;&amp;1 ; launchctl bootout "gui/$(id -u)/com.kobaamd.pipeline_resume"</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <!-- launchd の Weekday: 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat -->
+        <key>Weekday</key>
+        <integer>5</integer>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/com.kobaamd.pipeline_resume.out</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/com.kobaamd.pipeline_resume.err</string>
+</dict>
+</plist>

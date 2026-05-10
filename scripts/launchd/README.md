@@ -9,8 +9,26 @@ kobaamd 自律パイプラインの定期実行を macOS launchd で動かすた
 | `com.kobaamd.pipeline_active.plist` | 30 分間隔 | merge_pr → assign_work |
 | `com.kobaamd.pipeline_daily.plist` | 毎日 8:00 | archive_done / detect_stale / sync_github |
 | `com.kobaamd.pipeline_weekly.plist` | 毎週月曜 9:00 | research / report / changelog / improve_prompt |
+| `com.kobaamd.pipeline_resume.plist` | 毎週金曜 7:00 | one-shot 再開エージェント（後述「一時停止と再開」参照） |
 
 plist は `run_bundle.sh` 経由で `claude -p` を起動する設計。完了時に macOS 通知センターに結果を通知する。
+
+## Pre-flight check (KMD-194)
+
+`pipeline_active` のみ、`run_bundle.sh` の冒頭で `preflight_check.sh` が走り、Linear に対象 issue がゼロの場合は `claude -p` の起動を skip して exit する（メインセッショントークン消費 ~8k → 0）。
+
+判定ロジック（OR、いずれかに該当すれば proceed）:
+
+- `Reviewed` 状態の issue が 1 件以上
+- `Human in Review` 状態の issue が 1 件以上
+- `in Review` 状態の issue が 1 件以上
+- CONFLICTING PR が 1 件以上
+- `draft` 状態の issue が 1 件以上
+- `Todo` 状態の issue が 1 件以上 かつ `In Progress` = 0 件
+
+すべて満たさなければ `PREFLIGHT_SKIP: all queues empty (...)` をログに残して exit。Linear API / gh CLI 失敗時は **fail-open** で通常起動する（計測機構の不備で開発を止めない）。
+
+`pipeline_daily` / `pipeline_weekly` は対象外。
 
 plist 内のパスは `__KOBAAMD_DIR__` プレースホルダで書かれており、`install.sh` が実行時に絶対パスへ置換する（OSS 公開可）。
 
@@ -80,6 +98,44 @@ launchctl unload ~/Library/LaunchAgents/com.kobaamd.pipeline_active.plist
 ```bash
 ./scripts/launchd/uninstall.sh
 ```
+
+## 一時停止と再開（しばらく止めたい場合）
+
+plist は残したまま定期実行だけ止めたい場合は `bootout` を使う。`uninstall.sh` と違って plist ファイルは消さないので、`install.sh` 一発で復活する。
+
+```bash
+# 即停止
+UID=$(id -u)
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_active"
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_daily"
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_weekly"
+
+# 再開
+./scripts/launchd/install.sh
+```
+
+### 自動再開（金曜 07:00）
+
+`com.kobaamd.pipeline_resume.plist` は **毎週金曜 07:00 に install.sh を 1 回だけ実行** する one-shot LaunchAgent。実行後は自分自身を bootout して 1 回限りで終了する。
+
+```bash
+# 一時停止 + 自動再開を仕掛けたい場合
+UID=$(id -u)
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_active"
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_daily"
+launchctl bootout "gui/$UID/com.kobaamd.pipeline_weekly"
+
+cp scripts/launchd/com.kobaamd.pipeline_resume.plist ~/Library/LaunchAgents/
+launchctl bootstrap "gui/$UID" ~/Library/LaunchAgents/com.kobaamd.pipeline_resume.plist
+```
+
+予約をキャンセルしたい場合:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.kobaamd.pipeline_resume"
+```
+
+実行ログは `.logs/pipeline_resume.log` に追記される。
 
 ## トラブルシューティング
 

@@ -40,6 +40,27 @@ cd "$KOBAAMD_DIR"
 # bash から zshrc は読めないため、zsh -c で PATH を取得する
 eval "$(zsh -lc 'echo "export PATH=\"$PATH\""' 2>/dev/null)" || true
 
+# ---- pre-flight check (KMD-194) ----
+# pipeline_active のみ、対象 issue ゼロなら claude -p 起動を skip して
+# メインセッションのトークン消費（CLAUDE.md ~8k tokens）を 0 にする。
+# preflight 自体が失敗（exit 2）したら fail-open で通常起動する。
+if [ "$BUNDLE" = "kobaamd_pipeline_active" ] && [ -x "$SCRIPT_DIR/preflight_check.sh" ]; then
+  PREFLIGHT_OUT=$("$SCRIPT_DIR/preflight_check.sh" 2>&1)
+  PREFLIGHT_EXIT=$?
+  {
+    echo ""
+    echo "==== $(date '+%Y-%m-%d %H:%M:%S') preflight: /$BUNDLE (exit=$PREFLIGHT_EXIT) ===="
+    echo "$PREFLIGHT_OUT"
+  } >> "$LOG"
+  if [ "$PREFLIGHT_EXIT" -eq 1 ]; then
+    {
+      echo "==== $(date '+%Y-%m-%d %H:%M:%S') skip: /$BUNDLE (preflight skip, no claude session started) ===="
+    } >> "$LOG"
+    # macOS 通知は出さない（30 分毎の skip 通知は noise なので all モードでも抑止）
+    exit 0
+  fi
+fi
+
 # ---- 実行 ----
 {
   echo ""
