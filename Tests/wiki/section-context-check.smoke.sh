@@ -85,13 +85,22 @@ assert_empty() {
 }
 
 write_success_mock() {
-  cat >"$TMPDIR/claude" <<'EOF'
+  # MD_FILE, ROOT_DIR, CHECK_SCRIPT are available in this scope.
+  # Match section-context-check.sh hash calculation so the mock response maps
+  # back to the metadata collected for the emitted violation.
+  local rp="$MD_FILE"
+  local body_overview=$'\nThis section intentionally needs external context.'
+  local hash_input_overview="${rp}|H2|Overview|${body_overview}"
+  local hash_overview
+  hash_overview=$(printf '%s' "$hash_input_overview" | shasum -a 256 | awk '{print $1}')
+
+  cat >"$TMPDIR/claude" <<MOCKEOF
 #!/usr/bin/env bash
 cat >/dev/null
-printf '%s\n' '{"hash":"abc123","verdict":"NO: 外部文脈が必要"}'
+printf '%s\n' '{"hash":"${hash_overview}","verdict":"NO: 外部文脈が必要"}'
 printf '%s\n' '[mock claude] WARN: something' >&2
 exit 0
-EOF
+MOCKEOF
   chmod +x "$TMPDIR/claude"
 }
 
@@ -121,6 +130,14 @@ if awk 'NF { print }' "$OUT_FILE" | while IFS= read -r line; do printf '%s\n' "$
   pass "success path stdout is valid NDJSON"
 else
   fail "success path stdout is valid NDJSON"
+fi
+
+if awk 'NF { print }' "$OUT_FILE" | while IFS= read -r line; do
+  printf '%s' "$line" | jq -e '(.line | type) == "number"' >/dev/null 2>&1 || exit 1
+done; then
+  pass "success path NDJSON line field is a number"
+else
+  fail "success path NDJSON line field is a number (got null - mock hash mismatch?)"
 fi
 
 # Test 2: failed subagent attempts are skipped after retries, stderr is relayed, stdout stays empty.
