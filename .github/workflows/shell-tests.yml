@@ -1,0 +1,25 @@
+name: Shell Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/wiki/**'
+      - 'tests/wiki/**'
+      - '.github/workflows/shell-tests.yml'
+  pull_request:
+    paths:
+      - 'scripts/wiki/**'
+      - 'tests/wiki/**'
+      - '.github/workflows/shell-tests.yml'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y jq python3
+
+      - name: Run section-context-check smoke test
+        run: bash tests/wiki/section-context-check.smoke.sh
