@@ -127,9 +127,6 @@ final class APIKeyStore {
         if let legacy = UserDefaults.standard.string(forKey: "apiKey_\(provider.rawValue)"),
            !legacy.isEmpty {
             save(legacy, for: provider)   // move to Keychain (also updates cache)
-            cacheLock.lock()
-            cache[provider] = .some(legacy)
-            cacheLock.unlock()
             return legacy
         }
 
