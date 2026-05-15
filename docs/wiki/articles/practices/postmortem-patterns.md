@@ -11,8 +11,9 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-15-KMD-188.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-15
 ---
 
 # ポストモーテムから学ぶ実装パターン
@@ -211,6 +212,25 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 
 **出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
 
+
+### パターン 21: 削除 PR は「同一動作の制御フロー trace」を先出しする
+<!-- llm-context: KMD-188 で確立。削除のみの変更は「動作変更なし」の主張だけでなく、削除した処理が既存コードのどこで確実に実行されているかの制御フロー trace を PR description / review コメントに先出しすることが APPROVE を速める。auto-carve 起票の行番号粒度も合わせて規定。 -->
+
+**問題**: 削除のみの変更（冗長コード除去 / dead code 削除）では「save() が既に cache を更新するので削除してよい」という主張が実装コメントにとどまり、review_pr 側が同一動作を独立トレースする必要があった。トレースが review 側の負担になり、レビュー時間が伸びる。
+
+また auto-carve 起票時に「冗長なキャッシュ書き込み」のような抽象表現しかない場合、implement 側が対象コードの特定に迷い、誤った行を削除するリスクがある。
+
+**対策**:
+
+1. **削除 PR では実装側が先出し trace**: PR description に「削除した X 行は、既存 `method()` の line N で確定的に実行される（guard / 分岐の評価根拠を併記）」の形で制御フロー trace を添付する。review_pr はそれを検証するだけでよい
+2. **auto-carve 起票の粒度規約**: `kobaamd_review_pr` が carve-out チケットを起票する際、削除系 concern は **行番号またはコードスニペット**（例: `load() 内 117-121 行: cacheLock.lock / cache[provider] = .some(legacy) / cacheLock.unlock`）を issue 本文に含める。抽象表現だけで起票しない
+
+**なぜ有効か**: 削除の正当性は「削除後の等価性」ではなく「削除した処理が既に他で担保されていること」の証明。この証明が PR description に書かれていると、review_pr の APPROVE 根拠が強まり fail / rework が出にくい。KMD-188（`APIKeyStore.load()` の cache 二重書き込み削除）では `save()` の制御フロー trace がコメントに明示され、クリーン APPROVE → 5 分完結を実現した。
+
+**副次効果**: 削除 PR のセキュリティレビューも「攻撃面縮小」として positive 評価されやすくなる（冗長な lock/unlock が減ることで、ロック競合や誤った状態読み取りリスクが下がる）。
+
+**出所**: KMD-188 (PR #116) — KMD-187 auto-carve → size S クリーンアップサイクル
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
@@ -233,3 +253,4 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-15-KMD-188.md
