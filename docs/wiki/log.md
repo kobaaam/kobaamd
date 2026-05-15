@@ -124,3 +124,17 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - 注記: 本タスクは broken-link 4 件と related-asymmetric 9 件のうち、broken-link を新規記事 1 本で一括解消し、related-asymmetric を双方向化で解消した。既存記事の本文（Summary / Content / Sources）には触れていない
 - lint: pass を確認すること（本作業の AC）
 - ingest history: 別タスクとして扱う（本タスクは KB2 残作業に焦点）
+
+## [2026-05-15] Wiki ingest（--source docs/learnings/2026-05-15-KMD-186.md）
+
+KMD-186（`NSTextViewWrapper.swift` の `MainActor.assumeIsolated` 二重ネスト解消、auto-carve された純粋リファクタ PR）の postmortem を取り込み、動作等価リファクタの review 観点と PRD-lite 行番号明示の実践を postmortem-patterns に追加。
+
+- sources:
+  - docs/learnings/2026-05-15-KMD-186.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 21「純粋リファクタ PR の動作等価性は制御フロー追跡で論証する」を追加。PRD-lite に行番号範囲を明示する付帯事項も収録。sources / updated 更新）
+- new articles: なし
+- skipped sources（理由付き）: なし
+- 注記: KMD-186 は能動フェーズ 6 分という最短クラスのサイクル事例。postmortem-patterns パターン 21 として「純粋リファクタ検出 → 等価性論証モード」という観点を wiki 化した。kobaamd_update_wiki のサブエージェント起動は Bash 権限ポリシーによりブロックされたため、postmortem が直接 wiki 記事を更新した
+- lint: 未実行
+- ingest history: 未記録

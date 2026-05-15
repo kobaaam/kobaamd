@@ -11,8 +11,9 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-15-KMD-186.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-15
 ---
 
 # ポストモーテムから学ぶ実装パターン
@@ -211,6 +212,22 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 
 **出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
 
+### パターン 21: 純粋リファクタ PR の動作等価性は制御フロー追跡で論証する
+<!-- llm-context: `[carve]` / `[refactor]` / `[cleanup]` 的な PR では「動作に影響していないか」が主要確認事項。before/after の制御フローを trace して等価性を論証する観点を review_pr に明示することで、再現性ある APPROVE 品質を得る。 -->
+
+**問題**: 通常の PR は「変更が正しいか」を確認するが、純粋リファクタ PR（KMD-186 の `MainActor.assumeIsolated` 二重ネスト解消等）では逆に「変更が動作に影響していないか」の等価性証明が主要確認事項になる。この観点を `kobaamd_review_pr` のプロンプトに明示していないと、通常の機能確認観点でレビューされて等価性の論証が省略されうる。
+
+**対策**: `kobaamd_review_pr` のプロンプトに以下を追記する:
+
+- PR タイトルまたは description に `[refactor]` / `[cleanup]` / `[carve from]` を検出したら、**「動作等価リファクタ」モードでレビュー**する
+- 動作等価リファクタの主要観点: before/after の制御フローを 1 ステップずつ trace し、実行順序・条件分岐・副作用（キャプチャ変数・nil チェック・`@MainActor` 境界）が変化していないことを言語化して論証する
+- 等価性論証が本文に含まれていれば、PRD AC 整合・影響範囲一致・[BREAKING] なしの 3 条件でクリーン APPROVE へ進める
+
+**付帯事項（PRD-lite テンプレートへの反映）**: auto-carve 起票時の PRD-lite に「変更箇所: `<ファイル>:<L始>-<L終>`」フィールドを追加する。行番号まで明示されていると実装側（Codex CLI）が surgical 変更しやすく、reviewer がコラテラルダメージなしを diff で機械的に確認しやすくなる。KMD-186 はこの形式の PRD-lite を持ち、能動フェーズ（In Progress → Done）6 分で完了した。
+
+**出所**: KMD-186 (PR #114)、`NSTextViewWrapper.swift` の `MainActor.assumeIsolated` 二重ネスト解消（純粋リファクタ、動作等価性を `queue: .main` クロージャ内の制御フロー trace で論証）
+
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
@@ -233,3 +250,4 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-15-KMD-186.md
