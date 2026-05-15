@@ -74,6 +74,23 @@ OSS ユーザー / 新規参加開発者向けに、現在有効な配布物側�
 
 → `review_security` が全 PR で自動実行されることで、人間不在時のリスクを軽減。
 
+#### Bash allowlist の残余リスク（KMD-169）
+
+`scripts/wiki/lib/section-context-check.sh` など Claude Code subagent を `claude -p --allowedTools "Bash(<cmd>:*)"` で起動する際、allowlist はコマンド名の prefix のみでマッチする仕様である。この仕様に由来する残余リスクを以下に明示する（脅威モデルの前提として認識すること）:
+
+| 塞がれる経路 | 残る残余リスク |
+|---|---|
+| `curl` / `ssh` / `rm -rf` / `bash -c` の直接呼び出し | `awk 'BEGIN{system("curl ...")}'` のように allowlist 内コマンドを踏み台にした外部コマンド実行 |
+| 明示的なファイル削除コマンド | `sed -i 's/.*//' file` によるファイル内容の完全消去 |
+| ネットワーク直接アクセス | `python3 -c "import urllib.request; ..."` 経由の HTTP 通信（python3 が許可されている場合） |
+
+**現状の判断**: KB3 系ユースケース（wiki lint / section-context 判定）では `awk` / `sed` の処理は正当であり、allowlist から除去するとユーティリティが動作しない。このリスクを許容した上で運用する。
+
+**残余リスクを軽減するための追加対策**（実施済みまたは検討中）:
+- subagent のプロンプトで「`awk system()` / sed ベースの任意コード実行は行わない」を明示的に制約（`.claude/agents/kobaamd_lint_section_context.md` の `## 制約・厳守事項` 参照）
+- `review_security` が関連コードの変更時に残余リスク増大を検査する（Layer 2 補完）
+- `python3 -c` / `python3 -m` 等のワンライナー実行を必要とするユースケースが出た場合は `python3` を allowlist から除去し専用スクリプト呼び出しに変更する（将来検討）
+
 ### サイレント失敗パターン（KMD-6 / KMD-27 / KMD-144）
 
 「ビルドは通るのに本番動作で黙って機能を無効化する」クラスのバグは、AI レビューが見落としやすい盲点。`kobaamd_review_pr` の評価軸に **「サイレント失敗の検出」** を独立観点として追加する:
