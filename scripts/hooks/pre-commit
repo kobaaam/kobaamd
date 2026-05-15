@@ -11,23 +11,33 @@ cd "$REPO_ROOT"
 SWIFT_CHANGED=$(git diff --cached --name-only | grep '\.swift$' || true)
 
 if [ -z "$SWIFT_CHANGED" ]; then
-    exit 0  # Swift 変更なし → スキップ
+    echo "Swift 変更なし → ビルド確認をスキップ"
+else
+    echo "🔨 Swift ファイルが変更されています。ビルドを確認します..."
+    echo "$SWIFT_CHANGED" | sed 's/^/  /'
+
+    # メインビルド確認
+    if ! swift build 2>&1 | tail -3; then
+        echo "❌ swift build 失敗。コミットを中止します。"
+        exit 1
+    fi
+
+    # テストコンパイル確認（実行はXcode必須のためコンパイルのみ）
+    echo "🧪 テストのコンパイルを確認します..."
+    if ! swift build --target kobaamdTests 2>&1 | tail -3; then
+        echo "❌ テストのコンパイル失敗。コミットを中止します。"
+        exit 1
+    fi
 fi
 
-echo "🔨 Swift ファイルが変更されています。ビルドを確認します..."
-echo "$SWIFT_CHANGED" | sed 's/^/  /'
-
-# メインビルド確認
-if ! swift build 2>&1 | tail -3; then
-    echo "❌ swift build 失敗。コミットを中止します。"
-    exit 1
-fi
-
-# テストコンパイル確認（実行はXcode必須のためコンパイルのみ）
-echo "🧪 テストのコンパイルを確認します..."
-if ! swift build --target kobaamdTests 2>&1 | tail -3; then
-    echo "❌ テストのコンパイル失敗。コミットを中止します。"
-    exit 1
+# Shell スクリプトの claude -p variadic option 後置バグ検出
+SH_CHANGED=$(git diff --cached --name-only | grep '\.sh$' || true)
+if [ -n "$SH_CHANGED" ]; then
+    echo "🐚 Shell スクリプトの CLI 引数 lint を確認します..."
+    if ! scripts/lint/check-cli-args.sh --staged; then
+        echo "❌ CLI 引数 lint 失敗。コミットを中止します。"
+        exit 1
+    fi
 fi
 
 # シークレット検出（全ステージングファイル対象、ただし以下は除外）
@@ -59,5 +69,5 @@ if [ -n "$FORBIDDEN_FILES" ]; then
     exit 1
 fi
 
-echo "✅ ビルド・テストコンパイル・シークレット検査 OK"
+echo "✅ pre-commit 検査 OK"
 exit 0
