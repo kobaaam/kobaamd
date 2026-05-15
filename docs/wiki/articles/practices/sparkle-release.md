@@ -4,7 +4,7 @@ category: practices
 tags: [sparkle, security, release, eddsa]
 sources: [docs/prd/KMD-27-sparkle-eddsa-public-key.md, docs/prd/KMD-16-auto-updater.md, docs/learnings/2026-04-28-KMD-6.md]
 created: 2026-05-01
-updated: 2026-05-09
+updated: 2026-05-15
 ---
 
 # Sparkle 署名付きリリース手順
@@ -12,6 +12,9 @@ updated: 2026-05-09
 ## Summary
 
 Sparkle 自動アップデートを実運用するための EdDSA 署名付きリリース手順。公開鍵はソース管理に含めず、ビルド時に環境変数から注入し、秘密鍵は Keychain で管理する。
+
+標準運用は GitHub Actions による CI リリースで、`v*` タグ push を契機に DMG ビルド、EdDSA 署名、GitHub Release、`appcast.xml` 更新までを自動実行する。
+以下の手動手順は、マシン依存の確認や CI 障害時の fallback として残す。
 
 ## Content
 
@@ -46,7 +49,33 @@ export KOBAAMD_SU_PUBLIC_ED_KEY="YOUR_PUBLIC_KEY"
 
 `~/.zshrc` などに追記したあと、新しいシェルを開くか `source ~/.zshrc` を実行して反映する。`Info.plist` の `SUPublicEDKey` は空のまま維持し、`scripts/post-build.sh` が `.app/Contents/Info.plist` へ注入する。
 
-### 各リリースの手順
+### CI リリース手順（標準）
+
+`v*` タグを push すると `.github/workflows/release.yml` が自動実行され、`swift build -c release`、`./scripts/post-build.sh release`、DMG 作成、Sparkle EdDSA 署名、GitHub Release 作成、`appcast.xml` の `main` 反映までを処理する。
+
+必要な Secrets は `SU_PUBLIC_ED_KEY`、`SPARKLE_EDDSA_PRIVATE_KEY`、`GITHUB_TOKEN`（`contents: write` 権限）である。`GITHUB_TOKEN` は GitHub Actions の自動発行トークンを使い、workflow 側で `permissions: contents: write` を明示する。
+
+Secrets の設定手順:
+
+1. GitHub リポジトリの `Settings` を開く
+2. `Secrets and variables` > `Actions` に進む
+3. `New repository secret` を選び、`SU_PUBLIC_ED_KEY` に Sparkle 公開鍵を登録する
+4. 同様に `SPARKLE_EDDSA_PRIVATE_KEY` に Sparkle 秘密鍵を登録する
+5. workflow 実行時に `GITHUB_TOKEN` が release 作成と `main` への push に使えるよう、repository 側で Actions を無効化していないことを確認する
+
+秘密鍵を GitHub Secrets に移行する方法:
+
+- `generate_keys` をこれから実行する場合は、その出力で公開鍵を `SU_PUBLIC_ED_KEY` に登録し、秘密鍵は表示内容または生成直後の保存手順に従って `SPARKLE_EDDSA_PRIVATE_KEY` へ登録する
+- 既存環境から移す場合は、後述の「Keychain エクスポート」で取り出した Sparkle 秘密鍵を `SPARKLE_EDDSA_PRIVATE_KEY` に登録し、対応する公開鍵を `SU_PUBLIC_ED_KEY` に設定する
+
+リリース実行手順:
+
+1. `main` にリリース対象の変更が入っていることを確認する
+2. `git tag vX.Y.Z`
+3. `git push origin vX.Y.Z`
+4. GitHub Actions の `Release` workflow が完了し、GitHub Release と `appcast.xml` 更新コミットが作成されたことを確認する
+
+### 手動リリース手順（Fallback）
 
 1. `swift build -c release`
 2. `./scripts/post-build.sh release`
@@ -78,6 +107,7 @@ Sparkle が「アップデートのインストールに失敗しました」を
 
 ## Related
 
+- [[release-workflow]]
 - [[security-hardening]] — Sparkle 公開鍵注入を含む多層防御運用
 - [[external-teams]] — Sparkle 連携を含む外部依存の運用集約
 - docs/prd/KMD-16-auto-updater.md
