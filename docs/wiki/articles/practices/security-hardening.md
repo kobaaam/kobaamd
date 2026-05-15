@@ -2,9 +2,14 @@
 title: セキュリティ・ハードニング（多層防御）
 category: practices
 tags: [security, supply-chain, secrets, pre-commit, pipeline, silent-failure]
-sources: [docs/adr/0009-security-hardening.md, docs/learnings/2026-05-01-KMD-26.md, docs/learnings/2026-05-01-KMD-27.md, docs/learnings/2026-05-06-KMD-144.md]
+sources:
+  - docs/adr/0009-security-hardening.md
+  - docs/learnings/2026-05-01-KMD-26.md
+  - docs/learnings/2026-05-01-KMD-27.md
+  - docs/learnings/2026-05-06-KMD-144.md
+  - docs/learnings/2026-05-08-KMD-151.md
 created: 2026-04-29
-updated: 2026-05-09
+updated: 2026-05-15
 ---
 
 # セキュリティ・ハードニング（多層防御）
@@ -115,6 +120,17 @@ AI 自律パイプラインで生成されるシェルスクリプトには、�
 4. **`set -u` + `trap` + `local` の互換性**: 関数内 `local var=""` 宣言した変数を `trap cleanup EXIT` 内で参照するとき、関数スコープを抜けた cleanup 発火時に unbound variable で死ぬリスクがある。`[[ -n "${var:-}" ]]` の既定値展開を使うか、関数スコープ外の変数として宣言する（KMD-144）
 
 このルールは [[postmortem-patterns]] パターン 8/9/12 として体系化済み。
+
+### Hardened Runtime + 長期実行プロセスのトラブルシュート（KMD-151）
+<!-- llm-context: Hardened Runtime + ad-hoc 署名下でビルド済みバイナリを実行中に再ビルドで上書きすると、クラッシュまでに数時間〜1日のズレが生じる。Termination Reason CODESIGNING/Invalid Page を見たときのデバッグ入り口。 -->
+
+`Termination Reason: CODESIGNING / Invalid Page` を見たときのデバッグ手順:
+
+1. **クラッシュ時刻とビルド時刻のズレを確認する**。数時間以上ズレていれば「ビルド時に実行中プロセスのバイナリを上書き → 未ロードの code page をフォルトインした瞬間 SIGKILL」パターンを疑う（`applicationDidChangeScreenParameters` や 通知受信など、起動後に初めて実行されるコードパスで発生しやすい）
+2. **クラッシュしたコードパスが「起動後に初めて触られたか」をスタックトレースで確認する**。初めて実行されるコードパスほどリスクが高い
+3. **`scripts/post-build.sh` 冒頭の `pkill -x kobaamd` が実行済みかを確認する**。`2>/dev/null || true` で best-effort なため、実行されていても停止が間に合わなかった可能性は残る（race window）
+
+コードサイニングが「破られた瞬間」ではなく「page-in 時の検証失敗」で生じる点が重要。この挙動は macOS の Hardened Runtime の正常な保護機構であり、バイナリ上書き後に実行中プロセスのままでいることが根本原因。
 
 ## Related
 

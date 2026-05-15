@@ -11,8 +11,11 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-06-KMD-119.md
+  - docs/learnings/2026-05-06-KMD-53.md
+  - docs/learnings/2026-05-08-KMD-151.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-15
 ---
 
 # ポストモーテムから学ぶ実装パターン
@@ -211,6 +214,64 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 
 **出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
 
+### パターン 21: 節約系最適化と観測性は両立させる
+<!-- llm-context: pipeline_active の no-op early return（KMD-119）で実証された、トークン節約とスナップショット観測性を同一 PR で両立する設計原則。early return が監査ログを丸ごとスキップしてしまう誤設計への再発防止。 -->
+
+**問題**: `pipeline_active` に no-op early return（6 条件成立時に subagent 起動をスキップし ~770k tokens / 日を節約）を追加した KMD-119 では、実装時に「ステップ 0c 以降をすべてスキップ」と書いてしまい、pre/post-run スナップショット（ステップ 12）まで skip された。`.logs/pipeline_transitions.log` に no-op cycle が記録されない = AC の「24h 運用後 token 消費確認」自体が困難になる自己矛盾。
+
+**対策**: 早期 return / skip / no-op 化を入れる時は、**監査ログ・スナップショット・pre/post ペア整合系のステップは必ず残す**。明示的に「このステップは early return 後も実行する」と設計文書に書く。PRD section 8「その他リスク」に「監査ログ系ステップを early return がスキップしないこと」を必ず書く。
+
+**実例**: KMD-119 では「no-op early return は subagent 起動をスキップするが、pre/post スナップショット（ステップ 12）は起動 / 不起動どちらの場合も実行し、`.logs/pipeline_transitions.log` に no-op cycle を記録する」に修正すべきだった（fix_pr_comments 1 ラウンド要）。
+
+**出所**: KMD-119 (PR フローを振り返り)
+
+### パターン 22: CLI / シェルヘルパーの引数は help / source で確認してから書く
+<!-- llm-context: lq.sh の --json フラグが実在しないまま実装されて set -e 環境下でカウント変数が空になった KMD-119 の事例。implementer / fix_pr_comments が外部 CLI を使う前に help を参照する習慣の明文化。 -->
+
+**問題**: KMD-119 の実装初版で `lq.sh issue.list --json` を判定スクリプト例として書いたが、`cmd_issue_list` は `--json` フラグをサポートしない。`set -e` 環境下では全カウント変数が空文字列になり、no-op early return のガードがほぼ常に不成立に倒れる致命バグが発生した。
+
+**対策**: `implementer` / `fix_pr_comments` のプロンプトに「外部 CLI / シェルヘルパー（`lq.sh` / `gh` / `jq` 等）を呼ぶコードを書く前に `--help` または source の引数定義を必ず確認する」を一行追加する。`lq.sh / gh CLI / jq` の組み合わせは未対応フラグが `die` で stderr のみ出力する経路を持ち、目視レビューで見逃されやすい。
+
+**実例**: KMD-119 では `fix_pr_comments` が `lq.sh issue.list --json` を `lq.sh issue.list`（フラグなし）に修正し、1 ラウンドで再 APPROVE を得た。事前に `lq.sh help` を確認していれば 0 ラウンドで済んだ。
+
+**出所**: KMD-119 (PR #??、fix_pr_comments 1 ラウンド)
+
+### パターン 23: wiki 規約適合は lint ツールを先に作ると大規模編集でも安全
+<!-- llm-context: KMD-53 で 11 ファイル / 32 追加 / 18 削除という大規模 wiki 編集を 15 分で完走できたのは lint.sh の機械的検証があったから。規約ツール → 規約適合 の順序が正解という設計教訓。 -->
+
+**問題**: wiki articles の規約適合作業は、対象ファイルが多く（11 件）、双方向リンク・slug 置換・frontmatter 更新が絡み合う。人手でレビューすると漏れが出る。
+
+**対策**: 規約ツール（`lint.sh`）を先に整備してから適合作業を行う。lint → fix → lint のループを繰り返し、違反 0 件を確認してから PR を出す。「規約ツールが先・大規模編集は後」の順序を守れば、11 ファイルでも 15 分以内で完走できる。
+
+**SCHEMA §6 挙動マトリクス**: 同じ「title alias」への対応でも、目的によって扱いが異なる。
+
+| 操作 | title alias の扱い |
+|---|---|
+| broken-link 解決 | title alias 温存 OK（既存記事の表記揺れを尊重） |
+| related-asymmetric チェック（lint） | slug 厳密一致（双方向性の機械的検証） |
+| 新規生成・更新 | slug 必須（書き手の判断余地を残さない） |
+
+**markdown / docs のみの編集は Edit ツール直接編集を可とする**。Codex CLI 必須は `.swift / Package.swift` に限定。wiki / docs のみの編集で Codex 呼び出しのオーバーヘッドが編集時間より長くなる場合は直接 Edit が合理的。
+
+**出所**: KMD-53 (PR #66)
+
+### パターン 24: Hardened Runtime + 長期実行プロセスの SIGKILL トラブルシュート
+<!-- llm-context: Hardened Runtime + ad-hoc 署名下で swift build 後に kobaamd を再起動すると、applicationDidChangeScreenParameters で未ロードの code page をフォルトインして SIGKILL が発生する。クラッシュ時刻とビルド時刻が数時間〜数日ズレる固有パターン。 -->
+
+**問題**: Hardened Runtime + ad-hoc 署名下で実行中の kobaamd を止めずに `swift build` してバイナリを上書きすると、後続の `applicationDidChangeScreenParameters` で未ロードの code page をフォルトインした瞬間に `SIGKILL (Code Signature Invalid)` が発生する。クラッシュ時刻がビルド時刻から **数時間〜24 時間以上ズレる**ため、原因特定が難しい。
+
+**対策**: `scripts/post-build.sh` 冒頭に `pkill -x kobaamd 2>/dev/null || true` を best-effort で挿入する（KMD-151 で実装済み）。race window（pkill 後の終了完了前に cp が走ると SIGKILL 再誘発）が理論上存在するが、SIGTERM 後数百 ms で code page アクセスが収束する経験則から、wait loop なしで実用上は十分。
+
+**`Termination Reason: CODESIGNING / Invalid Page` を見たら疑う点**:
+
+1. 「クラッシュ時刻」と「バイナリ上書き（swift build）時刻」のズレを確認する。ズレが大きければ Hardened Runtime + code page 遅延フォルトインを疑う
+2. クラッシュしたコードパス（スタックトレース）が「起動後に初めて実行されたか」を確認する（`applicationDidChangeScreenParameters` / 通知受信 など）
+3. `post-build.sh` の冒頭 `pkill -x kobaamd` が実行されていたかを確認する（`/var/log/` 等に実行ログが残るかは環境依存だが、再現手順として「停止確認してからビルド」が有効）
+
+**一般化**: `post-build.sh` の冒頭は「副作用無効化」の場所として確立する。他の `scripts/release/*.sh` でも対応する実行中プロセスを best-effort で停止する 1 行を冒頭に置くパターンが再利用可能。
+
+**出所**: KMD-151 (PR #75)
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
@@ -222,6 +283,7 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - [[autonomous-pipeline-philosophy]] — パターン 7 / 8 が機能する前提となるレビュー運用
 - [[subagent-prompt-design]] — パターン 15 / 16 / 17 の subagent プロンプト設計への反映（KMD-120）
 - [[role-dispatch]] — パターン 20 の shell script 小規模 fix 経路の SSOT（§4 近接ロールの境界）
+- [[sparkle-release]] — パターン 24 の Hardened Runtime SIGKILL と race window 知見の実装先
 
 ## Sources
 
@@ -233,3 +295,6 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-06-KMD-119.md
+- docs/learnings/2026-05-06-KMD-53.md
+- docs/learnings/2026-05-08-KMD-151.md

@@ -2,7 +2,11 @@
 title: Sparkle 署名付きリリース手順
 category: practices
 tags: [sparkle, security, release, eddsa]
-sources: [docs/prd/KMD-27-sparkle-eddsa-public-key.md, docs/prd/KMD-16-auto-updater.md, docs/learnings/2026-04-28-KMD-6.md]
+sources:
+  - docs/prd/KMD-27-sparkle-eddsa-public-key.md
+  - docs/prd/KMD-16-auto-updater.md
+  - docs/learnings/2026-04-28-KMD-6.md
+  - docs/learnings/2026-05-08-KMD-151.md
 created: 2026-05-01
 updated: 2026-05-15
 ---
@@ -90,6 +94,8 @@ Secrets の設定手順:
 
 **注意**: 再ビルド時は kobaamd を必ず停止する（`scripts/post-build.sh` が冒頭で `pkill -x kobaamd` を best-effort で実行する / KMD-151）。Hardened Runtime + ad-hoc 署名下で実行中プロセスのままバイナリを上書きすると、未ロードの code page をフォルトインした瞬間に `SIGKILL (Code Signature Invalid)` でクラッシュするため。
 
+**既知の race window（KMD-151 nit として記録）**: `pkill -x kobaamd` は SIGTERM を送るだけで終了を待たない。`applicationWillTerminate` 実行中に `cp` が始まれば同じ SIGKILL を再誘発できる。再現確率は低く（SIGTERM 後数百 ms で code page アクセスが収束する経験則）、Simplicity First の観点から wait loop なしで許容している。再発した場合は別 issue で wait loop 化（`while pgrep -x kobaamd >/dev/null; do sleep 0.1; done`）を検討する。
+
 ### Keychain エクスポート
 
 マシン乗り換え時は、Keychain Access で Sparkle 用の秘密鍵エントリを探してエクスポートする。移行先ではその秘密鍵を Keychain に取り込み、同じ公開鍵を `KOBAAMD_SU_PUBLIC_ED_KEY` として設定する。秘密鍵ファイルをリポジトリに置かないこと。
@@ -107,9 +113,9 @@ Sparkle が「アップデートのインストールに失敗しました」を
 
 ## Related
 
-- [[release-workflow]]
 - [[security-hardening]] — Sparkle 公開鍵注入を含む多層防御運用
 - [[external-teams]] — Sparkle 連携を含む外部依存の運用集約
+- [[postmortem-patterns]] — パターン 24（Hardened Runtime SIGKILL トラブルシュート）
 - docs/prd/KMD-16-auto-updater.md
 - docs/prd/KMD-27-sparkle-eddsa-public-key.md
 
