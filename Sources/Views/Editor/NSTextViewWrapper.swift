@@ -146,12 +146,11 @@ struct EditorObserver: NSViewRepresentable {
                 ratio.wrappedValue = max(0, min(1, r))
                 if let self,
                    let textView = self.textViewRef,
-                   let appViewModel = self.appViewModel,
-                   MainActor.assumeIsolated({
-                       appViewModel.isAIInlinePromptVisible || appViewModel.isAIGenerating || !appViewModel.pendingAIText.isEmpty
-                   }) {
+                   let appViewModel = self.appViewModel {
                     MainActor.assumeIsolated {
-                        self.updateAIOverlayPosition(in: textView)
+                        if appViewModel.isAIInlinePromptVisible || appViewModel.isAIGenerating || !appViewModel.pendingAIText.isEmpty {
+                            self.updateAIOverlayPosition(in: textView)
+                        }
                     }
                 }
             }
