@@ -68,6 +68,9 @@ swift build
 open .build/kobaamd.app
 ```
 
+If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, run the development ACL helper described in [`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md).
+ローカルの ad-hoc 再ビルド後に API キーの Keychain アクセス確認が繰り返される場合は、[`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md) の開発用 ACL ヘルパーを使用してください。
+
 ### Release build / リリースビルド
 
 ```bash
@@ -104,7 +107,8 @@ kobaamd/
 │   ├── Services/               # FileService, MarkdownService, AIService, GitService, BacklinksScanner, BacklinkContextChecker, BacklinkContextCache
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/ (AI presets)
 ├── scripts/
-│   └── post-build.sh           # Bundles binary + resources → .app
+│   ├── post-build.sh           # Bundles binary + resources → .app
+│   └── keychain/               # Local development Keychain ACL helpers
 ├── Info.plist                  # App metadata + document type registration
 └── Package.swift
 ```
