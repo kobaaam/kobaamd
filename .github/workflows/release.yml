@@ -29,6 +29,24 @@ jobs:
           echo "::add-mask::$KOBAAMD_SU_PUBLIC_ED_KEY"
           echo "::add-mask::$SPARKLE_EDDSA_PRIVATE_KEY"
 
+      - name: Validate secrets format
+        shell: bash
+        run: |
+          set -euo pipefail
+          # SPARKLE_EDDSA_PRIVATE_KEY の存在チェック・最小長チェック・PLACEHOLDER 拒否
+          if [ -z "$SPARKLE_EDDSA_PRIVATE_KEY" ]; then
+            echo "::error::SPARKLE_EDDSA_PRIVATE_KEY is empty. Set the secret in GitHub repository settings." >&2
+            exit 1
+          fi
+          if [ "${#SPARKLE_EDDSA_PRIVATE_KEY}" -lt 40 ]; then
+            echo "::error::SPARKLE_EDDSA_PRIVATE_KEY is too short (got ${#SPARKLE_EDDSA_PRIVATE_KEY} chars, expected >=40). Check the secret value." >&2
+            exit 1
+          fi
+          if printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | grep -qE '(PLACEHOLDER|TODO|EXAMPLE|YOUR_KEY)'; then
+            echo "::error::SPARKLE_EDDSA_PRIVATE_KEY contains placeholder value. Set the actual Sparkle EdDSA private key." >&2
+            exit 1
+          fi
+
       - name: Resolve version
         id: version
         shell: bash
@@ -51,36 +69,32 @@ jobs:
 
       - name: Create DMG
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
           hdiutil create -volname "kobaamd" -srcfolder ".build/kobaamd.app" -ov -format UDZO "kobaamd-${VERSION}.dmg"
 
       - name: Sign DMG with Sparkle EdDSA
         id: sparkle_sign
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
           DMG="kobaamd-${VERSION}.dmg"
-          SIGN_UPDATE=$(find .build -name "sign_update" -type f | head -1)
+          SIGN_UPDATE=$(find .build -name "sign_update" -type f | grep -v old_dsa | head -1)
           if [ -z "$SIGN_UPDATE" ]; then
             echo "sign_update not found under .build" >&2
             exit 1
           fi
 
-          KEY_FILE=$(mktemp)
-          cleanup() {
-            rm -f "$KEY_FILE"
-          }
-          trap cleanup EXIT
-
-          printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" > "$KEY_FILE"
+          # 秘密鍵は stdin 経由で渡す（一時ファイルへの書き込みを廃止し debug ログ漏洩リスクを根本排除）
           # sign_update outputs either:
           #   (a) a bare Base64 EdDSA signature string, or
           #   (b) XML-attribute style: sparkle:edSignature="..."
           # Extract the Base64 string from either form.
-          SIGN_OUTPUT=$("$SIGN_UPDATE" --ed-key-file "$KEY_FILE" "$DMG")
+          SIGN_OUTPUT=$(printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$DMG")
           SIGNATURE=$(printf '%s' "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
           if [ -z "$SIGNATURE" ]; then
             # Assume bare Base64 output; strip any surrounding whitespace
@@ -96,9 +110,10 @@ jobs:
       - name: Capture DMG metadata
         id: dmg_meta
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
           DMG="kobaamd-${VERSION}.dmg"
           LENGTH=$(stat -f%z "$DMG")
           echo "length=$LENGTH" >> "$GITHUB_OUTPUT"
@@ -107,30 +122,37 @@ jobs:
 
       - name: Generate appcast.xml
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DMG_URL: ${{ steps.dmg_meta.outputs.dmg_url }}
+          SIGNATURE: ${{ steps.sparkle_sign.outputs.signature }}
+          DMG_LENGTH: ${{ steps.dmg_meta.outputs.length }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
           ./scripts/generate-appcast.sh \
             "$VERSION" \
-            "${{ steps.dmg_meta.outputs.dmg_url }}" \
-            "${{ steps.sparkle_sign.outputs.signature }}" \
-            "${{ steps.dmg_meta.outputs.length }}"
+            "$DMG_URL" \
+            "$SIGNATURE" \
+            "$DMG_LENGTH"
 
       - name: Create GitHub Release
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DMG_NAME: ${{ steps.dmg_meta.outputs.dmg_name }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
-          gh release create "v${VERSION}" "${{ steps.dmg_meta.outputs.dmg_name }}" \
+          gh release create "v${VERSION}" "${DMG_NAME}" \
             --title "v${VERSION}" \
             --notes "リリース v${VERSION}" \
             --draft=false
 
       - name: Commit and push appcast.xml to main
         shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.version.outputs.version }}"
           APPCAST_TMP=$(mktemp)
           cp appcast.xml "$APPCAST_TMP"
           rm -f appcast.xml
@@ -148,7 +170,24 @@ jobs:
 
       - name: Roll back failed release
         if: failure() && steps.version.outputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release delete "v${{ steps.version.outputs.version }}" --yes || true
+          # Release を削除（タグも含めて削除）
+          gh release delete "v${VERSION}" --yes --cleanup-tag || true
+          # appcast.xml が main に push 済みの場合はリバートを試みる
+          # git の状態を origin/main にリセットして appcast.xml を前バージョンに戻す
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main || true
+          # appcast.xml の直前コミット（バージョン更新前）を取得して revert push
+          PREV_APPCAST_SHA=$(git log origin/main --oneline -- appcast.xml | grep -v "v${VERSION}" | head -1 | awk '{print $1}') || true
+          if [ -n "$PREV_APPCAST_SHA" ]; then
+            git checkout -B rollback-appcast origin/main
+            git checkout "$PREV_APPCAST_SHA" -- appcast.xml
+            git add appcast.xml
+            git diff --cached --quiet || git commit -m "chore: rollback appcast.xml for failed v${VERSION} release [skip ci]"
+            git push origin HEAD:main || true
+          fi
