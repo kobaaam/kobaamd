@@ -11,15 +11,16 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-15-KMD-171.md
 created: 2026-04-30
-updated: 2026-05-08
+updated: 2026-05-15
 ---
 
 # ポストモーテムから学ぶ実装パターン
 
 ## Summary
 
-KMD-4/6/20/22/120/144/153 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
+KMD-4/6/20/22/120/144/153/171 の振り返りから抽出した再発防止パターン集。実装プロンプトへの反映事項を体系化。
 
 ## Content
 
@@ -211,6 +212,28 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 
 **出所**: KMD-153 (PR #84)、`docs/wiki/articles/practices/role-dispatch.md` §4 の SSOT に対応
 
+### パターン 21: mock の sentinel 値が本物の計算経路をバイパスする形骸化テスト
+<!-- llm-context: テスト対象が内部で hash 等を計算する場合、mock に固定 sentinel 値を渡すと処理経路を外れた形骸化テストになる。KMD-171 で smoke test が abc123 固定値で誤 PASS した事例。 -->
+
+**問題**: `section-context-check.sh` の smoke test で、mock claude が返す hash を `abc123` の固定値にしていた。本物の `shasum -a 256` が計算する値とは不一致になるため、`emit_if_violation` の出力が `{"line":null,...}` になり、`jq -e .` は null を valid JSON とみなして誤 PASS した。テストは「9/9 PASS」を報告しつつ実際の assertion を全く行っていない「形骸化」状態だった。初回 `kobaamd_review_pr` が REQUEST_CHANGES で正確に指摘し、1 リワークで修正された。
+
+**対策**: 実装プロンプトに「mock の入力値・ハッシュ等は本物の処理と同じ方法（同じコマンド / 同じ計算式）で生成すること。固定 sentinel 値は実処理経路をバイパスする形骸化テストを生む」を追記する。また、assertion は `jq -e .` のような「valid JSON か」レベルではなく、期待フィールドの型・値を明示的に確認する（例: `.line | type == "number"`）。
+
+**review_pr への反映**: `kobaamd_review_pr` の観点に「smoke test / unit test の assertion を見たとき、mock の戻り値が本物の処理経路を通っているか疑う。`jq -e .` や null を valid とみなす緩い assertion は形骸化テストのシグナル」を追加する。
+
+**出所**: KMD-171 (PR #119), review_pr の初回 REQUEST_CHANGES で検出
+
+### パターン 22: macOS case-insensitive FS が Linux CI の ENOENT を隠す罠
+<!-- llm-context: macOS 開発機では Tests/wiki と tests/wiki が同一パスとして扱われる case-insensitive FS のため、パスケース不一致がローカルを通過し Linux CI でのみ ENOENT が顕在化する。 -->
+
+**問題**: KMD-171 の GitHub Actions workflow で smoke test が `tests/wiki/`（小文字 `t`）で書かれていたが、リポジトリの実ディレクトリは `Tests/wiki/`（大文字 `T`）。macOS 開発機は case-insensitive FS なためローカル実行・`kobaamd_validate_build` の smoke test いずれも通過した。Linux CI（ubuntu-latest、case-sensitive FS）でのみ ENOENT が顕在化する状態でマージ寸前だったが、`review_security` が機能観点の副次検出として指摘し、rework で修正された。
+
+**対策**: workflow / Makefile / スクリプト内にパス文字列を書く際は、`ls <dir>` で実 FS の実際のケースを確認してから使う。`kobaamd_implement_code` プロンプトに「ファイルパスを含む workflow や Makefile の変更では、macOS 開発機と Linux CI runner の FS case-sensitivity の差を意識すること。`ls <path>` で実際のケースを確認してから文字列に書くこと」を追記する。
+
+**検出経路と限界**: `validate_build` はローカル smoke test で case-sensitive な確認ができないため、このクラスのバグは review_security / review_pr の静的チェックに頼る形になる。review_security が workflow の paths filter 文字列の case 正しさを確認する観点を持つことが重要。dual-review 体制（review_pr + review_security 並行）の相乗効果が機能した事例。
+
+**出所**: KMD-171 (PR #119), review_security が副次的に機能観点で検出
+
 ## Related
 
 - [[mvvm-observable]] — パターン 2 の概念的背景
@@ -233,3 +256,4 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-15-KMD-171.md

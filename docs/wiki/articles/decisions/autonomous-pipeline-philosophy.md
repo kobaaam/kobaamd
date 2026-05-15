@@ -9,8 +9,9 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-15-KMD-171.md
 created: 2026-04-30
-updated: 2026-05-09
+updated: 2026-05-15
 ---
 
 # AI 自律開発パイプラインの設計思想
@@ -106,9 +107,20 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 
 - 親 KMD-150（PR #74）の review_pr が「観測性回復は本 PR の goal と独立」と判断 → KMD-153 に auto-carve、親はクリーン APPROVE で Reviewed 直行
 - 子 KMD-153（PR #84、`section-context-check.sh` で stdout/stderr を分離する 17 行追加 / 2 行変更）が独立サイクルで完了。review_pr が「smoke test 自動化は本 PR の影響範囲外」と判断 → KMD-171 に再 auto-carve、KMD-153 自身もクリーン APPROVE 直行
-- 孫 KMD-171 は smoke test 整備として独立 Backlog で待機
+- 孫 KMD-171（PR #119、smoke test 9 件追加）は 2026-05-15 Done で完了。Backlog 滞留は **164 時間**（priority Low / `Improvement` ラベルのため後回しになった）。能動フェーズは約 73 分（1 リワーク含む）
 
 各段の carve-out 先 issue 本文には「親 KMD-XX (auto-carved-out by kobaamd_review_pr)」と re-open 手順を含めるルール（[[postmortem-patterns]] パターン 8）により、二段以上の連鎖でもリカバリ経路が担保される。
+
+#### 孫チケット（3 段目 carve-out）の Backlog 滞留リスク
+
+KMD-171 の 164 時間滞留に示すように、auto-carve 連鎖が 3 段に達すると孫チケットは priority Low のまま Backlog で長期滞留しやすい。KMD-153 の postmortem でも同傾向が記録されており、**構造的な滞留リスク**として認識する必要がある。
+
+暫定対策の検討候補:
+- `kobaamd_assign_work` に「auto-carve 世代数（n 段目）に応じた優先度フロア」を設ける（例: 3 段目以降は自動で priority Normal に昇格）
+- 「2 段 carve は原則禁止（孫まで carve する場合は人間に確認する）」というルール化
+- `kobaamd_detect_stale` の集計に「auto-carve 孫チケットの平均 Backlog 滞留時間」を観測対象として追加する
+
+詳細パターンは [[postmortem-patterns]] パターン 21（形骸化テスト検出）とあわせて KMD-171 事例を参照。
 
 ### フェーズ B 最短サイクルの参考値
 <!-- llm-context: pipeline_active のフェーズ B（PRD → 実装 → 検証 → レビュー → マージ → 振り返り）を 1 サイクル分 1 チケットで完走したときの最短実績値。小規模案件のリードタイム下限の目安として参照する。 -->
@@ -143,3 +155,4 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - docs/learnings/2026-05-06-KMD-144.md
 - docs/learnings/2026-05-08-KMD-120.md
 - docs/learnings/2026-05-08-KMD-153.md
+- docs/learnings/2026-05-15-KMD-171.md

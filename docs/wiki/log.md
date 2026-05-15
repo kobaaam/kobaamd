@@ -124,3 +124,13 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - 注記: 本タスクは broken-link 4 件と related-asymmetric 9 件のうち、broken-link を新規記事 1 本で一括解消し、related-asymmetric を双方向化で解消した。既存記事の本文（Summary / Content / Sources）には触れていない
 - lint: pass を確認すること（本作業の AC）
 - ingest history: 別タスクとして扱う（本タスクは KB2 残作業に焦点）
+
+## [2026-05-15] Wiki ingest（--source docs/learnings/2026-05-15-KMD-171.md）
+
+- sources:
+  - docs/learnings/2026-05-15-KMD-171.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 21「mock の sentinel 値が本物の計算経路をバイパスする形骸化テスト」/ パターン 22「macOS case-insensitive FS が Linux CI の ENOENT を隠す罠」を追加。Summary に KMD-171 追記、sources/updated 更新）
+  - articles/decisions/autonomous-pipeline-philosophy.md（「多段 auto carve-out 連鎖」セクションに孫 KMD-171 の完了実績（Done 2026-05-15、Backlog 164h）と孫チケット Backlog 滞留リスクの考察を追記。sources/updated 更新）
+- new articles: なし
+- skipped sources（理由付き）: なし
