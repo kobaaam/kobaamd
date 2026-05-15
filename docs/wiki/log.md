@@ -124,3 +124,20 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - 注記: 本タスクは broken-link 4 件と related-asymmetric 9 件のうち、broken-link を新規記事 1 本で一括解消し、related-asymmetric を双方向化で解消した。既存記事の本文（Summary / Content / Sources）には触れていない
 - lint: pass を確認すること（本作業の AC）
 - ingest history: 別タスクとして扱う（本タスクは KB2 残作業に焦点）
+
+## [2026-05-15] Wiki ingest（default: 7d）
+
+- sources:
+  - docs/learnings/2026-05-04-KMD-48-prompt-cache-benchmark.md
+  - docs/learnings/2026-05-06-KMD-119.md
+  - docs/learnings/2026-05-06-KMD-53.md
+  - docs/learnings/2026-05-08-KMD-151.md
+- updated articles:
+  - articles/practices/postmortem-patterns.md（パターン 21〜24 を追加: no-op 最適化と観測性の両立 / CLI 引数は help で確認 / wiki 規約適合の機械化 / Hardened Runtime SIGKILL トラブルシュート）
+  - articles/practices/wiki-reference-policy.md（§1.1.2 KMD-48 ベンチマーク数値を追加）
+  - articles/practices/sparkle-release.md（race window の既知 nit と wait loop 化ルートを追記）
+  - articles/practices/security-hardening.md（Hardened Runtime + 長期実行プロセスのトラブルシュート節を追加）
+  - articles/decisions/autonomous-pipeline-philosophy.md（no-op 最適化と観測性の両立原則節を追加）
+- new articles: なし
+- skipped sources（理由付き）:
+  - なし

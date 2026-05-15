@@ -2,9 +2,9 @@
 title: Wiki 参照ポリシー（Prompt Caching 標準運用）
 category: practices
 tags: [wiki, prompt-caching, anthropic, haiku, sonnet, opus, knowledge-base]
-sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-48, KMD-49, KMD-121, KMD-150, KMD-152, KMD-154]
+sources: [docs/wiki/SCHEMA.md, KMD-45, KMD-46, KMD-47, KMD-49, KMD-121, KMD-150, KMD-152, KMD-154, docs/learnings/2026-05-04-KMD-48-prompt-cache-benchmark.md]
 created: 2026-05-04
-updated: 2026-05-09
+updated: 2026-05-15
 ---
 
 # Wiki 参照ポリシー（Prompt Caching 標準運用）
@@ -65,9 +65,28 @@ KMD-121 以降、subagent (`kobaamd_create_prd` / `kobaamd_review_pr` / `kobaamd
 
 ask.sh 経由を標準とする理由:
 
-- Prompt Caching によって 2 回目以降の呼び出しは `cache_read` が wiki 全量に近づき、cost ≈ 1/10 / レイテンシ短縮（KMD-48 ベンチマーク）
+- Prompt Caching によって 2 回目以降の呼び出しは `cache_read` が wiki 全量に近づき、cost ≈ 1/10 / レイテンシ短縮（KMD-48 ベンチマーク、下記「1.1.2 ベンチマーク数値」参照）
 - subagent ごとに記事候補を手選びすると、記事追加時に subagent プロンプトを更新し続ける運用負荷が発生する。ask.sh は wiki 全量を毎回 LLM に渡すので、新規記事を追加するだけで自動で参照対象になる
 - 観点抽出（postmortem パターン・該当 decisions・関連 components）を一度の API 呼び出しで横断できる
+
+#### 1.1.2 KMD-48 ベンチマーク数値（理論値推計）
+<!-- llm-context: KMD-48 で計測された Prompt Caching の節約率・損益分岐点・理論レイテンシ。Anthropic API への直接アクセスができないため公開 pricing 値をもとにした理論値推計モードで確立した基準器。 -->
+
+KMD-48 では `scripts/wiki/benchmark.sh` を使い、**公開 pricing と公開ドキュメント値からの理論値推計**として以下を算出した（wiki 18,378 tokens / Claude Opus 4.5）。
+
+| 指標 | cache-off | cache-on | 改善 |
+|---|---|---|---|
+| 1 リクエスト平均レイテンシ | 2400 ms | 900 ms | 62.5% 短縮 |
+| 1 リクエスト平均コスト（USD） | $0.2856 | $0.0375 | **86.9% 削減** |
+| cache write コスト（初回） | — | $0.3446 | — |
+| 損益分岐点（write 回収 read 回数） | — | **1.39 回** | 5 分 TTL 内に 2 回読めば元取れる |
+
+注意: これは **理論値推計**（直接 API 実測ではない）。Anthropic API は運用上利用不可のため、Claude Code / Claude Cowork セッションの usage 観測が実測代替となる。
+
+**`--warm` / `--no-warm` フラグの意味**:
+
+- `--warm`: cache write を計測対象外に置き、定常 cache read の平均を出す前提（継続利用時のコスト）
+- `--no-warm`: 最初の cache-on 1 回に cache write を載せた初回込み平均（初回利用時のコスト）
 
 運用上の確認:
 

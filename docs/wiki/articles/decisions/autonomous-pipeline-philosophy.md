@@ -9,8 +9,9 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-120.md
   - docs/learnings/2026-05-08-KMD-153.md
+  - docs/learnings/2026-05-06-KMD-119.md
 created: 2026-04-30
-updated: 2026-05-09
+updated: 2026-05-15
 ---
 
 # AI 自律開発パイプラインの設計思想
@@ -109,6 +110,20 @@ KMD-54 の実例では auto carve-out 2 件（KMD-141 テスト整備・KMD-142 
 - 孫 KMD-171 は smoke test 整備として独立 Backlog で待機
 
 各段の carve-out 先 issue 本文には「親 KMD-XX (auto-carved-out by kobaamd_review_pr)」と re-open 手順を含めるルール（[[postmortem-patterns]] パターン 8）により、二段以上の連鎖でもリカバリ経路が担保される。
+
+### no-op 最適化と観測性の両立原則（KMD-119）
+<!-- llm-context: pipeline_active の no-op early return 導入で token 節約と観測性維持を両立するための設計原則。early return が監査ログ系ステップをスキップしてしまう誤設計への再発防止として KMD-119 で確立。 -->
+
+`pipeline_active` に no-op early return（6 条件成立時に subagent 起動をスキップ、推定 ~770k tokens / 日の削減）を導入した KMD-119 の教訓として、**「節約系最適化」と「観測性」はトレードオフではなく両立すべき**原則が確立された。
+
+- early return / skip / no-op 化を入れる時は、**監査ログ・スナップショット・pre/post ペア整合系のステップは必ず残す**
+- 「subagent を起動しない」と「ログを残さない」は別の判断。前者は節約、後者は観測性の放棄
+- PRD section 8「その他リスク」に「early return が監査ログ系ステップをスキップしないこと」を必ず明記する
+- AC には「~770k tokens / 日削減」のような測定可能な数値を書く。postmortem / improve_prompt が次サイクルで効果検証できるようになる
+
+実例: KMD-119 実装初版で「ステップ 0c 以降をすべてスキップ」と書いたため、スナップショット（ステップ 12）も skip され `.logs/pipeline_transitions.log` に no-op cycle が記録されない自己矛盾が発生。`fix_pr_comments` 1 ラウンドで修正した。
+
+詳細パターンは [[postmortem-patterns]] パターン 21 を参照。
 
 ### フェーズ B 最短サイクルの参考値
 <!-- llm-context: pipeline_active のフェーズ B（PRD → 実装 → 検証 → レビュー → マージ → 振り返り）を 1 サイクル分 1 チケットで完走したときの最短実績値。小規模案件のリードタイム下限の目安として参照する。 -->
