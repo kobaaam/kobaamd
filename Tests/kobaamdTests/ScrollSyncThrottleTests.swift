@@ -44,6 +44,29 @@ struct ScrollSyncThrottleTests {
         #expect(flushed.first?.1 == "leading-only")
     }
 
+    @Test("16ms 以内の連続更新は最新値だけを trailing flush する")
+    func coalescesUpdatesInsideDefaultInterval() async throws {
+        var flushed: [(Double, String)] = []
+        let throttle = ScrollSyncThrottle(delay: .milliseconds(16)) { ratio, source in
+            flushed.append((ratio, source))
+        }
+
+        throttle.schedule(ratio: 0.1, source: "first")
+        throttle.schedule(ratio: 0.2, source: "second")
+        throttle.schedule(ratio: 0.3, source: "third")
+
+        #expect(flushed.count == 1)
+        #expect(flushed.first?.0 == 0.1)
+        #expect(flushed.first?.1 == "first")
+
+        try await Task.sleep(for: .milliseconds(40))
+        await Task.yield()
+
+        #expect(flushed.count == 2)
+        #expect(flushed.last?.0 == 0.3)
+        #expect(flushed.last?.1 == "third")
+    }
+
     @Test("間隔が throttle interval より長ければ個別に flush される")
     func flushesSeparatedUpdates() async throws {
         var flushed: [(Double, String)] = []
@@ -58,6 +81,22 @@ struct ScrollSyncThrottleTests {
 
         #expect(flushed.count == 2)
         #expect(flushed.map(\.0) == [0.2, 0.7])
+        #expect(flushed.map(\.1) == ["first", "second"])
+    }
+
+    @Test("16ms 経過後の更新は trailing 予約を待たずに個別 flush する")
+    func flushesUpdateAfterDefaultIntervalImmediately() async throws {
+        var flushed: [(Double, String)] = []
+        let throttle = ScrollSyncThrottle(delay: .milliseconds(16)) { ratio, source in
+            flushed.append((ratio, source))
+        }
+
+        throttle.schedule(ratio: 0.25, source: "first")
+        try await Task.sleep(for: .milliseconds(25))
+        throttle.schedule(ratio: 0.75, source: "second")
+
+        #expect(flushed.count == 2)
+        #expect(flushed.map(\.0) == [0.25, 0.75])
         #expect(flushed.map(\.1) == ["first", "second"])
     }
 }
