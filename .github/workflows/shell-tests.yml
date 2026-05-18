@@ -35,3 +35,6 @@ jobs:
 
       - name: Run allowlist drift verification test
         run: bash Tests/wiki/verify-allowlist-drift.sh
+
+      - name: Run wiki lint smoke test
+        run: bash Tests/wiki/lint.smoke.sh

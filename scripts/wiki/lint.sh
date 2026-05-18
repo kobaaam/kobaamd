@@ -33,6 +33,8 @@ set -euo pipefail
 #                    frontmatter fields. Edits files in-place.
 #   --cache <path>   Path for the section-context content_hash cache.
 #                    Default: .cache/wiki-lint.json (under repo root)
+#   --report <path>  Path for the execution report JSON.
+#                    Default: .cache/wiki-lint-report.json (under repo root)
 #   --model <id>     Haiku model id (legacy path only; default: claude-haiku-4-5)
 #   --retries <n>    Retry count for Haiku calls (default: 3)
 #   --legacy-api     Use direct Anthropic API for rule 4 (requires
@@ -61,6 +63,7 @@ Options:
   --no-llm         Skip rule 4 (Haiku-based section context check)
   --fix            Apply auto-fixes (tag normalization, frontmatter defaults)
   --cache <path>   Section-context cache file (default: .cache/wiki-lint.json)
+  --report <path>  Execution report JSON (default: .cache/wiki-lint-report.json)
   --model <id>     Haiku model id (legacy path only; default: claude-haiku-4-5)
   --retries <n>    Retry count for Haiku calls (default: 3)
   --legacy-api     Use direct Anthropic API (requires ANTHROPIC_API_KEY).
@@ -77,6 +80,7 @@ EOF
 no_llm=0
 do_fix=0
 cache_path=""
+report_path=""
 model="${ANTHROPIC_HAIKU_MODEL:-claude-haiku-4-5}"
 retries=3
 legacy_api=0
@@ -89,6 +93,9 @@ while [ "$#" -gt 0 ]; do
     --cache)
       [ "$#" -ge 2 ] || { usage; exit 2; }
       cache_path="$2"; shift 2 ;;
+    --report)
+      [ "$#" -ge 2 ] || { usage; exit 2; }
+      report_path="$2"; shift 2 ;;
     --model)
       [ "$#" -ge 2 ] || { usage; exit 2; }
       model="$2"; shift 2 ;;
@@ -127,6 +134,10 @@ fi
 if [ -z "$cache_path" ]; then
   cache_path="$ROOT/.cache/wiki-lint.json"
 fi
+if [ -z "$report_path" ]; then
+  report_path="$ROOT/.cache/wiki-lint-report.json"
+fi
+mkdir -p "$(dirname "$cache_path")" "$(dirname "$report_path")"
 
 # --- Resolve target files ---------------------------------------------------
 
@@ -405,6 +416,80 @@ VIOLATION_LOG=$(mktemp)
 PARSE_DIR_BASE="$PARSE_DIR"
 trap 'rm -rf "$PARSE_DIR_BASE"; rm -f "$slug_index_tmp" "$title_index_tmp" "$referrers_tmp" "$VIOLATION_LOG"' EXIT
 
+rule_frontmatter_files=0
+rule_orphan_files=0
+rule_broken_link_files=0
+rule_stale_files=0
+rule_section_context_attempted=0
+rule_section_context_executed=0
+rule_section_context_skipped=0
+rule_section_context_failed=0
+rule_section_context_status="pending"
+rule_section_context_reason=""
+
+record_section_context_skip() {
+  local reason="$1"
+  rule_section_context_skipped=$((rule_section_context_skipped + 1))
+  if [ "$rule_section_context_status" = "pending" ]; then
+    rule_section_context_status="skipped"
+    rule_section_context_reason="$reason"
+  fi
+}
+
+write_report() {
+  jq -nc \
+    --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg report_path "$report_path" \
+    --argjson target_count "${#target_files[@]}" \
+    --argjson violation_count "$violation_count" \
+    --argjson no_llm "$no_llm" \
+    --argjson legacy_api "$legacy_api" \
+    --arg section_status "$rule_section_context_status" \
+    --arg section_reason "$rule_section_context_reason" \
+    --argjson rule_frontmatter_files "$rule_frontmatter_files" \
+    --argjson rule_orphan_files "$rule_orphan_files" \
+    --argjson rule_broken_link_files "$rule_broken_link_files" \
+    --argjson rule_stale_files "$rule_stale_files" \
+    --argjson section_attempted "$rule_section_context_attempted" \
+    --argjson section_executed "$rule_section_context_executed" \
+    --argjson section_skipped "$rule_section_context_skipped" \
+    --argjson section_failed "$rule_section_context_failed" \
+    '{
+      generated_at: $generated_at,
+      report_path: $report_path,
+      target_count: $target_count,
+      violation_count: $violation_count,
+      options: {
+        no_llm: ($no_llm == 1),
+        legacy_api: ($legacy_api == 1)
+      },
+      rules: {
+        frontmatter: {status: "executed", files: $rule_frontmatter_files},
+        orphan: {status: "executed", files: $rule_orphan_files},
+        broken_link: {status: "executed", files: $rule_broken_link_files},
+        stale: {status: "executed", files: $rule_stale_files},
+        section_context: {
+          status: $section_status,
+          reason: (if $section_reason == "" then null else $section_reason end),
+          attempted_files: $section_attempted,
+          executed_files: $section_executed,
+          skipped_files: $section_skipped,
+          failed_files: $section_failed
+        }
+      },
+      rules_executed: (
+        ["frontmatter", "orphan", "broken_link", "stale"] +
+        (if $section_executed > 0 then ["section_context"] else [] end)
+      ),
+      rules_skipped: (
+        if $section_skipped > 0 then ["section_context"] else [] end
+      ),
+      rules_failed: (
+        if $section_failed > 0 then ["section_context"] else [] end
+      )
+    }' >"$report_path"
+}
+
 emit() {
   local file="$1" rule="$2" line="$3" detail="$4" model_tag="${5:-shell}"
   local line_arg
@@ -432,6 +517,7 @@ TAG_RE='^[a-z0-9]+(-[a-z0-9]+)*$'
 
 check_frontmatter() {
   local f="$1"
+  rule_frontmatter_files=$((rule_frontmatter_files + 1))
   local rel=${f#"$ROOT"/}
   local parsed
   parsed=$(parse_cached "$f")
@@ -528,6 +614,7 @@ check_frontmatter() {
 
 check_orphan() {
   local f="$1"
+  rule_orphan_files=$((rule_orphan_files + 1))
   local rel=${f#"$ROOT"/}
   local slug
   slug=$(basename "$f" .md)
@@ -543,6 +630,7 @@ check_orphan() {
 
 check_broken_links() {
   local f="$1"
+  rule_broken_link_files=$((rule_broken_link_files + 1))
   local rel=${f#"$ROOT"/}
 
   # Extract [[slug]] outside of code fences with line numbers
@@ -582,6 +670,7 @@ today_epoch=$(date +%s)
 
 check_stale() {
   local f="$1"
+  rule_stale_files=$((rule_stale_files + 1))
   local rel=${f#"$ROOT"/}
   local parsed
   parsed=$(parse_cached "$f")
@@ -629,11 +718,14 @@ check_stale() {
 
 check_section_context() {
   local f="$1"
+  rule_section_context_attempted=$((rule_section_context_attempted + 1))
   if [ "$no_llm" -eq 1 ]; then
+    record_section_context_skip "no_llm"
     return
   fi
   if [ ! -x "$SECTION_CHECK" ]; then
     err "WARN: $SECTION_CHECK not executable; skipping rule 4"
+    record_section_context_skip "helper_not_executable"
     return
   fi
   # The helper emits NDJSON to stdout; we forward and count.
@@ -652,9 +744,15 @@ check_section_context() {
     ${extra_args[@]+"${extra_args[@]}"} >"$tmp" 2>>/dev/stderr || rc=$?
   if [ "$rc" -ne 0 ]; then
     err "WARN: section-context-check failed (rc=$rc) for $f — skipping that rule"
+    rule_section_context_failed=$((rule_section_context_failed + 1))
+    rule_section_context_status="failed"
+    rule_section_context_reason="helper_failed"
     rm -f "$tmp"
     return
   fi
+  rule_section_context_executed=$((rule_section_context_executed + 1))
+  rule_section_context_status="executed"
+  rule_section_context_reason=""
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     printf '%s\n' "$line"
@@ -859,6 +957,11 @@ for f in "${target_files[@]}"; do
 done
 
 violation_count=$(wc -l <"$VIOLATION_LOG" | awk '{print $1}')
+if [ "$rule_section_context_status" = "pending" ]; then
+  rule_section_context_status="skipped"
+  rule_section_context_reason="not_requested"
+fi
+write_report
 log "done: violations=$violation_count"
 
 if [ "$violation_count" -gt 0 ]; then
