@@ -115,6 +115,7 @@ KMD-48 では `scripts/wiki/benchmark.sh` を使い、**公開 pricing と公開
 - subagent 定義ファイル（`.claude/agents/<name>.md`）の frontmatter `tools:` だけでは不十分。Claude Code の現行仕様では frontmatter は `Read, Bash` のような粗い宣言しかできず、`Bash` を許すと内部で `curl` / `ssh` / `rm -rf` 等の任意コマンドが通る
 - 実装パターン: subagent 側のドキュメント（`## 制約・厳守事項`）に「呼ばれることを想定するコマンドのリスト」を明記し、呼び出し元 shell スクリプトの `--allowedTools` 配列にも同じリストを書く。両者がドリフトした場合、subagent が期待外のコマンドを実行するリスクが生じるため、運用 PR では必ず両方を同時更新する
 - 攻撃モデル上の意義: AI 自律パイプライン（30 分間隔）で wiki 記事を AI が編集する KB3 系設計と組み合わさると、プロンプトインジェクション経由で任意コマンド実行に直結する経路が理論上開く。Bash allowlist を絞っておくことで、注入が成功しても **lint subagent が叩ける道具が `python3` / `jq` / `shasum` / `git rev-parse` / `mkdir` / `mv` / `cat` / `printf` / `awk` / `sed` に限定される**
+- Canonical allowlist: `python3`, `jq`, `shasum`, `git rev-parse`, `mkdir`, `mv`, `cat`, `printf`, `awk`, `sed`
 - **allowlist の効力範囲（KMD-169）**: この allowlist はコマンド名の prefix でマッチするため、直接的な `curl` / `ssh` / `rm -rf` / `bash -c` 呼び出し経路は塞がれる。ただし `awk` の `system()` 関数や `sed -i` スクリプト経由での外部コマンド実行・ファイル書き換えは理論上残る残余リスクである。この限界を踏まえた上で運用すること
 - 実装例: `scripts/wiki/lib/section-context-check.sh` の `run_subagent()`、および `.claude/agents/kobaamd_lint_section_context.md` の `## 制約・厳守事項` を参照
 

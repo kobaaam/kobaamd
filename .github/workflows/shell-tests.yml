@@ -3,11 +3,17 @@ name: Shell Tests
 on:
   push:
     paths:
+      - '.claude/agents/kobaamd_lint_section_context.md'
+      - 'docs/wiki/articles/practices/wiki-reference-policy.md'
+      - 'scripts/hooks/pre-commit'
       - 'scripts/wiki/**'
       - 'Tests/wiki/**'
       - '.github/workflows/shell-tests.yml'
   pull_request:
     paths:
+      - '.claude/agents/kobaamd_lint_section_context.md'
+      - 'docs/wiki/articles/practices/wiki-reference-policy.md'
+      - 'scripts/hooks/pre-commit'
       - 'scripts/wiki/**'
       - 'Tests/wiki/**'
       - '.github/workflows/shell-tests.yml'
@@ -23,3 +29,9 @@ jobs:
 
       - name: Run section-context-check smoke test
         run: bash Tests/wiki/section-context-check.smoke.sh
+
+      - name: Run section-context allowlist test
+        run: bash Tests/wiki/section-context-allowlist.sh
+
+      - name: Run allowlist drift verification test
+        run: bash Tests/wiki/verify-allowlist-drift.sh
