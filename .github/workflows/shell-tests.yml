@@ -23,3 +23,6 @@ jobs:
 
       - name: Run section-context-check smoke test
         run: bash Tests/wiki/section-context-check.smoke.sh
+
+      - name: Run wiki lint smoke test
+        run: bash Tests/wiki/lint.smoke.sh
