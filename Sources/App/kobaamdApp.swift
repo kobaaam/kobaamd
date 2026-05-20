@@ -68,9 +68,16 @@ struct kobaamdApp: App {
                 Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
                     .keyboardShortcut(".", modifiers: .command)
                 Button("クイックインサート") { AppCommand.quickInsert.post() }
-                    .keyboardShortcut("k", modifiers: .command)
+                    .keyboardShortcut("k", modifiers: [.command, .option])
             }
             CommandMenu("Format") {
+                Button("Bold") { AppCommand.toggleBold.post() }
+                    .keyboardShortcut("b", modifiers: .command)
+                Button("Italic") { AppCommand.toggleItalic.post() }
+                    .keyboardShortcut("i", modifiers: .command)
+                Button("Add Link") { AppCommand.insertLink.post() }
+                    .keyboardShortcut("k", modifiers: .command)
+                Divider()
                 Button("Format Document") { AppCommand.formatDocument.post() }
                     .keyboardShortcut("f", modifiers: [.command, .shift])
             }
@@ -80,7 +87,7 @@ struct kobaamdApp: App {
             }
             CommandGroup(before: .sidebar) {
                 Button("サイドバーの表示/非表示") { AppCommand.toggleSidebar.post() }
-                    .keyboardShortcut("b", modifiers: .command)
+                    .keyboardShortcut("s", modifiers: [.command, .option])
                 Button("読書モード") { AppCommand.toggleReadingMode.post() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
@@ -124,6 +131,9 @@ extension Notification.Name {
     static let toggleReadingModeRequested = AppCommand.toggleReadingMode.notificationName
     static let newTabRequested          = AppCommand.newTab.notificationName
     static let formatDocumentRequested = AppCommand.formatDocument.notificationName
+    static let toggleBoldRequested      = AppCommand.toggleBold.notificationName
+    static let toggleItalicRequested    = AppCommand.toggleItalic.notificationName
+    static let insertLinkRequested      = AppCommand.insertLink.notificationName
     static let openRecentNotification  = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")

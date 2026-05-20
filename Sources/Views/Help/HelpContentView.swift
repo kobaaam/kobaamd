@@ -23,7 +23,7 @@ struct HelpContentView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     bodyText("kobaamd は AI が生成した Markdown を Mac で最も快適に扱えるエディタです。")
                     bodyText("使い始め: ⌘O でフォルダを開く、または Finder から .md ファイルをダブルクリック。")
-                    bodyText("エディタ左にサイドバー（⌘B で表示切替）、右にプレビューが表示されます。")
+                    bodyText("エディタ左にサイドバー（⌥⌘S で表示切替）、右にプレビューが表示されます。")
                 }
             }
 
@@ -84,7 +84,7 @@ struct HelpContentView: View {
                     text: "{{プロンプト}} 記法で Cmd+Return するとその場で AI が文章を生成。ストリーミング対応。"
                 )
                 featureBlock(
-                    title: "クイックインサート（⌘K）",
+                    title: "クイックインサート（⌥⌘K）",
                     text: "AI プロンプトスニペットをワンキーで挿入。"
                 )
             }
@@ -151,11 +151,14 @@ struct HelpContentView: View {
             ("⌘S", "保存"),
             ("⌘F", "検索・置換"),
             ("⌘⇧F", "ドキュメント整形"),
-            ("⌘B", "サイドバー表示切替"),
+            ("⌘B", "太字"),
+            ("⌘I", "斜体"),
+            ("⌘K", "リンク挿入"),
+            ("⌥⌘K", "クイックインサート"),
+            ("⌥⌘S", "サイドバー表示切替"),
             ("⌘E", "AI アシスト"),
             ("⌘⇧E", "AI チャット"),
             ("⌘.", "AI 生成キャンセル"),
-            ("⌘K", "クイックインサート"),
             ("⌘P", "クイックオープン"),
             ("⌘⇧P", "PDF 書き出し"),
             ("⌘⇧U", "Confluence 同期"),
