@@ -21,6 +21,9 @@ enum AppCommand: String {
     case aiChat                 = "kobaamd.aiChatRequested"
     case newFileFromTemplate    = "kobaamd.newFileFromTemplateRequested"
     case toggleReadingMode      = "kobaamd.toggleReadingMode"
+    case toggleBold             = "kobaamd.toggleBoldRequested"
+    case toggleItalic           = "kobaamd.toggleItalicRequested"
+    case insertLink             = "kobaamd.insertLinkRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

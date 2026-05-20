@@ -40,6 +40,22 @@ if [ -n "$SH_CHANGED" ]; then
     fi
 fi
 
+ALLOWLIST_CHANGED=$(git diff --cached --name-only -- \
+    .claude/agents/kobaamd_lint_section_context.md \
+    docs/wiki/articles/practices/wiki-reference-policy.md \
+    scripts/wiki/lib/section-context-check.sh \
+    scripts/wiki/lib/verify_allowlist_drift.sh \
+    Tests/wiki/section-context-allowlist.sh \
+    Tests/wiki/verify-allowlist-drift.sh \
+    .github/workflows/shell-tests.yml || true)
+if [ -n "$ALLOWLIST_CHANGED" ]; then
+    echo "🛡️ section-context allowlist drift を確認します..."
+    if ! scripts/wiki/lib/verify_allowlist_drift.sh; then
+        echo "❌ allowlist drift 検知に失敗。コミットを中止します。"
+        exit 1
+    fi
+fi
+
 # シークレット検出（全ステージングファイル対象、ただし以下は除外）
 # - Sources/Resources/d2-browser.js: D2 描画用にバンドルされた WASM 入り JS。
 #   ランダムなバイナリバイトが AKIA... / AIza... 等の正規表現に偽陽性ヒットするため除外。

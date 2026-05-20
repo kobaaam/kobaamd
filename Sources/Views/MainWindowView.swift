@@ -38,7 +38,7 @@ struct MainWindowView: View {
             } label: {
                 Image(systemName: "sidebar.left")
             }
-            .help("サイドバーの表示/非表示 (⌘B)")
+            .help("サイドバーの表示/非表示 (⌥⌘S)")
 
             Button {
                 NotificationCenter.default.post(name: .openFolderRequested, object: nil)
