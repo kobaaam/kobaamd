@@ -91,6 +91,7 @@ You are kobaamd's Section Context Lint Agent (`kobaamd_lint_section_context`). �
   - `shasum`
   - `git rev-parse`
   - `mkdir` / `mv` / `cat` / `printf` / `awk` / `sed`
+  - Canonical allowlist: `python3`, `jq`, `shasum`, `git rev-parse`, `mkdir`, `mv`, `cat`, `printf`, `awk`, `sed`
   これ以外のコマンドは呼ばないこと。機能拡張で新しいコマンドが必要になった場合は呼び出し元の `--allowedTools` も更新する必要がある（運用 PR で同時更新）。
   **allowlist の効力範囲に関する注記（KMD-169）**: この allowlist は「コマンド名の prefix」でマッチするため、直接的な `curl` / `ssh` / `rm -rf` / `bash -c` 等の呼び出し経路は塞がれる。ただし以下の迂回路は理論上残る:
   - `awk` の `system()` 関数 / パイプ（`awk 'BEGIN{system("curl ...")}'`）経由の外部コマンド実行

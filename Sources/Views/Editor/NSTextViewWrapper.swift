@@ -83,13 +83,23 @@ struct EditorObserver: NSViewRepresentable {
     final class Coordinator: NSObject {
         private var scrollObserver: Any?
         private var selectionObserver: Any?
+        private var textDidChangeObserver: Any?
         private var insertSnippetObserver: Any?
+        private var toggleBoldObserver: Any?
+        private var toggleItalicObserver: Any?
+        private var insertLinkObserver: Any?
         private var eventMonitor: Any?
+        private let highlightService: HighlightServiceProtocol
         weak var textViewRef: NSTextView?
         weak var appViewModel: AppViewModel?
         var currentTheme: ColorTheme = AppState.shared.selectedTheme
         var highlightColor: NSColor { currentTheme.editorCurrentLineHighlight }
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
+
+        @MainActor
+        init(highlightService: HighlightServiceProtocol? = nil) {
+            self.highlightService = highlightService ?? TreeSitterHighlightService()
+        }
 
         func attach(to view: NSView, scrollRatio: Binding<Double>) {
             var current: NSView? = view
@@ -126,6 +136,33 @@ struct EditorObserver: NSViewRepresentable {
                       let text = note.userInfo?["text"] as? String else { return }
                 let range = tv.selectedRange()
                 tv.insertText(text, replacementRange: range)
+            }
+
+            toggleBoldObserver = NotificationCenter.default.addObserver(
+                forName: .toggleBoldRequested,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self, let tv = self.textViewRef, tv.window?.firstResponder === tv else { return }
+                self.applyMarkdownShortcut(.bold, in: tv)
+            }
+
+            toggleItalicObserver = NotificationCenter.default.addObserver(
+                forName: .toggleItalicRequested,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self, let tv = self.textViewRef, tv.window?.firstResponder === tv else { return }
+                self.applyMarkdownShortcut(.italic, in: tv)
+            }
+
+            insertLinkObserver = NotificationCenter.default.addObserver(
+                forName: .insertLinkRequested,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self, let tv = self.textViewRef, tv.window?.firstResponder === tv else { return }
+                self.applyMarkdownShortcut(.link, in: tv)
             }
         }
 
@@ -170,6 +207,20 @@ struct EditorObserver: NSViewRepresentable {
                 MainActor.assumeIsolated {
                     self.updateAIOverlayPosition(in: tv)
                 }
+            }
+            textDidChangeObserver = NotificationCenter.default.addObserver(
+                forName: NSText.didChangeNotification,
+                object: tv,
+                queue: .main
+            ) { [weak self, weak tv] _ in
+                guard let self, let tv else { return }
+                MainActor.assumeIsolated {
+                    self.highlightEditedText(in: tv)
+                }
+            }
+
+            MainActor.assumeIsolated {
+                applySyntaxHighlight(in: tv)
             }
             highlightCurrentLine(in: tv)
             MainActor.assumeIsolated {
@@ -251,6 +302,25 @@ struct EditorObserver: NSViewRepresentable {
         }
 
         // MARK: - Auto list continuation
+
+        @discardableResult
+        func applyMarkdownShortcut(_ shortcut: MarkdownShortcutKind, in tv: NSTextView) -> Bool {
+            let nsString = tv.string as NSString
+            let edit = MarkdownShortcutFormatter.edit(
+                for: shortcut,
+                in: nsString,
+                selectedRange: tv.selectedRange()
+            )
+
+            guard let textStorage = tv.textStorage,
+                  tv.shouldChangeText(in: edit.replacementRange, replacementString: edit.replacementText)
+            else { return false }
+
+            textStorage.replaceCharacters(in: edit.replacementRange, with: edit.replacementText)
+            tv.didChangeText()
+            tv.setSelectedRange(edit.selectedRange)
+            return true
+        }
 
         /// Cmd+Z を処理する。ストリーミング中なら AI 生成をキャンセルして true を返す。
         /// それ以外は false を返し通常 Undo に委譲する。
@@ -352,11 +422,51 @@ struct EditorObserver: NSViewRepresentable {
 
         @MainActor
         func refreshHighlightForThemeChange(in tv: NSTextView) {
+            applySyntaxHighlight(in: tv)
             if let lm = tv.layoutManager, lastHighlightedRange.location != NSNotFound {
                 lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: lastHighlightedRange)
             }
             lastHighlightedRange = NSRange(location: NSNotFound, length: 0)
             highlightCurrentLine(in: tv)
+        }
+
+        @MainActor
+        func applySyntaxHighlight(
+            in tv: NSTextView,
+            editedRange: NSRange? = nil,
+            changeInLength: Int = 0
+        ) {
+            guard let textStorage = tv.textStorage else { return }
+
+            if let editedRange, editedRange.location != NSNotFound {
+                highlightService.applyIncrementalHighlight(
+                    textStorage: textStorage,
+                    editedRange: editedRange,
+                    changeInLength: changeInLength
+                )
+                return
+            }
+
+            highlightService.highlight(textStorage)
+        }
+
+        @MainActor
+        func highlightEditedText(in tv: NSTextView) {
+            guard let textStorage = tv.textStorage else { return }
+
+            let editedRange = textStorage.editedRange
+            let changeInLength = textStorage.changeInLength
+
+            if editedRange.location == NSNotFound {
+                applySyntaxHighlight(in: tv)
+                return
+            }
+
+            applySyntaxHighlight(
+                in: tv,
+                editedRange: editedRange,
+                changeInLength: changeInLength
+            )
         }
 
         private func highlightCurrentLine(in tv: NSTextView) {
@@ -408,7 +518,17 @@ struct EditorObserver: NSViewRepresentable {
         }
 
         deinit {
-            [scrollObserver, selectionObserver, insertSnippetObserver].compactMap { $0 }.forEach {
+            [
+                scrollObserver,
+                selectionObserver,
+                textDidChangeObserver,
+                insertSnippetObserver,
+                toggleBoldObserver,
+                toggleItalicObserver,
+                insertLinkObserver
+            ]
+            .compactMap { $0 }
+            .forEach {
                 NotificationCenter.default.removeObserver($0)
             }
             if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }

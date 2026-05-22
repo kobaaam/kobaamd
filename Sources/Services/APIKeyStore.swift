@@ -1,6 +1,31 @@
 import Foundation
 import Security
 
+protocol APIKeyStoreKeychainProviding {
+    func update(_ query: [CFString: Any], attributes: [CFString: Any]) -> OSStatus
+    func add(_ query: [CFString: Any]) -> OSStatus
+    func copyMatching(_ query: [CFString: Any], result: inout AnyObject?) -> OSStatus
+    func delete(_ query: [CFString: Any]) -> OSStatus
+}
+
+struct SystemAPIKeyStoreKeychainProvider: APIKeyStoreKeychainProviding {
+    func update(_ query: [CFString: Any], attributes: [CFString: Any]) -> OSStatus {
+        SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    }
+
+    func add(_ query: [CFString: Any]) -> OSStatus {
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    func copyMatching(_ query: [CFString: Any], result: inout AnyObject?) -> OSStatus {
+        SecItemCopyMatching(query as CFDictionary, &result)
+    }
+
+    func delete(_ query: [CFString: Any]) -> OSStatus {
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
 /// Persists AI provider API keys in the macOS Keychain.
 /// Falls back to environment variables for development convenience.
 final class APIKeyStore {
@@ -49,6 +74,14 @@ final class APIKeyStore {
     /// at test setUp, before any concurrent access begins.
     nonisolated(unsafe) static var serviceOverride: String? = nil
 
+    /// Overridable Keychain access provider. Tests use this to verify cache
+    /// behavior without relying on the process-global macOS Keychain.
+    ///
+    /// `nonisolated(unsafe)` follows `serviceOverride`: tests mutate it in
+    /// serialized setup before concurrent cache access begins.
+    nonisolated(unsafe) static var keychainProvider: APIKeyStoreKeychainProviding =
+        SystemAPIKeyStoreKeychainProvider()
+
     private static var service: String {
         serviceOverride ?? productionService
     }
@@ -81,11 +114,11 @@ final class APIKeyStore {
 
         // Update if exists, otherwise add
         let updateAttrs: [CFString: Any] = [kSecValueData: data]
-        let status = SecItemUpdate(query as CFDictionary, updateAttrs as CFDictionary)
+        let status = keychainProvider.update(query, attributes: updateAttrs)
         if status == errSecItemNotFound {
             var addQuery = query
             addQuery[kSecValueData] = data
-            SecItemAdd(addQuery as CFDictionary, nil)
+            _ = keychainProvider.add(addQuery)
         }
         // Migrate away from UserDefaults if anything was stored there
         UserDefaults.standard.removeObject(forKey: "apiKey_\(provider.rawValue)")
@@ -112,7 +145,7 @@ final class APIKeyStore {
         query[kSecMatchLimit] = kSecMatchLimitOne
 
         var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let status = keychainProvider.copyMatching(query, result: &result)
         if status == errSecSuccess,
            let data = result as? Data,
            let str = String(data: data, encoding: .utf8),
@@ -142,7 +175,7 @@ final class APIKeyStore {
     }
 
     static func clear(for provider: Provider) {
-        SecItemDelete(baseQuery(for: provider) as CFDictionary)
+        _ = keychainProvider.delete(baseQuery(for: provider))
         UserDefaults.standard.removeObject(forKey: "apiKey_\(provider.rawValue)")
 
         // Cache the cleared state so the next `load` does not re-query the
