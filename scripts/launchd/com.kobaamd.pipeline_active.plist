@@ -11,7 +11,7 @@
     <string>kobaamd_pipeline_active</string>
   </array>
   <key>StartInterval</key>
-  <integer>1800</integer>
+  <integer>3600</integer>
   <key>RunAtLoad</key>
   <false/>
   <key>StandardOutPath</key>

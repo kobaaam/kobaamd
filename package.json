@@ -1,0 +1,16 @@
+{
+  "name": "kobaamd-pipeline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Node-side pipeline scripts for kobaamd (Anthropic SDK direct invocation).",
+  "scripts": {
+    "ping": "node scripts/pipeline/ping.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

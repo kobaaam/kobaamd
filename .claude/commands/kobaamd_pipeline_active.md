@@ -1,5 +1,5 @@
 ---
-description: アクティブ系パイプライン（30 分間隔想定）— 1チケットのライフサイクル全体（PRD→実装→検証→PR→レビュー→マージ→振り返り）を順に進める
+description: アクティブ系パイプライン（1 時間間隔想定）— 1チケットのライフサイクル全体（PRD→実装→検証→PR→レビュー→マージ→振り返り）を順に進める
 ---
 
 以下を順番に実行してください。各ステップ失敗時は次に進む（部分成功許容）。
@@ -24,7 +24,7 @@ e. 修正がなければ「整合性 OK」と報告して次へ
 
 ## ステップ 0b': No-op early return ガード（起動時 / 必須）
 
-ステップ 0b でステータス整合性が取れた直後、以下のガード条件をすべて満たす場合は subagent を起動せずに即終了する。launchd 30 分毎の起動で no-op cycle が連続した場合の token 空費（CLAUDE.md ~8k tokens + subagent プロンプト）を削減するための最適化。
+ステップ 0b でステータス整合性が取れた直後、以下のガード条件をすべて満たす場合は subagent を起動せずに即終了する。launchd 1 時間毎の起動で no-op cycle が連続した場合の token 空費（CLAUDE.md ~8k tokens + subagent プロンプト）を削減するための最適化。
 
 **ガード条件（すべて AND）**:
 
@@ -195,7 +195,7 @@ if [[ "$USAGE_EXIT" == "10" ]]; then
 
 新規実装（PRD → 実装 → レビュー → マージ）はスキップしました。
 フェーズ A（既存 PR の処理）は通常通り実行済みです。
-次回の launchd 起動（30 分後）で再度 usage を確認します。
+次回の launchd 起動（1 時間後）で再度 usage を確認します。
 EOF
 
   ./scripts/linear/lq.sh comment.add KMD-117 @/tmp/usage_skip_comment.md
@@ -293,4 +293,4 @@ end while
 - Linear I/O は `./scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリシー」参照）
 - `gh` CLI 認証済み
 
-対象想定: launchd で 1800 秒間隔起動 / または手動キックでも可
+対象想定: launchd で 3600 秒間隔起動 / または手動キックでも可
