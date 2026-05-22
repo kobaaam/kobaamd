@@ -3,6 +3,10 @@
 *.o
 *.d
 
+# Node (SDK pipeline)
+node_modules/
+artifacts/
+
 # macOS
 .DS_Store
 .AppleDouble

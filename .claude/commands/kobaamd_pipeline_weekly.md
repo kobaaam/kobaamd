@@ -6,8 +6,9 @@ description: ウィークリー系パイプライン（1 週間間隔想定）�
 
 1. `/kobaamd_research_create_ticket` ← 新機能候補を backlog に PRD-lite 起票
 2. `/kobaamd_report_status 7` ← 直近 1 週間のリードタイム・AI 採用率・コスト集計を生成
+2b. `TOKEN_RETRO_PATH=$(scripts/usage/retro.sh --window-hours 168)` ← 直近 1 週間の token 使用量を deterministic に振り返り、`.logs/token-retros/` に改善チェックリストを出力
 3. `/kobaamd_summarize_changelog` ← 直近タグ以降の done を集約してリリースノート生成
-4. `/kobaamd_improve_prompt` ← `docs/learnings/` から各 subagent のプロンプト改善案を提案（learnings 2 件未満なら自動スキップ）
+4. `/kobaamd_improve_prompt` ← `docs/learnings/` と `$TOKEN_RETRO_PATH`（未設定なら最新の `.logs/token-retros/*.md`）から各 subagent / pipeline prompt / model budget の改善案を提案（learnings 2 件未満でも token retro に recommendation があれば実行）
 5. `/kobaamd_update_wiki --since-last-run` ← 前回 ingest 以降に増えた `docs/learnings/` / `docs/adr/` を `docs/wiki/articles/` に取り込み
 5b. **月初（実行日の day-of-month が 7 以下）なら追加で** `/kobaamd_update_wiki --since-last-month-low` ← 先月の `wiki_value: low` 判定 learnings を救済対象として一括検討（KMD-133）
    - 判定例:

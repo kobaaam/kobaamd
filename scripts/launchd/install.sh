@@ -20,11 +20,11 @@ echo "==> launch agents: $LAUNCHAGENTS_DIR"
 mkdir -p "$LAUNCHAGENTS_DIR"
 mkdir -p "$KOBAAMD_DIR/.logs"
 
-# claude CLI のパス確認
-if ! command -v claude >/dev/null 2>&1; then
-  echo "WARN: 'claude' コマンドが PATH に見つかりません。"
+# Codex CLI のパス確認
+if ! command -v codex >/dev/null 2>&1; then
+  echo "WARN: 'codex' コマンドが PATH に見つかりません。"
   echo "      ~/.zshrc で PATH が通っているか確認してください。"
-  echo "      plist 内では 'source ~/.zshrc' を実行するため、対話シェルで使えていれば動きます。"
+  echo "      run_bundle.sh は zsh -lc で PATH を補完します。"
 fi
 
 for plist in "${PLISTS[@]}"; do

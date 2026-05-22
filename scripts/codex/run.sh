@@ -24,6 +24,12 @@
 #                   optional usage log context（KMD-XX など）
 #   CODEX_RUN_DRY_RUN=1
 #                   skip codex 実行 + Linear 起票のスキップ判定だけ実施
+#   CODEX_EXEC_MODEL
+#                   optional model passed to `codex exec -m`
+#   CODEX_EXEC_SANDBOX
+#                   sandbox passed to `codex exec -s` (default: workspace-write)
+#   CODEX_EXEC_CD
+#                   working directory passed to `codex exec -C` (default: repo root)
 #
 # Exit codes:
 #   0    成功（codex exec が 0、stderr に quota パターンなし）
@@ -171,7 +177,9 @@ EOF
 }
 
 main() {
-  "${REPO_ROOT}/scripts/usage/log.sh" codex "run.sh" 0 "${CODEX_RUN_CONTEXT:-}" || true
+  if [[ "${CODEX_RUN_LOGGED_BY_BUNDLE:-0}" != "1" ]]; then
+    "${REPO_ROOT}/scripts/usage/log.sh" codex "run.sh" 0 "${CODEX_RUN_CONTEXT:-}" || true
+  fi
   command -v jq >/dev/null || { err "jq が必要です (brew install jq)"; exit 2; }
 
   local stderr_file stdout_exit
@@ -190,10 +198,20 @@ main() {
     exit 2
   fi
 
+  local codex_args=(
+    exec
+    -C "${CODEX_EXEC_CD:-$REPO_ROOT}"
+    -s "${CODEX_EXEC_SANDBOX:-workspace-write}"
+  )
+  if [[ -n "${CODEX_EXEC_MODEL:-}" ]]; then
+    codex_args+=(-m "$CODEX_EXEC_MODEL")
+  fi
+  codex_args+=(-)
+
   # codex exec を起動。stdout はそのまま親に渡す。stderr は tee で
   # ターミナルにも見せつつファイルにも捕捉する。
   set +e
-  codex exec 2> >(tee "$stderr_file" >&2)
+  codex "${codex_args[@]}" 2> >(tee "$stderr_file" >&2)
   stdout_exit=$?
   set -e
 

@@ -10,10 +10,9 @@ set -euo pipefail
 #   1. orphan          — article not linked from index.md nor any other Related
 #   2. broken-link     — [[wikilink]] target does not exist
 #   3. stale           — `updated` older than 60 days AND newer source files exist
-#   4. section-context-missing — H2/H3 section unclear without article title
-#                        (Claude Code subagent `kobaamd_lint_section_context`,
-#                        model: haiku. Mandatory unless --no-llm. Use
-#                        --legacy-api to fall back to direct Anthropic API.)
+#   4. section-context-missing — H2/H3 section unclear without article title.
+#                        Disabled by default in Codex/Gemini-only automation
+#                        because the legacy route uses Claude/Anthropic.
 #   5. frontmatter     — required field missing / tag naming / Related symmetry
 #
 # Output: NDJSON to stdout, one violation per line:
@@ -28,7 +27,7 @@ set -euo pipefail
 #   scripts/wiki/lint.sh [options] [path ...]
 #
 # Options:
-#   --no-llm         Skip rule 4 (Haiku-based section context check)
+#   --no-llm         Skip rule 4 (default; kept for compatibility)
 #   --fix            Apply automatic fixes for tag normalization and missing
 #                    frontmatter fields. Edits files in-place.
 #   --cache <path>   Path for the section-context content_hash cache.
@@ -60,7 +59,7 @@ Without paths, lints every file under docs/wiki/articles/.
 Paths may be article files or subdirectories under docs/wiki/articles/.
 
 Options:
-  --no-llm         Skip rule 4 (Haiku-based section context check)
+  --no-llm         Skip rule 4 (default; kept for compatibility)
   --fix            Apply auto-fixes (tag normalization, frontmatter defaults)
   --cache <path>   Section-context cache file (default: .cache/wiki-lint.json)
   --report <path>  Execution report JSON (default: .cache/wiki-lint-report.json)
@@ -77,7 +76,7 @@ EOF
 
 # --- Args -------------------------------------------------------------------
 
-no_llm=0
+no_llm=1
 do_fix=0
 cache_path=""
 report_path=""
@@ -102,7 +101,12 @@ while [ "$#" -gt 0 ]; do
     --retries)
       [ "$#" -ge 2 ] || { usage; exit 2; }
       retries="$2"; shift 2 ;;
-    --legacy-api) legacy_api=1; shift ;;
+    --legacy-api)
+      err "--legacy-api is disabled in Codex/Gemini-only automation; rule 4 remains skipped"
+      legacy_api=0
+      no_llm=1
+      shift
+      ;;
     -h|--help) usage; exit 0 ;;
     --) shift; while [ "$#" -gt 0 ]; do paths+=("$1"); shift; done ;;
     -*) err "unknown option: $1"; usage; exit 2 ;;

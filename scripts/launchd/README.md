@@ -11,11 +11,11 @@ kobaamd 自律パイプラインの定期実行を macOS launchd で動かすた
 | `com.kobaamd.pipeline_weekly.plist` | 毎週月曜 9:00 | research / report / changelog / improve_prompt |
 | `com.kobaamd.pipeline_resume.plist` | 毎週金曜 7:00 | one-shot 再開エージェント（後述「一時停止と再開」参照） |
 
-plist は `run_bundle.sh` 経由で `claude -p` を起動する設計。完了時に macOS 通知センターに結果を通知する。
+plist は `run_bundle.sh` 経由で `scripts/codex/autopilot.sh` を起動する設計。Codex と Gemini のみを使い、Claude Code / Anthropic API は起動しない。完了時に macOS 通知センターに結果を通知する。
 
 ## Pre-flight check (KMD-194)
 
-`pipeline_active` のみ、`run_bundle.sh` の冒頭で `preflight_check.sh` が走り、Linear に対象 issue がゼロの場合は `claude -p` の起動を skip して exit する（メインセッショントークン消費 ~8k → 0）。
+`pipeline_active` のみ、`run_bundle.sh` の冒頭で `preflight_check.sh` が走り、Linear に対象 issue がゼロの場合は Codex 起動を skip して exit する（メインセッショントークン消費を 0 にする）。
 
 判定ロジック（OR、いずれかに該当すれば proceed）:
 
@@ -139,21 +139,32 @@ launchctl bootout "gui/$(id -u)/com.kobaamd.pipeline_resume"
 
 ## トラブルシューティング
 
-**ログに何も書かれない / "claude: command not found"**
+**ログに何も書かれない / "codex: command not found"**
 
-`source ~/.zshrc` で PATH が通っていない可能性。以下を確認:
+対話シェル側の PATH に `codex` が入っていない可能性。以下を確認:
 
 ```bash
-which claude
-# /opt/homebrew/bin/claude のような絶対パスが返ること
+which codex
+# /opt/homebrew/bin/codex のような絶対パスが返ること
 ```
 
-返らない場合、`~/.zshrc` で `claude` のインストール先を PATH に追加するか、plist 内の `claude` を絶対パスに書き換える。
+返らない場合、`~/.zshrc` で `codex` のインストール先を PATH に追加する。`run_bundle.sh` は launchd の最小環境を補うため `zsh -lc` で PATH を取得する。
 
 **LLM コストが想定以上**
 
 - pipeline_active の `StartInterval` を 1800 → 3600 に伸ばす（30分→1時間）
 - 該当 plist を編集後、`./scripts/launchd/install.sh` を再実行
+- Codex usage が高いときは `run_bundle.sh` が Codex 起動前に soft guard で skip する
+  - 既定 soft threshold: `KOBAAMD_USAGE_SOFT_THRESHOLD_CODEX=35` / `KOBAAMD_USAGE_SOFT_THRESHOLD_GEMINI=20` / `KOBAAMD_USAGE_SOFT_THRESHOLD_CLAUDE=80`（5時間窓）
+  - `pipeline_active` は `Reviewed` / `Human in Review` の処理だけ threshold 超過時も続行し、それ以外（新規実装・review 継続・daily/weekly）は次回へ defer
+  - 一時的に無効化する場合のみ `KOBAAMD_USAGE_GUARD=0`
+- launchd 経由の Codex 既定モデルは、active が `gpt-5.4`、daily/weekly が `gpt-5.4-mini`
+  - 必要時は `KOBAAMD_CODEX_MODEL_ACTIVE` / `KOBAAMD_CODEX_MODEL_MAINTENANCE` で上書き
+- Token 使用量の振り返り:
+  - `scripts/usage/report.sh --window-hours 24`
+  - `scripts/usage/retro.sh --window-hours 168 --print`
+  - `run_bundle.sh` は Codex CLI の `tokens used` を抽出し、`.logs/api_usage.jsonl` に bundle 単位で追記する
+  - weekly pipeline は `.logs/token-retros/` の最新結果を prompt / model budget / 実行単位の改善入力として扱う
 
 **スリープ復帰時に動かない**
 
@@ -172,7 +183,7 @@ launchctl load ~/Library/LaunchAgents/com.kobaamd.pipeline_active.plist
 
 - plist は OSS 公開を考慮して、ホームディレクトリの絶対パスをコミットしない設計（`__KOBAAMD_DIR__` プレースホルダ）
 - 実行ログは `kobaamd/.logs/` に集約。`.gitignore` に追加済み
-- 各バンドルは `run_bundle.sh` 経由で起動し、claude -p の結果と経過時間を集計、通知センターに結果を出す
+- 各バンドルは `run_bundle.sh` 経由で起動し、Codex autopilot の結果と経過時間を集計、通知センターに結果を出す
 - pipeline_active は `StartInterval` で起動時の即時キャッチアップを期待しない（`RunAtLoad: false`）。手動実行は `launchctl start`
 - pipeline_daily / weekly は時刻指定なので、PC 起動状態が必須。常時起動でない場合は cron や Cloud Run など別経路を検討
 - Slack 通知は `KOBAAMD_SLACK_WEBHOOK_URL` 環境変数を plist の EnvironmentVariables に追加することで有効化（コミットしないこと）
