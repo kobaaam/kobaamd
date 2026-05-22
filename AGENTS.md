@@ -6,6 +6,25 @@
 
 Codex がこのリポジトリで作業する場合、親エージェントは orchestrator として振る舞い、調査・検証・小さな実装を必要に応じて subagent に委譲して、親コンテキストの肥大化と token 消費を抑えることを既定動作にします。
 
+### Autopilot Sandbox Policy
+
+Codex/Gemini autopilot の許可範囲:
+- Linear の読み取り、transition/comment/create（PRD、carve-out、health、blocked quota 起票を含む）
+- feature branch の作成、commit、feature branch push、PR 作成
+- `Reviewed` 済み、または `Human in Review` の明示承認コメントを `Reviewed` 相当に翻訳できる PR の `gh pr merge --squash --delete-branch`
+- `swift build`、`swift test`、debug 用 `./scripts/post-build.sh`
+- Gemini API を使う PRD / research / review / wiki Q&A
+
+Codex/Gemini autopilot の禁止・手動承認範囲:
+- `claude` / `claude -p` / Claude Code subagent / Anthropic API / `ANTHROPIC_API_KEY` を必要とする経路
+- Tart VM / E2E、`brew install`、launchd install/uninstall、release signing/notary、`git tag`、`gh release`
+- main への直接 push、force push、`git reset --hard`、未追跡ファイル削除
+- 旧 `kobaamd_merge_pr` の「README/docs を main に直接 commit」手順。必要なら follow-up branch/PR または Linear issue にする
+- Linear archive は人間が明示許可した場合のみ実行
+- GitHub write / PR / merge 前に `gh auth status` を確認し、認証が無効なら push/PR/merge を試さず blocked として Linear コメントまたはログに残す
+
+`.claude/agents/*.md` と `.claude/commands/*.md` は Codex では仕様参照のみです。Claude/Anthropic 前提の手順は、Codex/Gemini/local shell に翻訳するか、翻訳できない rule を skip してください。
+
 ### Token 圧縮と Subagent 分担
 
 **原則**: 親エージェントは、設計判断・統合・最終レビュー・ユーザーへの説明に集中します。独立して進められる調査、ログ解析、検証、限定的な実装は軽量 subagent に任せ、親には要約だけを戻します。
@@ -160,7 +179,7 @@ kobaamd は AI エージェント群が自律的に開発を進めるパイプ�
 
 Linear への読み書きは **必ず** `scripts/linear/lq.sh` 経由で行う。Linear hosted MCP（`mcp__linear__*` / `.mcp.json` の linear エントリ）はもう使わない。リポジトリから `.mcp.json` も撤去済み。
 
-接続アカウントは `$LINEAR_API_KEY`（`~/.zshrc`）に格納された **es57ster+claude@gmail.com** ／ kobaan workspace ／ KMD team。
+接続アカウントは `$LINEAR_CODEX_API_KEY`（`~/.zshrc`）に格納された **es57ster+codex@gmail.com** ／ kobaan workspace ／ KMD team。既存スクリプト互換のため、`~/.zshrc` で `LINEAR_API_KEY="$LINEAR_CODEX_API_KEY"` としてエイリアスする。
 
 理由:
 - メインセッションでは Linear MCP（`mcp__linear__*`）が露出せず subagent 経由でしか動かなかった

@@ -3,7 +3,7 @@
 #
 # kobaamd_pipeline_active を起動するべきか判定する pre-flight check。
 # launchd が 30 分毎に呼ぶ run_bundle.sh の前段で動作し、対象 issue がゼロなら
-# claude -p の起動を skip してメインセッションのトークン消費 (~8k tokens) を 0 にする。
+# Codex の起動を skip してメインセッションのトークン消費を 0 にする。
 #
 # Exit code:
 #   0  proceed: pipeline_active を起動する
@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KOBAAMD_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$KOBAAMD_DIR"
 
-# launchd の最小環境で claude / gh / jq が PATH に無い対策（run_bundle.sh と同じ）。
+# launchd の最小環境で codex / gh / jq が PATH に無い対策（run_bundle.sh と同じ）。
 # zshrc を bash で source すると zsh 専用構文で parse error → 即終了するので、
 # 必要な変数だけ zsh から export 形式で取り出して eval する。
 # PATH は .zprofile / .zshenv で定義されているので zsh -lc で取れる。

@@ -22,8 +22,8 @@ kobaamd のコアチーム外で連携する外部サービス・SDK・LLM の�
 | 関わるタイミング | 全フェーズ |
 | 主な責務 | issue 状態管理、PRD 格納、コメント、優先度判定、ラベル管理 |
 | ワークスペース / チーム | kobaan workspace / KMD team |
-| 接続アカウント | `es57ster+claude@gmail.com`（AI コメント分離用） |
-| 認証 | `$LINEAR_API_KEY`（`~/.zshrc`） |
+| 接続アカウント | `es57ster+codex@gmail.com`（AI コメント分離用） |
+| 認証 | `$LINEAR_CODEX_API_KEY`（`~/.zshrc`、既存スクリプト互換で `$LINEAR_API_KEY` にエイリアス） |
 | アクセス経路 | `scripts/linear/lq.sh` 経由のみ（hosted MCP は撤去済み） |
 | 監査ログ | `.logs/linear_writes.jsonl`、ID キャッシュ `.logs/linear_cache.json` |
 | halted 時 | API エラー時はリトライ 3 回 → スキップ。pipeline_active 全体は止めない |
