@@ -14,8 +14,9 @@ sources:
   - docs/learnings/2026-05-06-KMD-119.md
   - docs/learnings/2026-05-06-KMD-53.md
   - docs/learnings/2026-05-08-KMD-151.md
+- docs/learnings/2026-05-23-KMD-117.md
 created: 2026-04-30
-updated: 2026-05-15
+updated: 2026-05-23
 ---
 
 # ポストモーテムから学ぶ実装パターン
@@ -271,6 +272,20 @@ PRD 側にも反映する: `docs/prd/` テンプレートに「テスト戦略�
 **一般化**: `post-build.sh` の冒頭は「副作用無効化」の場所として確立する。他の `scripts/release/*.sh` でも対応する実行中プロセスを best-effort で停止する 1 行を冒頭に置くパターンが再利用可能。
 
 **出所**: KMD-151 (PR #75)
+
+### パターン 25: 共有インフラスクリプトの API 切り替えは全呼び出し元更新を同 PR に含めるか別 PR に切り出す
+<!-- llm-context: KMD-117 で scripts/wiki/ask.sh を Anthropic→Gemini API に切り替えたまま、呼び出し元の 4 subagent を更新せずに PR が作成された事例。review_pr がコラテラルダメージ観点で fail 検出し、revert で解消した。 -->
+
+**問題**: KMD-117 の実装中に `scripts/wiki/ask.sh` が `ANTHROPIC_API_KEY` → `GEMINI_API_KEY` / `--model claude-opus-4-5` → `gemini-3.1-pro-preview` に切り替えられたが、`kobaamd_review_pr` / `kobaamd_review_security` / `kobaamd_create_prd` / `kobaamd_review_prd` の 4 subagent は更新なしに PR が作成された。マージされると全 subagent の wiki Q&A ステップが `GEMINI_API_KEY is not set` で失敗する。`kobaamd_review_pr` がコラテラルダメージ観点で fail 検出し、revert で解消した（KMD-209 として切り出し）。
+
+**対策**: 実装プロンプト（`kobaamd_implement_code` / `scripts/codex/run.sh`）に以下を追記する:
+- `scripts/wiki/ask.sh` など複数の subagent から呼ばれる共有スクリプトを変更する場合は、`.claude/agents/*.md` を grep して全呼び出し元を特定し、呼び出し元の更新を同 PR に含めるか、共有スクリプト変更だけを別 PR に切り出すかのどちらかにする
+- 環境変数や CLI 引数の interface 変更は **downstream を壊す破壊的変更** として扱い、`[BREAKING]` ラベルを付ける
+
+**判定ロジック**: `kobaamd_review_pr` の「コラテラルダメージ検出」観点は PR diff 外に影響が及ぶ変更を fail として扱う。共有スクリプトの API 変更は必ずこの観点にヒットする。「呼び出し元を全更新 or 切り出して別 PR」を fix_pr_comments の 2 択として提示することで 1 ラウンドで解消できる。
+
+**出所**: KMD-117 (PR #130) review_pr ラウンド 1 fail → fix_pr_comments revert → ラウンド 2 APPROVE
+
 
 ## Related
 

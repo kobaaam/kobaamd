@@ -4,7 +4,7 @@ category: practices
 tags: [concern, review-pr, carve-out, pipeline, ssot, human-in-review]
 sources: [.claude/commands/kobaamd_carve_concerns.md, docs/wiki/articles/practices/postmortem-patterns.md, docs/wiki/articles/practices/role-dispatch.md, docs/wiki/articles/decisions/autonomous-pipeline-philosophy.md, CLAUDE.md]
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-23
 ---
 
 # concern carve-out（PR レビュー懸念の 3 分類と別チケット退避）
@@ -70,6 +70,7 @@ updated: 2026-05-09
 - **多段 auto-carve 連鎖**（パターン 18 / 19 / 20）: KMD-150 → KMD-153 → KMD-171 のように carve-out した issue に対するレビューでさらに carve-out が連鎖しうる。連鎖は妨げないが、各 carve-out が独立した auto-carveable 3 条件を満たすことを毎回検証する
 - **観測機構変更時の smoke test**（パターン 18）: stderr / log / metric の中継・出力フォーマット変更は **同 PR で smoke test** を含めるのが原則。test を欠く concern は rework に分類されることが多い
 - **review_security のゲート観点選択**（パターン 19）: 観測性回復のような小規模 PR にすべての security 観点を盲目適用すると過剰 concern を量産する。`kobaamd_review_security` のゲート観点は PR 本質に応じて選ぶ
+- **共有インフラスクリプトの API 切り替えは full PR が必須**（[[postmortem-patterns]] パターン 25）: `scripts/wiki/ask.sh` のような複数 subagent から呼ばれるスクリプトの環境変数 / CLI interface を変更する場合、呼び出し元の更新を同 PR に含めるか切り出して別 PR にするかのどちらかのみ許容される。呼び出し元更新なしで API を変えると `kobaamd_review_pr` のコラテラルダメージ観点で **fail** になり in-review → in-progress 戻しが確定する（KMD-117 の実例）
 
 ### 7. 関連 slash / subagent
 
