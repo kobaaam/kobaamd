@@ -81,22 +81,40 @@ cat /tmp/review_prompt.md | codex exec --model gpt-5.4-mini --json --output-last
 
 **選定の判断ルール (subagent 内部で機械的に判定)**:
 
+物量だけでなく「論理複雑」も拾うため、concurrency / public API / migration 系のキーワード grep もトリガーに含める。短い diff でも subtle なバグが入りうるケース (例: 100 行の actor 書き換え) で mini が取りこぼすのを防ぐ。
+
 ```bash
-DIFF_LINES=$(gh pr diff "$PR" | wc -l)
+DIFF=$(gh pr diff "$PR" 2>/dev/null)
+DIFF_LINES=$(echo "$DIFF" | wc -l | tr -d ' ')
 SWIFT_TOUCHED=$(gh pr view "$PR" --json files --jq '[.files[].path | select(endswith(".swift"))] | length')
 IS_BREAKING=$(gh pr view "$PR" --json title --jq '.title | test("\\[BREAKING\\]")')
-HAS_SECURITY_PATTERNS=$(gh pr diff "$PR" | grep -ciE 'api_key|secret|password|token|Keychain|entitlement|sandbox' || true)
+
+# 物量 trigger
+HAS_SECURITY_PATTERNS=$(echo "$DIFF" | grep -ciE 'api[_-]?key|secret|password|token|Keychain|entitlement|sandbox|jwt|hmac' || true)
+
+# 論理複雑 trigger 1: concurrency / 状態管理 (Swift)
+HAS_CONCURRENCY=$(echo "$DIFF" | grep -cE '^\+.*\b(actor|async|await|@MainActor|@TaskLocal|DispatchQueue|NSLock|os_unfair_lock|withTaskGroup|withCheckedContinuation|AsyncStream|Combine\.(sink|assign))\b' || true)
+
+# 論理複雑 trigger 2: public/open API signature 変更 (追加/削除/シグネチャ修正の合計)
+HAS_PUBLIC_API_CHANGES=$(echo "$DIFF" | grep -cE '^[+-]\s*(public|open)\s+(func|class|struct|enum|protocol|var|let|init|subscript)' || true)
+
+# 論理複雑 trigger 3: migration / schema / package 系ファイル
+HAS_MIGRATION_TOUCHED=$(gh pr view "$PR" --json files --jq '[.files[].path | select(test("(migration|schema|Package\\.swift|Info\\.plist|entitlements|UserDefaults)", "i"))] | length')
 
 if [[ "$IS_BREAKING" == "true" || "$HAS_SECURITY_PATTERNS" -gt 5 ]]; then
   MODEL="gpt-5.5"
+elif [[ "$HAS_CONCURRENCY" -gt 3 || "$HAS_PUBLIC_API_CHANGES" -gt 2 || "$HAS_MIGRATION_TOUCHED" -gt 0 ]]; then
+  MODEL="gpt-5.4"        # 論理複雑 trigger (短い diff でも取りこぼし回避)
 elif [[ "$DIFF_LINES" -gt 500 || "$SWIFT_TOUCHED" -gt 3 ]]; then
-  MODEL="gpt-5.4"
+  MODEL="gpt-5.4"        # 物量 trigger
 elif [[ "$SWIFT_TOUCHED" -gt 0 ]]; then
-  MODEL="gpt-5.4-mini"  # default
+  MODEL="gpt-5.4-mini"   # default
 else
   MODEL="gpt-5-nano"
 fi
 ```
+
+**論理複雑 trigger を入れた理由**: GPT-5.4 mini は OpenAI 公式で「task-decomposition expert (Agent サブタスク用)」と位置付けられており、**「短い diff でも俯瞰理解が必要な refactor」では mini の recall (42.4% Qodo benchmark) が無視できない**。concurrency / public API / migration の 3 つは「物量は小さいが取りこぼしのコストが高い」典型なので、優先的に full に bump する。
 
 ### 運用上の注意
 - `--json` フラグで JSON 出力モードを明示し、`--output-last-message` で最終出力をファイルに固定。prompt 側でも JSON-only を指示する (二重防御)。

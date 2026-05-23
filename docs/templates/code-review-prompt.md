@@ -132,25 +132,63 @@ Return ONLY the JSON object. No markdown fences. No leading prose. No commentary
 
 ### Auto-selection heuristic (shell)
 
+The heuristic combines **volume triggers** (diff size, source-file count) with **logical-complexity triggers** (concurrency, public API surface, migration). Short diffs can still be complex (e.g. a 100-line refactor of an actor or a public API rename), and Mini-tier models systematically under-call concerns in those cases. The logical triggers bump such PRs to `gpt-5.4` (full) even when volume is small.
+
 ```bash
-DIFF_LINES=$(gh pr diff "$PR" 2>/dev/null | wc -l | tr -d ' ')
+DIFF=$(gh pr diff "$PR" 2>/dev/null)
+DIFF_LINES=$(echo "$DIFF" | wc -l | tr -d ' ')
+
 SOURCE_FILES=$(gh pr view "$PR" --json files \
   --jq '[.files[].path | select(test("\\.(py|ts|tsx|js|jsx|rs|go|java|kt|swift|rb|cs|cpp|cc|c|h|hpp|php|scala|ex|exs|erl|hs|ml)$"))] | length')
+
 IS_BREAKING=$(gh pr view "$PR" --json title --jq '.title | test("\\[BREAKING\\]")')
-SEC_PATTERNS=$(gh pr diff "$PR" 2>/dev/null \
+
+# Volume / security trigger
+SEC_PATTERNS=$(echo "$DIFF" \
   | grep -ciE 'api[_-]?key|secret|password|token|keychain|jwt|hmac|crypto|cipher|sanitize|escape|injection|csrf|xss' \
   || true)
 
+# Logical-complexity trigger 1: concurrency / shared-state primitives (multi-language)
+# - Python: asyncio, async def, threading, multiprocessing, Lock, Semaphore
+# - TypeScript / JS: async, Promise.all, Mutex, AbortController, Worker
+# - Rust: tokio, async fn, Arc<Mutex<>>, Send + Sync, channel, spawn
+# - Go: goroutine, sync.Mutex, sync.WaitGroup, chan, select
+# - Java / Kotlin: synchronized, AtomicReference, Coroutine, suspend, Flow
+# - Swift: actor, async/await, @MainActor, DispatchQueue, NSLock, withTaskGroup
+HAS_CONCURRENCY=$(echo "$DIFF" | grep -cE '^\+.*\b(async|await|asyncio|goroutine|tokio::spawn|thread\.spawn|Promise\.(all|race)|Mutex|RwLock|Semaphore|AtomicReference|sync\.(Mutex|WaitGroup|Once|RWMutex)|chan |go func|actor|@MainActor|DispatchQueue|NSLock|withTaskGroup|withCheckedContinuation|AsyncStream|suspend fun|coroutine|threading\.|multiprocessing\.|AbortController|Worker\()\b' || true)
+
+# Logical-complexity trigger 2: public API surface changes
+# Match added / removed lines that declare exported symbols at the start of a line.
+# Languages covered:
+#   Python      → no `public` keyword but `__all__` / top-level `def`/`class`
+#   TypeScript  → `export (default|function|class|interface|type|const|let)`
+#   Rust        → `pub fn|struct|enum|trait|mod|const|static`
+#   Go          → exported identifier (Capitalized) in `func|type|var|const`
+#   Java        → `public (class|interface|enum|record|static|abstract)`
+#   Kotlin      → `public|internal (fun|class|object|interface|val|var)`
+#   Swift       → `public|open (func|class|struct|enum|protocol|var|let|init|subscript)`
+HAS_PUBLIC_API_CHANGES=$(echo "$DIFF" | grep -cE '^[+-]\s*(export\s+(default\s+)?(function|class|interface|type|const|let|enum)\b|pub\s+(fn|struct|enum|trait|mod|const|static)\b|public\s+(class|interface|enum|record|static|abstract|fun|val|var|func|struct|protocol|init|subscript)\b|open\s+(func|class|struct|enum|protocol)\b|internal\s+(fun|class|object|interface|val|var)\b|^[+-]\s*func\s+[A-Z][A-Za-z0-9_]*\s*\(|^[+-]\s*type\s+[A-Z][A-Za-z0-9_]*\s+)' || true)
+
+# Logical-complexity trigger 3: migration / schema / build-config / runtime-config files
+HAS_MIGRATION_TOUCHED=$(gh pr view "$PR" --json files \
+  --jq '[.files[].path | select(test("(migration|schema|alembic|prisma|knex|liquibase|flyway|Package\\.swift|Cargo\\.toml|go\\.mod|requirements\\.txt|pyproject\\.toml|package\\.json|tsconfig|Info\\.plist|entitlements|Dockerfile|docker-compose|\\.env\\.example)", "i"))] | length')
+
 if [[ "$IS_BREAKING" == "true" || "$SEC_PATTERNS" -gt 5 ]]; then
   MODEL="gpt-5.5"
+elif [[ "$HAS_CONCURRENCY" -gt 3 || "$HAS_PUBLIC_API_CHANGES" -gt 2 || "$HAS_MIGRATION_TOUCHED" -gt 0 ]]; then
+  MODEL="gpt-5.4"          # logical-complexity trigger (short diff can still be hard)
 elif [[ "$DIFF_LINES" -gt 500 || "$SOURCE_FILES" -gt 3 ]]; then
-  MODEL="gpt-5.4"
+  MODEL="gpt-5.4"          # volume trigger
 elif [[ "$SOURCE_FILES" -gt 0 ]]; then
-  MODEL="gpt-5.4-mini"   # default
+  MODEL="gpt-5.4-mini"     # default
 else
   MODEL="gpt-5-nano"
 fi
 ```
+
+**Why logical triggers matter**: OpenAI positions the GPT-5.4 Mini / Nano tier as "task-decomposition experts for Agent sub-tasks". They under-call concerns when the PR is short but logically dense — a 100-line actor / async refactor or a public-API rename can introduce subtle bugs that the Mini tier glosses over. Bumping these to `gpt-5.4` (full) costs ~$0.010 more per review but recovers recall in exactly the cases where the cost of a missed regression is highest.
+
+**Tuning the thresholds**: the values `3`, `2`, `0` above are starting points. If your repo has lots of utility refactors that aren't actually complex (e.g. mechanical renames done by `gofmt -r` or `rustfmt`), raise the `HAS_PUBLIC_API_CHANGES` threshold; if you want to be more conservative, lower the `HAS_CONCURRENCY` threshold to `1`.
 
 ### When to override the ladder upward
 
