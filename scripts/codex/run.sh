@@ -57,12 +57,30 @@ QUOTA_PATTERN='(^|[^0-9])429([^0-9]|$)|rate.?limit|quota|usage.?limit|insufficie
 mkdir -p "$LOG_DIR"
 
 err() { echo "codex/run.sh: $*" >&2; }
+redact_secrets() {
+  sed -E \
+    -e 's/sk-ant-[A-Za-z0-9_-]{20,}/***/g' \
+    -e 's/sk-[A-Za-z0-9_-]{20,}/***/g' \
+    -e 's/Bearer [A-Za-z0-9._-]{20,}/***/g' \
+    -e 's/gh[pousr]_[A-Za-z0-9]{36,}/***/g' \
+    -e 's/lin_api_[A-Za-z0-9]{40,}/***/g' \
+    -e 's/xox[abpr]-[A-Za-z0-9-]{10,}/***/g' \
+    -e 's/AKIA[0-9A-Z]{16}/***/g'
+}
+sanitize_stderr_snippet() {
+  local snippet="${1:-}"
+  printf '%s' "$snippet" \
+    | redact_secrets \
+    | sed 's/```/\\`\\`\\`/g'
+}
 log_run() {
   local exit_code="$1" matched="$2" stderr_snippet="$3"
+  local sanitized_snippet
+  sanitized_snippet=$(sanitize_stderr_snippet "$stderr_snippet")
   jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
          --argjson code "$exit_code" \
          --arg matched "$matched" \
-         --arg snippet "$stderr_snippet" \
+         --arg snippet "$sanitized_snippet" \
          '{ts:$ts, exit_code:$code, blocked:$matched, stderr_snippet:$snippet}' \
     >> "$RUN_LOG"
 }
@@ -100,8 +118,13 @@ existing_blocked_issue() {
 # 既存がある場合はその identifier を返して skip する。
 create_blocked_issue() {
   local stderr_snippet="$1"
+  local sanitized_snippet
+  sanitized_snippet=$(sanitize_stderr_snippet "$stderr_snippet")
   local existing existing_status
-  existing=$(existing_blocked_issue); existing_status=$?
+  set +e
+  existing=$(existing_blocked_issue)
+  existing_status=$?
+  set -e
   case "$existing_status" in
     0)
       err "既存の BLOCKED チケット: $existing — 起票 skip"
@@ -143,7 +166,7 @@ create_blocked_issue() {
 ## 検出ログ抜粋
 
 \`\`\`
-$(printf '%s' "$stderr_snippet" | head -c 2000)
+$(printf '%s' "$sanitized_snippet" | head -c 2000)
 \`\`\`
 
 ## 自動起票元
@@ -241,4 +264,6 @@ main() {
   exit "$stdout_exit"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
