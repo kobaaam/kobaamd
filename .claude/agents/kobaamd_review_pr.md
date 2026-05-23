@@ -47,23 +47,62 @@ cat > /tmp/review_prompt.md <<'PROMPT_EOF'
 6. 破壊的変更チェック (既存 public API / UserDefaults / ファイルフォーマット)
 7. PRD section 8「変更してはいけない箇所」への抵触
 
+## 出力ルール (severity filter — 必ず守ること)
+- `fails` は **「PRD AC 未充足」または「破壊的変更で BREAKING 明示なし」** のときだけ出す。スタイル / 軽微なリファクタは fails に入れない (Qodo PR Benchmark の知見: GPT-5.4 系は過保守だが「明示的な severity 制約を渡すと焦点が定まる」)。
+- `concerns.severity` は以下のルールで厳格に振る:
+  - **high**: 即マージ阻止級 — 既存挙動の破壊、メモリリーク、メインスレッドブロッキング、セキュリティ問題
+  - **medium**: マージ前修正推奨 — テスト不足、命名の不整合、retain cycle 疑い
+  - **low**: 出さない (= concerns から落とす)。コメント追加 / nit / docstring / 微小なフォーマット指摘は **黙殺してよい**
+- `concerns` の最大数は **PR 差分行数 / 50** (例: 100 行差分なら 2 件まで)。それを超えるなら **重要度上位だけ**残し、残りは捨てる。
+- false positive を避けるためのチェック: 出す前に「これは本当にこの PR の差分で生まれた問題か？」を自問。既存コードに由来する問題は出さない。
+
 ## 出力フォーマット (JSON のみ、prose 禁止)
 {
   "verdict": "APPROVE" | "REQUEST_CHANGES" | "BREAKING",
   "fails": [{"file": "path", "line": N, "issue": "..."}],
-  "concerns": [{"file": "path", "line": N, "issue": "...", "severity": "low|medium|high"}],
+  "concerns": [{"file": "path", "line": N, "issue": "...", "severity": "high|medium"}],
   "summary": "<=200 chars overall verdict"
 }
 PROMPT_EOF
 
-cat /tmp/review_prompt.md | codex exec --model gpt-5-mini --json --output-last-message /tmp/review_result.json
+# model 選定は下記の段階表に従う (デフォルト gpt-5.4-mini)
+cat /tmp/review_prompt.md | codex exec --model gpt-5.4-mini --json --output-last-message /tmp/review_result.json
 # 必要なら --output-schema <FILE> で JSON Schema を強制してもよい (codex exec 0.130+)
 ```
 
-- model はデフォルト `gpt-5-mini`。極めて軽い PR (10 行以下 / docs のみ) なら `gpt-5-nano` でよい。BREAKING 候補が疑われる場合は `gpt-5` まで上げてよい。
+### Model 選定の段階表 (2026-05 改訂、コミュニティ知見反映)
+
+| PR の性質 | model | 1 review コスト (概算) | 根拠 |
+|---|---|--:|---|
+| docs / wiki / コメント変更のみ (差分 ~100 行未満、Swift 触らず) | `gpt-5-nano` | $0.0004 | bug 探しは不要、コスト最優先 |
+| **通常 Swift PR (default)** | **`gpt-5.4-mini`** | **$0.005** | Qodo PR Benchmark で「nano 系は task decomposition 用、judgement に不適」と指摘。recall 確保のため mini 以上 |
+| 複雑 refactor / multi-file / [BREAKING] 候補 | `gpt-5.4` (full) | ~$0.015 | mini の SWE-Bench Pro 比 +3pt、recall に効く |
+| CRITICAL security / 最終 BREAKING 判断 / Human escalate 直前 | `gpt-5.5` (reasoning=medium) | $0.034 | 2026-04 リリースの flagship、agentic + 長時間 task 向け |
+
+**選定の判断ルール (subagent 内部で機械的に判定)**:
+
+```bash
+DIFF_LINES=$(gh pr diff "$PR" | wc -l)
+SWIFT_TOUCHED=$(gh pr view "$PR" --json files --jq '[.files[].path | select(endswith(".swift"))] | length')
+IS_BREAKING=$(gh pr view "$PR" --json title --jq '.title | test("\\[BREAKING\\]")')
+HAS_SECURITY_PATTERNS=$(gh pr diff "$PR" | grep -ciE 'api_key|secret|password|token|Keychain|entitlement|sandbox' || true)
+
+if [[ "$IS_BREAKING" == "true" || "$HAS_SECURITY_PATTERNS" -gt 5 ]]; then
+  MODEL="gpt-5.5"
+elif [[ "$DIFF_LINES" -gt 500 || "$SWIFT_TOUCHED" -gt 3 ]]; then
+  MODEL="gpt-5.4"
+elif [[ "$SWIFT_TOUCHED" -gt 0 ]]; then
+  MODEL="gpt-5.4-mini"  # default
+else
+  MODEL="gpt-5-nano"
+fi
+```
+
+### 運用上の注意
 - `--json` フラグで JSON 出力モードを明示し、`--output-last-message` で最終出力をファイルに固定。prompt 側でも JSON-only を指示する (二重防御)。
 - Codex の output が JSON として parse できない場合は再試行 (max 2 回)。それでも JSON 化できない場合は `verdict=HUMAN_REVIEW` で escalate。
 - Codex CLI が非ゼロ exit (quota / rate-limit / network) を返した場合は `[BLOCKED] Codex Platform API quota / rate-limit detected` を Linear に起票して halt。実装側 (Claude Sonnet) の auth 経路は別なので、そちらは継続できる旨を blocked 起票本文に記載。
+- **`gpt-5.5-nano` / `gpt-5.5-mini` は存在しない** (2026-05 時点で OpenAI flagship 系の小型 variant は GPT-5.4 family に集約)。`--model gpt-5.5-nano` を渡すと 404 になるので注意。
 
 ## Linear I/O
 
