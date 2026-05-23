@@ -14,7 +14,7 @@ kobaamd の設計思考・技術知見の知識ベース。
 ## Decisions（意思決定の文脈）
 
 - [AI 自律開発パイプラインの設計思想](articles/decisions/autonomous-pipeline-philosophy.md) — なぜ Linear + subagent 構成を選んだか、人間承認ゲートの設計意図
-- [マルチ LLM ペルソナ体制](articles/decisions/multi-llm-persona.md) — Claude/Codex/Gemini の役割分担、Opus/Sonnet のモデル割り当て基準
+- [マルチ LLM ペルソナ体制](articles/decisions/multi-llm-persona.md) — Claude/Codex/Gemini の役割分担、Opus/Sonnet/Haiku のモデル割り当て基準（正本）
 
 ## Components（コンポーネント知識）
 
