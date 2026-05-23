@@ -26,8 +26,12 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
    - Phase 4 roadmap (TreeSitter / outline / PDF Export) listed in `CLAUDE.md`
    - kobaamd's vision: "AIが生成したMarkdownを、Macで最も快適に扱えるエディタ"
    - Concrete Mac-native UX touches that strengthen differentiation
+   - **AI-native editor ergonomics from Zed / Cursor** that translate well to a Markdown-first editor (agent-in-buffer presence, edit prediction, project-scoped AI rules, MCP / ACP integration, BYOK provider switching, multi-agent parallel editing)
 7. **Gemini による競合・トレンド調査（必須）**
-   リサーチの精度を上げるため、Gemini に以下を問い合わせる（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。KMD-131）:
+   リサーチの精度を上げるため、Gemini に以下を 2 つ問い合わせる（`source ~/.zshrc` はこの Bash call の冒頭で実行済みである前提。KMD-131）。1 回目は Markdown エディタ領域、2 回目は AI-native コードエディタの作法を Markdown 領域に持ち込む観点での調査:
+
+   **問い合わせ 1: Markdown エディタ領域**
+
    ```bash
    cat > /tmp/req.json << 'PROMPT_EOF'
    {"contents": [{"parts": [{"text": "macOS 向け Markdown エディタ（Bear, Obsidian, Typora, iA Writer, Marked2, Zettlr）の最新バージョンの機能一覧を比較してください。特に以下の観点で kobaamd（SwiftUI + AppKit ベースの OSS エディタ）が差別化できる領域を提案してください:\n1. AI 連携機能（インライン補完、要約、翻訳）\n2. ダイアグラム対応（Mermaid, D2, PlantUML）\n3. エクスポート形式（PDF, HTML, DOCX）\n4. コラボレーション・同期\n5. プラグイン/拡張性\n6. macOS ネイティブ統合（Shortcuts, Spotlight, Quick Look）\nそれぞれの競合の強み・弱みと、kobaamd が攻められる隙間を教えてください。"}]}]}
@@ -37,7 +41,21 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
      -d @/tmp/req.json \
      | jq -r '.candidates[0].content.parts[0].text'
    ```
-   Gemini の回答をギャップ分析に組み込み、各候補の「参考リンク」セクションに反映する。
+
+   **問い合わせ 2: AI-native code editor → Markdown 領域への転用**
+
+   ```bash
+   cat > /tmp/req2.json << 'PROMPT_EOF'
+   {"contents": [{"parts": [{"text": "AI-native コードエディタ Zed (1.0, 2026) と Cursor (2.0/Composer 2.5, 2026) の以下の機能のうち、Markdown エディタ kobaamd に持ち込んで意味のあるものを 5 件、Mac ネイティブ実装での実現可能性（S/M/L）と一緒に挙げてください。\n\nZed の比較対象機能:\n- Agent Client Protocol (ACP) による外部 AI CLI 統合 (Claude Code / Codex / OpenCode)\n- Zeta2 edit-prediction model (Copilot より高速、Ollama でローカル動作)\n- Real-time multiplayer collaboration (native, low-latency)\n- BYOK + provider 切替 (Claude / GPT / Gemini / local)\n- Multi-agent parallel editing (複数 AI が同じバッファに並行書き込み)\n\nCursor の比較対象機能:\n- Composer model (low-latency agentic editing, 30s/turn 以下)\n- Agent Mode (自然言語タスク → multi-file edit + terminal + iteration)\n- Background Agent (off-machine 実行、GitHub issue → draft PR)\n- Multi-Agent Interface (git worktrees / cloud で parallel agents、ナビが agent 中心)\n- .cursor/rules/ (version-controlled, file-scoped AI rules)\n\n各候補について以下を明示してください:\n1. 機能名（Markdown 文脈に翻訳）\n2. kobaamd のビジョンとの接続（AI が生成した Markdown を Mac で最も快適に扱う）\n3. Swift / SwiftUI / NSTextView での実装難度（S/M/L）と侵襲度\n4. ユーザーが得られる具体的な体験変化（before / after を 1 行ずつ）\n5. 既存の差別化（Markdown レンダリング済み diff ビューア）との相乗効果（あれば）"}]}]}
+   PROMPT_EOF
+   curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=$GEMINI_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d @/tmp/req2.json \
+     | jq -r '.candidates[0].content.parts[0].text'
+   ```
+
+   両方の Gemini 回答をギャップ分析に組み込む。問い合わせ 2 の出力からは「Markdown エディタ × AI-native ergonomics」のクロス候補を最低 1 件はラインナップに含める（Markdown 領域だけの提案にならないようにバランスを取る）。各候補の「参考リンク」セクションに Zed / Cursor の該当機能名を併記する。
+
 8. Use WebSearch sparingly to confirm specific facts that Gemini's response raised, only when it sharpens the proposal.
 8. Propose 3〜5 concrete feature candidates. Each candidate must:
    - Connect to kobaamd's vision (no generic editor features)
@@ -86,7 +104,7 @@ Linear 操作は `scripts/linear/lq.sh` 経由（CLAUDE.md「Linear I/O ポリ�
 - テスト負荷
 
 ## 参考リンク
-- 類似 OSS（具体機能名で）: Bear / Obsidian / Typora / Marked2 / iA Writer など
+- 類似 OSS / 競合（具体機能名で）: Bear / Obsidian / Typora / Marked2 / iA Writer / Zed (ACP, Zeta2, multiplayer) / Cursor (Composer, Agent Mode, Background Agent, .cursor/rules/) など
 - 関連 issue（あれば）
 
 ---
@@ -111,7 +129,7 @@ generated_at: <ISO-8601>
 ## リサーチ結果サマリ
 
 起票した issue (state: backlog):
-- KMD-XX: <title> — <category: vision-fit | phase4 | mac-native | infra>
+- KMD-XX: <title> — <category: vision-fit | phase4 | mac-native | infra | ai-native-cross>
 - KMD-YY: <title> — ...
 
 採否判断補足:
