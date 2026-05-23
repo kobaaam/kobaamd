@@ -125,6 +125,13 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - lint: pass を確認すること（本作業の AC）
 - ingest history: 別タスクとして扱う（本タスクは KB2 残作業に焦点）
 
+## [2026-05-23] KMD-90: モデル割り当て表の一本化（Haiku 反映）
+
+- `index.md` の `multi-llm-persona.md` 説明文を更新: 「Opus/Sonnet のモデル割り当て基準」→「Opus/Sonnet/Haiku のモデル割り当て基準（正本）」
+- 現状確認: `decisions/multi-llm-persona.md` は KMD-50 時点で Haiku 行（SubAgent（バッチ）/ Claude Haiku）が追記済みのため本文変更なし
+- 現状確認: `practices/wiki-reference-policy.md` の Summary と セクション 3 冒頭は「正本は [[multi-llm-persona]]」が既に明記済みのため変更なし
+- ソース: KMD-90（PR #48 review concern C1 から auto-carve）
+
 ## [2026-05-15] Wiki ingest（default: 7d）
 
 - sources:
