@@ -99,7 +99,9 @@ fi
 
 # Resolve repository-root-relative path (best-effort; fallback to original)
 relative_path="$file_path"
+repo_root="$(pwd)"
 if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+  repo_root="$root"
   case "$file_path" in
     "$root"/*) relative_path="${file_path#"$root"/}" ;;
   esac
@@ -357,6 +359,7 @@ run_subagent() {
     attempt=$((attempt + 1))
     : >"$out_tmp"
     : >"$err_tmp"
+    "$repo_root/scripts/usage/log.sh" claude "kobaamd_lint_section_context" 0 "$relative_path" || true
     set +e
     printf '%s' "$prompt" | claude -p \
       --agent kobaamd_lint_section_context \
