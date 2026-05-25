@@ -45,7 +45,7 @@ count_actionable_conflicting_prs() {
   local actionable=0
   local ignored=0
 
-  prs=$(gh pr list --state open --json mergeable,headRefName 2>/dev/null) || return 1
+  prs=$(gh pr list --state open --limit 200 --json mergeable,headRefName 2>/dev/null) || return 1
   conflicting_branches=$(echo "$prs" | jq -r '.[] | select(.mergeable == "CONFLICTING") | .headRefName' 2>/dev/null) || return 1
 
   if [[ -z "$conflicting_branches" ]]; then
