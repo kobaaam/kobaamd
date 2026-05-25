@@ -55,8 +55,64 @@ Issue identifier (e.g., `KMD-12`) as the first argument. Halt and ask if missing
    - **使用制限ガード**: ANTHROPIC_API_KEY 起因の rate limit / 429 を `Bash` ツールで `curl` 等が返した場合、`$LQ issue.transition KMD-XX Todo` で Todo に戻し、`[BLOCKED] Anthropic API quota / rate-limit detected` を新規 Linear issue として起票（既存があれば skip）して halt する。Codex (Platform API) への fallback は **本 subagent では行わない** — それは別 subagent (`kobaamd_review_pr` 系) の役割。
    - optional: 破壊的変更が大規模で第二意見が欲しい場合のみ、`scripts/codex/run.sh` 経由で Codex (Platform API) に「設計レビュー」を依頼してよい (実装そのものは依頼しない)
 8. 自分が書いた diff を Read で読み直す。明らかな typo / 抜け / PRD section 8 違反がないか自己検証。
-9. Run `swift build` to verify compile. If fails, summarize error and decide: retry Codex with error fed back, or escalate (halt and report).
+9. Run `swift build` to verify compile. If fails, summarize error and decide: retry the relevant Edit/Write with error fed back, or escalate (halt and report).
 10. If build OK, run `swift test`. If fails, same retry logic.
+
+10.3. **セルフレビューループ（必須 / 2026-05-25 追加）**
+
+   PR を作成して `kobaamd_review_pr`（Codex 経由）に回す前に、**自分自身で diff を critical review** して明らかな問題を潰す。Codex に渡す PR を可能な限り clean にすることで、review_pr ↔ fix_pr_comments ループ（pipeline_active phase A の最大 3 回ループ）を呼び込まずに済む確率を上げるのが目的。
+
+   **ループ仕様**:
+   - 最大 **3 回** (ループ変数 `self_review_round = 1..3`)
+   - 各ループで以下を順に実施:
+
+     a. `git diff $(git merge-base HEAD main)...HEAD` で本 PR の全体 diff を取得
+     b. 下記の severity filter ルールに従って自分の diff を critical review する（reviewer persona に切り替えて読む）
+     c. `fails` が 1 件以上 OR `severity=high` concerns が 1 件以上ある場合は **自分で Edit/Write で修正**し、`swift build` を再実行
+     d. 修正後の diff を再度 self-review してループ最初に戻る
+     e. `fails = 0` かつ `severity=high concerns = 0` になったらループ終了。`severity=medium` は許容（review_pr で再検討させる）。
+
+   **Severity filter（`kobaamd_review_pr.md` と同じルールを self-apply）**:
+   - **`fails`**: PRD section 6 (AC) 未充足 / PRD section 8「変更してはいけない箇所」抵触 / undeclared [BREAKING] のみ
+   - **`severity=high`**: 即マージ阻止級 — 既存挙動の破壊 / メモリリーク / メインスレッドブロッキング / セキュリティ問題
+   - **`severity=medium`**: マージ前修正推奨 — テスト不足 / 命名不整合 / retain cycle 疑い（**ループ終了 OK、review_pr に委ねる**）
+   - **`severity=low`**: **報告しない** — 軽微な nit / docstring / フォーマット指摘は自己破棄
+
+   **観点リスト**（review_pr と同じ、self-apply 用に簡略化）:
+   1. PRD AC との整合（section 6 全項目がコードで実現されているか）
+   2. PRD section 8「影響範囲マップ」内に変更が収まっているか / 「変更してはいけない箇所」に抵触していないか
+   3. Swift / SwiftUI / AppKit 慣習との整合（force unwrap, try!, retain cycle, weak/unowned 不足）
+   4. パフォーマンス（メインスレッドブロッキング, 無駄なループ, 大量メモリ確保）
+   5. テスト存在（追加した public ロジックに対応する Tests/ 更新があるか）
+   6. 破壊的変更（既存 public API / Notification.Name / UserDefaults キー / Info.plist の削除・変更）
+
+   **3 回繰り返してもクリーンにならない場合**:
+   - そのまま通常フロー (step 10.5 → 13 → 14) に進む。PR は作成して `in Review` 遷移する
+   - Linear に self-review の残件を記録するコメントを残す (review_pr が context として読めるように):
+     ```
+     [SELF_REVIEW_STUCK] 3 ラウンド回しても残った fails/high concerns:
+     - <file>:<line>: <issue>
+     ...
+     review_pr (Codex) に最終判定を委ねる。
+     ```
+   - **人間への escalation は不要**。pipeline_active phase A の review_pr ↔ fix_pr_comments ループ（最大 3 回）が後段で判定を続行する。self-review で潰しきれなかったものは Codex review の判断に従う
+
+   **このループで `kobaamd_review_pr` (Codex) を呼んではいけない**: Codex は別人格 reviewer として PR 作成後の別 subagent で走らせる。self-review はあくまで「自分が書いたものを自分で見直す」第一防衛線で、Codex に渡す品質を底上げするためのもの。
+
+   **自分の self-review コメントを Linear に残す**（後続の review_pr が「実装者は何を気にしたか」を見えるようにする）:
+   ```bash
+   cat > /tmp/self_review.md <<EOF
+   <!-- self-review -->
+   ## Self-review (round $self_review_round, final)
+   - rounds: $self_review_round / 3
+   - fails: 0
+   - high concerns: 0
+   - medium concerns (review_pr に委ねる): $N
+     - <file>:<line>: <issue>
+     ...
+   EOF
+   $LQ comment.add KMD-XX @/tmp/self_review.md
+   ```
 
 10.5. **中断耐性のための WIP コミット & push（必須）**
 
