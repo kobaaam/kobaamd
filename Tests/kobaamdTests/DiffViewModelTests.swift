@@ -83,7 +83,65 @@ struct DiffViewModelTests {
         #expect(vm.renderedHTMLForA.contains("<!DOCTYPE html>"))
     }
 
-    // MARK: - 一時ファイルの並列安全性
+    // MARK: - computeDiff（Pure Swift diff）
+
+    @Test("同一テキストでは差分が空であること")
+    func identicalTextProducesNoDiff() async {
+        let lines = await DiffViewModel.testableComputeDiff(a: "line1\nline2", b: "line1\nline2")
+        #expect(lines.isEmpty)
+    }
+
+    @Test("中間行の変更で context / removed / added が順に出ること")
+    func lineReplacementProducesExpectedKinds() async {
+        let lines = await DiffViewModel.testableComputeDiff(
+            a: "line1\nline2\nline3",
+            b: "line1\nLINE2\nline3"
+        )
+
+        #expect(lines.count == 4)
+        #expect(lines[0].text == "line1")
+        #expect(lines[0].kind == .context)
+        #expect(lines[1].text == "-line2")
+        #expect(lines[1].kind == .removed)
+        #expect(lines[2].text == "+LINE2")
+        #expect(lines[2].kind == .added)
+        #expect(lines[3].text == "line3")
+        #expect(lines[3].kind == .context)
+    }
+
+    @Test("追加のみの変更で added 行が出ること")
+    func insertionProducesAddedLine() async {
+        let lines = await DiffViewModel.testableComputeDiff(
+            a: "line1\nline3",
+            b: "line1\nline2\nline3"
+        )
+
+        #expect(lines.count == 3)
+        #expect(lines[0].text == "line1")
+        #expect(lines[0].kind == .context)
+        #expect(lines[1].text == "+line2")
+        #expect(lines[1].kind == .added)
+        #expect(lines[2].text == "line3")
+        #expect(lines[2].kind == .context)
+    }
+
+    @Test("削除のみの変更で removed 行が出ること")
+    func deletionProducesRemovedLine() async {
+        let lines = await DiffViewModel.testableComputeDiff(
+            a: "line1\nline2\nline3",
+            b: "line1\nline3"
+        )
+
+        #expect(lines.count == 3)
+        #expect(lines[0].text == "line1")
+        #expect(lines[0].kind == .context)
+        #expect(lines[1].text == "-line2")
+        #expect(lines[1].kind == .removed)
+        #expect(lines[2].text == "line3")
+        #expect(lines[2].kind == .context)
+    }
+
+    // MARK: - 並列安全性 / legacy temp file cleanup
 
     @Test("並列で scheduleUpdate を複数回呼び出しても干渉せず lines が更新されること")
     func parallelDiffComputationDoesNotInterfere() async throws {
