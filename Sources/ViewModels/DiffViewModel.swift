@@ -18,12 +18,12 @@ final class DiffViewModel {
 
     private var debounceTask: Task<Void, Never>?
 
-    struct DiffLine: Identifiable {
+    struct DiffLine: Identifiable, Sendable {
         let id = UUID()
         let text: String
         let kind: Kind
 
-        enum Kind {
+        enum Kind: Equatable, Sendable {
             case added
             case removed
             case context
@@ -248,6 +248,10 @@ final class DiffViewModel {
         escapeHTML(string)
     }
 
+    static func testableComputeDiff(a: String, b: String) async -> [DiffLine] {
+        await computeDiff(a: a, b: b)
+    }
+
     nonisolated private static func escapeHTML(_ string: String) -> String {
         string
             .replacingOccurrences(of: "&", with: "&amp;")
@@ -257,49 +261,70 @@ final class DiffViewModel {
             .replacingOccurrences(of: "'", with: "&#39;")
     }
 
+    nonisolated private static func splitLines(_ text: String) -> [String] {
+        guard !text.isEmpty else { return [] }
+        return text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
     private static func computeDiff(a: String, b: String) async -> [DiffLine] {
-        let uuid = UUID().uuidString
-        let tmpA = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_a_\(uuid).txt")
-        let tmpB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kobaamd_diff_b_\(uuid).txt")
-        try? a.write(to: tmpA, atomically: true, encoding: .utf8)
-        try? b.write(to: tmpB, atomically: true, encoding: .utf8)
+        guard a != b else { return [] }
 
         return await Task.detached(priority: .userInitiated) {
-            defer {
-                try? FileManager.default.removeItem(at: tmpA)
-                try? FileManager.default.removeItem(at: tmpB)
-            }
+            let oldLines = splitLines(a)
+            let newLines = splitLines(b)
 
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            proc.arguments = ["diff", "--no-index", "--color=never", tmpA.path, tmpB.path]
+            guard oldLines != newLines else { return [] }
 
-            let pipe = Pipe()
-            proc.standardOutput = pipe
-            proc.standardError = Pipe()
+            let diff = newLines.difference(from: oldLines)
+            guard !diff.isEmpty else { return [] }
 
-            try? proc.run()
-            proc.waitUntilExit()
+            var removalsByOffset: [Int: String] = [:]
+            var insertionsByOffset: [Int: String] = [:]
 
-            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-
-            if output.isEmpty { return [] }
-
-            return output.components(separatedBy: "\n").compactMap { raw in
-                guard !raw.isEmpty else { return nil }
-
-                if raw.hasPrefix("+++") || raw.hasPrefix("---") || raw.hasPrefix("diff") || raw.hasPrefix("index") {
-                    return DiffViewModel.DiffLine(text: raw, kind: .header)
-                } else if raw.hasPrefix("+") {
-                    return DiffViewModel.DiffLine(text: raw, kind: .added)
-                } else if raw.hasPrefix("-") {
-                    return DiffViewModel.DiffLine(text: raw, kind: .removed)
-                } else if raw.hasPrefix("@@") {
-                    return DiffViewModel.DiffLine(text: raw, kind: .header)
-                } else {
-                    return DiffViewModel.DiffLine(text: raw, kind: .context)
+            for change in diff {
+                switch change {
+                case let .remove(offset, element, _):
+                    removalsByOffset[offset] = element
+                case let .insert(offset, element, _):
+                    insertionsByOffset[offset] = element
                 }
             }
+
+            var lines: [DiffLine] = []
+            var oldIndex = 0
+            var newIndex = 0
+
+            while oldIndex < oldLines.count || newIndex < newLines.count {
+                if let removed = removalsByOffset[oldIndex] {
+                    lines.append(DiffLine(text: "-\(removed)", kind: .removed))
+                    oldIndex += 1
+                    continue
+                }
+
+                if let added = insertionsByOffset[newIndex] {
+                    lines.append(DiffLine(text: "+\(added)", kind: .added))
+                    newIndex += 1
+                    continue
+                }
+
+                if oldIndex < oldLines.count && newIndex < newLines.count {
+                    lines.append(DiffLine(text: newLines[newIndex], kind: .context))
+                    oldIndex += 1
+                    newIndex += 1
+                    continue
+                }
+
+                if oldIndex < oldLines.count {
+                    lines.append(DiffLine(text: "-\(oldLines[oldIndex])", kind: .removed))
+                    oldIndex += 1
+                    continue
+                }
+
+                lines.append(DiffLine(text: "+\(newLines[newIndex])", kind: .added))
+                newIndex += 1
+            }
+
+            return lines
         }.value
     }
 }
