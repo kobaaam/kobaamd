@@ -3,6 +3,12 @@
 <plist version="1.0">
 <dict>
     <!--
+      App Sandbox はまだ有効化しないが、将来の段階的移行に備えて
+      placeholder key を明示しておく（KMD-40）。
+    -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    <!--
       Hardened Runtime (KMD-26) と ad-hoc 署名の組み合わせで、外部 framework
       （Sparkle.framework など）のロードを許可するために必要。
 
