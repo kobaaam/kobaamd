@@ -23,10 +23,11 @@ plist は `run_bundle.sh` 経由で `scripts/codex/autopilot.sh` を起動する
 - `Human in Review` 状態の issue が 1 件以上
 - `in Review` 状態の issue が 1 件以上
 - CONFLICTING PR が 1 件以上
+  - ただし `feature/learnings-KMD-XX` 形式の docs-only postmortem PR で、対応する Linear issue がすでに `Done` のものは **active work ではない** とみなし除外する
 - `draft` 状態の issue が 1 件以上
 - `Todo` 状態の issue が 1 件以上 かつ `In Progress` = 0 件
 
-すべて満たさなければ `PREFLIGHT_SKIP: all queues empty (...)` をログに残して exit。Linear API / gh CLI 失敗時は **fail-open** で通常起動する（計測機構の不備で開発を止めない）。
+すべて満たさなければ `PREFLIGHT_SKIP: no actionable queue (...)` をログに残して exit。`Todo > 0` でも `In Progress = 1` のように **今この run で着手できる queue が無い** 場合は skip になる。Linear API / gh CLI 失敗時は **fail-open** で通常起動する（計測機構の不備で開発を止めない）。
 
 `pipeline_daily` / `pipeline_weekly` は対象外。
 

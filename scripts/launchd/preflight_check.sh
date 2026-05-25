@@ -37,6 +37,42 @@ count_state() {
   echo "$out" | jq 'length' 2>/dev/null
 }
 
+# docs-only learnings/postmortem PRs can remain open after the parent issue is
+# Done. Those follow-up PRs are not actionable work for pipeline_active, so
+# ignore them when deciding whether conflicting PRs should wake the bundle.
+count_actionable_conflicting_prs() {
+  local prs conflicting_branches branch issue_id issue_state
+  local actionable=0
+  local ignored=0
+
+  prs=$(gh pr list --state open --json mergeable,headRefName 2>/dev/null) || return 1
+  conflicting_branches=$(echo "$prs" | jq -r '.[] | select(.mergeable == "CONFLICTING") | .headRefName' 2>/dev/null) || return 1
+
+  if [[ -z "$conflicting_branches" ]]; then
+    ACTIONABLE_CONFLICTING=0
+    IGNORED_STALE_LEARNINGS=0
+    return 0
+  fi
+
+  while IFS= read -r branch; do
+    [[ -z "$branch" ]] && continue
+
+    if [[ "$branch" =~ ^feature/learnings-(KMD-[0-9]+)$ ]]; then
+      issue_id="${BASH_REMATCH[1]}"
+      issue_state=$("$LQ" issue.get "$issue_id" 2>/dev/null | jq -r '.state.name' 2>/dev/null) || return 1
+      if [[ "$issue_state" == "Done" ]]; then
+        ignored=$((ignored + 1))
+        continue
+      fi
+    fi
+
+    actionable=$((actionable + 1))
+  done <<< "$conflicting_branches"
+
+  ACTIONABLE_CONFLICTING=$actionable
+  IGNORED_STALE_LEARNINGS=$ignored
+}
+
 REVIEWED=$(count_state "Reviewed")        || REVIEWED=-1
 HUMAN=$(count_state "Human in Review")    || HUMAN=-1
 IN_REVIEW=$(count_state "in Review")      || IN_REVIEW=-1
@@ -45,14 +81,16 @@ TODO=$(count_state "Todo")                || TODO=-1
 IN_PROGRESS=$(count_state "In Progress")  || IN_PROGRESS=-1
 
 # CONFLICTING PR を gh で確認
-CONFLICTING=$(gh pr list --json number,mergeable --jq '[.[] | select(.mergeable == "CONFLICTING")] | length' 2>/dev/null)
-[[ -z "$CONFLICTING" ]] && CONFLICTING=-1
+ACTIONABLE_CONFLICTING=0
+IGNORED_STALE_LEARNINGS=0
+count_actionable_conflicting_prs || ACTIONABLE_CONFLICTING=-1
+CONFLICTING="$ACTIONABLE_CONFLICTING"
 
 # 1 つでも -1（取得失敗）が混じっていれば fail-open
 if [[ "$REVIEWED" == "-1" ]] || [[ "$HUMAN" == "-1" ]] || [[ "$IN_REVIEW" == "-1" ]] \
    || [[ "$DRAFT" == "-1" ]] || [[ "$TODO" == "-1" ]] || [[ "$IN_PROGRESS" == "-1" ]] \
    || [[ "$CONFLICTING" == "-1" ]]; then
-  echo "PREFLIGHT_ERROR: Linear API or gh CLI fetch failed (fail-open, will proceed). reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING"
+  echo "PREFLIGHT_ERROR: Linear API or gh CLI fetch failed (fail-open, will proceed). reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING ignored_stale_learnings=$IGNORED_STALE_LEARNINGS"
   exit 2
 fi
 
@@ -80,10 +118,10 @@ elif [[ "$TODO" -gt 0 ]] && [[ "$IN_PROGRESS" -eq 0 ]]; then
 fi
 
 if [[ -n "$PROCEED_REASON" ]]; then
-  echo "PREFLIGHT_PROCEED: $PROCEED_REASON (reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING)"
+  echo "PREFLIGHT_PROCEED: $PROCEED_REASON (reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING ignored_stale_learnings=$IGNORED_STALE_LEARNINGS)"
   exit 0
 fi
 
-# すべての queue が empty
-echo "PREFLIGHT_SKIP: all queues empty (reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING)"
+# active pipeline が今この run で処理すべき actionable queue がない
+echo "PREFLIGHT_SKIP: no actionable queue (reviewed=$REVIEWED human=$HUMAN in_review=$IN_REVIEW draft=$DRAFT todo=$TODO in_progress=$IN_PROGRESS conflicting=$CONFLICTING ignored_stale_learnings=$IGNORED_STALE_LEARNINGS)"
 exit 1
