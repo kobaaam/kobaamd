@@ -18,6 +18,19 @@ final class SessionCoordinator {
     private let worktreeService = WorktreeService()
     private weak var appViewModel: AppViewModel?
 
+    init() {
+        let (loaded, activeID) = AppState.loadE1LocalSessions()
+        if loaded.isEmpty {
+            let home = FileManager.default.homeDirectoryForCurrentUser
+            let session = WorktreeSession.localDirectory(name: "Home", path: home)
+            sessions = [session]
+            activeSessionID = session.id
+        } else {
+            sessions = loaded
+            activeSessionID = activeID ?? loaded.first?.id
+        }
+    }
+
     var activeSession: WorktreeSession? {
         guard let id = activeSessionID else { return nil }
         return sessions.first { $0.id == id }
@@ -25,8 +38,12 @@ final class SessionCoordinator {
 
     var terminalSessions: [WorktreeSession] { sessions }
 
-    var activeTerminalSession: WorktreeSession {
-        activeSession ?? sessions[0]
+    var activeTerminalSession: WorktreeSession? {
+        guard !sessions.isEmpty else { return nil }
+        if let id = activeSessionID, let match = sessions.first(where: { $0.id == id }) {
+            return match
+        }
+        return sessions.first
     }
 
     var canRemoveSessions: Bool { sessions.count > 1 }
@@ -40,11 +57,14 @@ final class SessionCoordinator {
         if sessions.isEmpty {
             appendDefaultHomeSession()
         }
-        if let id = activeSessionID, sessions.contains(where: { $0.id == id }) {
-            selectSession(id: id, skipRefresh: true)
-        } else {
-            selectSession(id: sessions[0].id, skipRefresh: true)
+        guard let targetID = activeSessionID,
+              sessions.contains(where: { $0.id == targetID }) else {
+            if let first = sessions.first?.id {
+                selectSession(id: first, skipRefresh: true)
+            }
+            return
         }
+        selectSession(id: targetID, skipRefresh: true)
     }
 
     /// フォルダを選んで Local セッションを追加する。

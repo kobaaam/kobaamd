@@ -10,27 +10,31 @@ struct E1TerminalPaneView: View {
 
     var body: some View {
         ZStack {
-            ForEach(coordinator.terminalSessions) { session in
-                let isActive = session.id == coordinator.activeTerminalSession.id
-                E1TerminalRepresentable(
-                    terminal: terminalController.terminalView(for: session),
-                    isActive: isActive
-                ) {
-                    if isActive {
-                        terminalController.ensureProcessStarted(for: session)
+            if let active = coordinator.activeTerminalSession {
+                ForEach(coordinator.terminalSessions) { session in
+                    let isActive = session.id == active.id
+                    E1TerminalRepresentable(
+                        terminal: terminalController.terminalView(for: session),
+                        isActive: isActive
+                    ) {
+                        if isActive {
+                            terminalController.ensureProcessStarted(for: session)
+                        }
                     }
+                    .opacity(isActive ? 1 : 0)
+                    .allowsHitTesting(isActive)
                 }
-                .opacity(isActive ? 1 : 0)
-                .allowsHitTesting(isActive)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.kobaPaper)
         .onChange(of: coordinator.activeSessionID) { _, _ in
-            terminalController.ensureProcessStarted(for: coordinator.activeTerminalSession)
+            guard let session = coordinator.activeTerminalSession else { return }
+            terminalController.ensureProcessStarted(for: session)
         }
         .onAppear {
-            terminalController.ensureProcessStarted(for: coordinator.activeTerminalSession)
+            guard let session = coordinator.activeTerminalSession else { return }
+            terminalController.ensureProcessStarted(for: session)
         }
     }
 }
