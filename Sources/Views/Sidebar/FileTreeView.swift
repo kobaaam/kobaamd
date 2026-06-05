@@ -116,7 +116,7 @@ struct FileTreeView: View {
 
 // MARK: - Per-folder section
 
-private struct FolderSection: View {
+struct FolderSection: View {
     @Binding var folder: WorkspaceFolder
     var fileTreeViewModel: FileTreeViewModel
     @Binding var renamingNode: FileNode?

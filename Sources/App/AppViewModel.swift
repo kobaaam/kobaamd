@@ -152,6 +152,20 @@ final class AppViewModel {
         pendingJumpLine = line
     }
 
+    /// セッション切替時にエディタ・タブ・プレビュー状態をクリアする（KMD-224）。
+    func resetEditorStateForSessionSwitch() {
+        flushActiveTab()
+        tabs = []
+        activate(tab: nil)
+        isDiffMode = false
+        pendingJumpLine = nil
+        outlineViewModel.update(text: "")
+        backlinksViewModel.refresh(
+            currentURL: nil,
+            workspaceFolders: fileTreeViewModel.folders.map(\.url)
+        )
+    }
+
     /// 新しい空タブを追加する。
     func newTab() {
         isDiffMode = false

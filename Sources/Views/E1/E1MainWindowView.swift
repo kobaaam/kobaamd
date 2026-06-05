@@ -1,9 +1,11 @@
+import AppKit
 import SwiftUI
 
 // MARK: - E1 main window (placeholder shell, KMD-220)
 
 struct E1MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @State private var sessionCoordinator = SessionCoordinator()
 
     @State private var leftWidth: CGFloat = 240
     @State private var rightWidth: CGFloat = 360
@@ -13,7 +15,7 @@ struct E1MainWindowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            E1SessionRailView()
+            E1SessionRailView(coordinator: sessionCoordinator)
                 .frame(width: leftWidth)
 
             E1WidthDivider(
@@ -56,7 +58,14 @@ struct E1MainWindowView: View {
                 .help("Save (⌘S)")
             }
         }
-        .modifier(E1MainWindowCommandReceiver(appViewModel: appViewModel))
+        .onAppear {
+            sessionCoordinator.attach(appViewModel: appViewModel)
+            Task { await sessionCoordinator.bootstrapIfNeeded() }
+        }
+        .modifier(E1MainWindowCommandReceiver(
+            appViewModel: appViewModel,
+            sessionCoordinator: sessionCoordinator
+        ))
     }
 }
 
@@ -64,6 +73,7 @@ struct E1MainWindowView: View {
 
 private struct E1MainWindowCommandReceiver: ViewModifier {
     let appViewModel: AppViewModel
+    let sessionCoordinator: SessionCoordinator
 
     func body(content: Content) -> some View {
         content
@@ -74,7 +84,7 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                 appViewModel.saveCurrentFile()
             }
             .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
-                appViewModel.fileTreeViewModel.addFolder()
+                openGitRepositoryFolder()
             }
             .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
                 guard let url = fileURL else { return }
@@ -83,6 +93,18 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                     await appViewModel.openFile(url: url)
                 }
             }
+    }
+
+    private func openGitRepositoryFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "リポジトリを開く"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task {
+            await sessionCoordinator.handleFolderOpened(url)
+        }
     }
 }
 

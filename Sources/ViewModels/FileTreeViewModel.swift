@@ -106,6 +106,24 @@ final class FileTreeViewModel {
         }
     }
 
+    // MARK: - E1 scoped worktree (KMD-223)
+
+    /// active worktree のみをワークスペースにする（セッション切替用）。
+    func setScopedWorktree(_ url: URL) {
+        selectedNode = nil
+        let folder = WorkspaceFolder(url: url)
+        folders = [folder]
+        AppState.saveLastFolder(url)
+        reloadFolder(id: folder.id)
+        NotificationCenter.default.post(name: .workspaceRootChanged, object: url)
+    }
+
+    func clearWorkspace() {
+        folders = []
+        selectedNode = nil
+        isLoading = false
+    }
+
     // MARK: - File operations
 
     func createNewFile(in directory: URL) throws -> URL {
