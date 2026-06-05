@@ -45,9 +45,9 @@ struct E1MainWindowView: View {
                 Button {
                     NotificationCenter.default.post(name: .openFolderRequested, object: nil)
                 } label: {
-                    Image(systemName: "folder")
+                    Image(systemName: "plus.folder")
                 }
-                .help("Open Folder (⌘O)")
+                .help("セッションを追加 (⌘O)")
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -66,7 +66,7 @@ struct E1MainWindowView: View {
         }
         .onAppear {
             sessionCoordinator.attach(appViewModel: appViewModel)
-            Task { await sessionCoordinator.bootstrapIfNeeded() }
+            sessionCoordinator.bootstrapIfNeeded()
         }
         .modifier(E1MainWindowCommandReceiver(
             appViewModel: appViewModel,
@@ -90,10 +90,10 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                 appViewModel.saveCurrentFile()
             }
             .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
-                openGitRepositoryFolder()
+                _ = sessionCoordinator.addLocalSession()
             }
             .onReceive(NotificationCenter.default.publisher(for: .newFileRequested)) { _ in
-                createNewFileInActiveWorktree()
+                createNewFileInActiveSession()
             }
             .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
                 guard let url = fileURL else { return }
@@ -104,19 +104,7 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
             }
     }
 
-    private func openGitRepositoryFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "リポジトリを開く"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task {
-            await sessionCoordinator.handleFolderOpened(url)
-        }
-    }
-
-    private func createNewFileInActiveWorktree() {
+    private func createNewFileInActiveSession() {
         guard sessionCoordinator.activeSession != nil else { return }
         do {
             let url = try appViewModel.fileTreeViewModel.createNewFileInRoot()

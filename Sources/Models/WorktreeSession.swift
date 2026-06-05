@@ -1,15 +1,17 @@
 import Foundation
 
-/// E1 の 1 セッション = 1 つの git worktree（PRD KMD-218 §4）。
+/// E1 の 1 セッション（Local ディレクトリ、または git worktree）。
 struct WorktreeSession: Identifiable, Equatable {
     let id: UUID
-    /// 表示名（worktree ディレクトリ名）
+    /// 表示名（ディレクトリ名ベース）
     var name: String
     var worktreePath: URL
-    /// `git branch --show-current` 相当（porcelain の `branch refs/heads/...` から抽出）
+    /// `git branch --show-current` 相当（worktree のみ）
     var branchName: String?
     /// リポジトリのメイン worktree か
     var isMainWorktree: Bool
+    /// ユーザー追加の Local セッション（PTY cwd = worktreePath）
+    var isLocalSession: Bool
     var lastAccessedAt: Date
 
     init(
@@ -18,6 +20,7 @@ struct WorktreeSession: Identifiable, Equatable {
         worktreePath: URL,
         branchName: String?,
         isMainWorktree: Bool,
+        isLocalSession: Bool = false,
         lastAccessedAt: Date = Date()
     ) {
         self.id = id
@@ -25,20 +28,27 @@ struct WorktreeSession: Identifiable, Equatable {
         self.worktreePath = worktreePath
         self.branchName = branchName
         self.isMainWorktree = isMainWorktree
+        self.isLocalSession = isLocalSession
         self.lastAccessedAt = lastAccessedAt
     }
 
-    /// git 未接続時のフォールバック（PTY の cwd = ホーム）。
-    static let localShellID = UUID(uuidString: "E1A10000-0000-4000-8000-000000000001")!
-
-    static func localShell(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> WorktreeSession {
+    static func localDirectory(
+        name: String,
+        path: URL,
+        id: UUID = UUID()
+    ) -> WorktreeSession {
         WorktreeSession(
-            id: localShellID,
-            name: "Local",
-            worktreePath: home,
+            id: id,
+            name: name,
+            worktreePath: path.standardizedFileURL,
             branchName: nil,
-            isMainWorktree: false
+            isMainWorktree: false,
+            isLocalSession: true
         )
+    }
+
+    var displayPath: String {
+        (worktreePath.path as NSString).abbreviatingWithTildeInPath
     }
 }
 

@@ -23,10 +23,6 @@ struct E1TerminalPaneView: View {
                 .opacity(isActive ? 1 : 0)
                 .allowsHitTesting(isActive)
             }
-
-            if coordinator.sessions.isEmpty {
-                terminalGitHint
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.kobaPaper)
@@ -36,25 +32,6 @@ struct E1TerminalPaneView: View {
         .onAppear {
             terminalController.ensureProcessStarted(for: coordinator.activeTerminalSession)
         }
-    }
-
-    /// git worktree セッションがまだ無いときの薄いヒント（PTY は Local で起動済み）。
-    private var terminalGitHint: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Text("フォルダから git リポジトリを開くと worktree セッションが追加されます")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.kobaMute.opacity(0.9))
-                    .padding(8)
-                    .background(Color.kobaPaper.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .padding(12)
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 

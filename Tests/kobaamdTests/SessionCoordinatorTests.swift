@@ -13,13 +13,8 @@ struct SessionCoordinatorTests {
 
         let mainPath = URL(fileURLWithPath: "/tmp/repo-main", isDirectory: true)
         let featurePath = URL(fileURLWithPath: "/tmp/repo-feature", isDirectory: true)
-        let main = WorktreeSession(name: "main", worktreePath: mainPath, branchName: "main", isMainWorktree: true)
-        let feature = WorktreeSession(
-            name: "feature",
-            worktreePath: featurePath,
-            branchName: "feature/foo",
-            isMainWorktree: false
-        )
+        let main = WorktreeSession.localDirectory(name: "main", path: mainPath)
+        let feature = WorktreeSession.localDirectory(name: "feature", path: featurePath)
         coordinator.sessions = [main, feature]
         coordinator.activeSessionID = main.id
         coordinator.selectSession(id: main.id, skipRefresh: true)
@@ -31,6 +26,21 @@ struct SessionCoordinatorTests {
         #expect(vm.fileTreeViewModel.rootURL == featurePath)
         #expect(vm.tabs.isEmpty)
         #expect(vm.selectedFileURL == nil)
+    }
+
+    @Test("addLocalSession deduplicates same directory")
+    @MainActor
+    func addLocalSessionDeduplicates() async {
+        let vm = AppViewModel()
+        let coordinator = SessionCoordinator()
+        coordinator.attach(appViewModel: vm)
+        let path = FileManager.default.temporaryDirectory
+        coordinator.sessions = [WorktreeSession.localDirectory(name: "tmp", path: path)]
+        coordinator.activeSessionID = coordinator.sessions[0].id
+
+        await coordinator.handleFolderOpened(path)
+        #expect(coordinator.sessions.count == 1)
+        #expect(coordinator.activeSessionID == coordinator.sessions[0].id)
     }
 
     @Test("two-worktree fixture sessions remain distinct paths")

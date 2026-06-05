@@ -17,6 +17,8 @@ import Observation
     private static let workspaceBookmarks = "workspaceFolderBookmarks"
     private static let maxRecentFiles     = 10
     private static let selectedThemeKey   = "selectedColorTheme"
+    private static let e1LocalSessionsKey = "e1LocalSessions"
+    private static let e1ActiveSessionIDKey = "e1ActiveSessionID"
 
     var selectedTheme: ColorTheme {
         didSet {
@@ -150,5 +152,49 @@ import Observation
     static var useE1Shell: Bool {
         get { shared.useE1Shell }
         set { shared.useE1Shell = newValue }
+    }
+
+    // MARK: - E1 local sessions
+
+    private struct E1LocalSessionRecord: Codable {
+        let id: UUID
+        var name: String
+        var path: String
+    }
+
+    func saveE1LocalSessions(_ sessions: [WorktreeSession], activeID: UUID?) {
+        let records = sessions
+            .filter(\.isLocalSession)
+            .map { E1LocalSessionRecord(id: $0.id, name: $0.name, path: $0.worktreePath.path) }
+        if let data = try? JSONEncoder().encode(records) {
+            defaults.set(data, forKey: Self.e1LocalSessionsKey)
+        }
+        if let activeID {
+            defaults.set(activeID.uuidString, forKey: Self.e1ActiveSessionIDKey)
+        } else {
+            defaults.removeObject(forKey: Self.e1ActiveSessionIDKey)
+        }
+    }
+
+    func loadE1LocalSessions() -> ([WorktreeSession], UUID?) {
+        guard let data = defaults.data(forKey: Self.e1LocalSessionsKey),
+              let records = try? JSONDecoder().decode([E1LocalSessionRecord].self, from: data) else {
+            return ([], nil)
+        }
+        let sessions = records.compactMap { record -> WorktreeSession? in
+            let url = URL(fileURLWithPath: record.path, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return WorktreeSession.localDirectory(name: record.name, path: url, id: record.id)
+        }
+        let activeID = defaults.string(forKey: Self.e1ActiveSessionIDKey).flatMap(UUID.init(uuidString:))
+        return (sessions, activeID)
+    }
+
+    static func saveE1LocalSessions(_ sessions: [WorktreeSession], activeID: UUID?) {
+        shared.saveE1LocalSessions(sessions, activeID: activeID)
+    }
+
+    static func loadE1LocalSessions() -> ([WorktreeSession], UUID?) {
+        shared.loadE1LocalSessions()
     }
 }
