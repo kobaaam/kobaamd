@@ -36,6 +36,8 @@ final class FileTreeViewModel {
     var folders: [WorkspaceFolder] = []
     var selectedNode: FileNode? = nil
     var isLoading: Bool = false
+    /// ツリー上で NEW バッジを付けるファイル（KMD-228）
+    var newFilePaths: Set<String> = []
 
     // MARK: - Legacy compat
 
@@ -111,6 +113,7 @@ final class FileTreeViewModel {
     /// active worktree のみをワークスペースにする（セッション切替用）。
     func setScopedWorktree(_ url: URL) {
         selectedNode = nil
+        newFilePaths = []
         let folder = WorkspaceFolder(url: url)
         folders = [folder]
         AppState.saveLastFolder(url)
@@ -122,6 +125,19 @@ final class FileTreeViewModel {
         folders = []
         selectedNode = nil
         isLoading = false
+        newFilePaths = []
+    }
+
+    func markFileAsNew(_ url: URL) {
+        newFilePaths.insert(url.standardizedFileURL.path)
+    }
+
+    func clearNewMark(for url: URL) {
+        newFilePaths.remove(url.standardizedFileURL.path)
+    }
+
+    func isNewFile(_ url: URL) -> Bool {
+        newFilePaths.contains(url.standardizedFileURL.path)
     }
 
     // MARK: - File operations
@@ -129,6 +145,7 @@ final class FileTreeViewModel {
     func createNewFile(in directory: URL) throws -> URL {
         let target = uniqueNewFileURL(in: directory)
         try FileService().saveFile(at: target, content: "")
+        markFileAsNew(target)
         if let folder = folders.first(where: { directory.path.hasPrefix($0.url.path) }) {
             reloadFolder(id: folder.id)
         }

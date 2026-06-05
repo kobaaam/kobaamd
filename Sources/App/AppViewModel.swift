@@ -152,6 +152,19 @@ final class AppViewModel {
         pendingJumpLine = line
     }
 
+    /// 新規作成した成果物を開く（KMD-228）。`autoOpenNewArtifacts` が OFF のときは URL のみセット。
+    @MainActor
+    func openNewArtifact(url: URL) async {
+        AppState.saveLastFile(url)
+        guard AppState.shared.autoOpenNewArtifacts else {
+            selectedFileURL = url
+            editorText = ""
+            markSaved()
+            return
+        }
+        await openFile(url: url)
+    }
+
     /// セッション切替時にエディタ・タブ・プレビュー状態をクリアする（KMD-224）。
     func resetEditorStateForSessionSwitch() {
         flushActiveTab()

@@ -35,6 +35,15 @@ import Observation
         set { defaults.set(newValue, forKey: "autoFormatOnSave") }
     }
 
+    /// 新規作成した成果物を自動でビューアに開く（E1 / KMD-228）
+    var autoOpenNewArtifacts: Bool {
+        get {
+            if defaults.object(forKey: "autoOpenNewArtifacts") == nil { return true }
+            return defaults.bool(forKey: "autoOpenNewArtifacts")
+        }
+        set { defaults.set(newValue, forKey: "autoOpenNewArtifacts") }
+    }
+
     var updateCheckInterval: UpdateCheckInterval {
         get {
             let raw = defaults.string(forKey: "updateCheckInterval") ?? UpdateCheckInterval.atLaunch.rawValue

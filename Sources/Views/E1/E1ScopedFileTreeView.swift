@@ -75,6 +75,7 @@ private struct E1FileTreeList: View {
     private func select(node: FileNode) {
         guard !node.isDirectory else { return }
         fileTreeViewModel.selectedNode = node
+        fileTreeViewModel.clearNewMark(for: node.url)
         appViewModel.isFileLoading = true
         AppState.saveLastFile(node.url)
         Task.detached {

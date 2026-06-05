@@ -24,7 +24,7 @@ struct E1MainWindowView: View {
                 dragMultiplier: 1
             )
 
-            E1TerminalPlaceholderView()
+            E1TerminalPaneView(coordinator: sessionCoordinator)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             E1WidthDivider(
@@ -33,7 +33,7 @@ struct E1MainWindowView: View {
                 dragMultiplier: -1
             )
 
-            E1ViewerPlaceholderView()
+            E1ViewerTabsView()
                 .frame(width: rightWidth)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -50,6 +50,12 @@ struct E1MainWindowView: View {
                 .help("Open Folder (⌘O)")
             }
             ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    NotificationCenter.default.post(name: .newFileRequested, object: nil)
+                } label: {
+                    Image(systemName: "doc.badge.plus")
+                }
+                .help("New File (⌘N)")
                 Button {
                     NotificationCenter.default.post(name: .saveRequested, object: nil)
                 } label: {
@@ -86,6 +92,9 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .openFolderRequested)) { _ in
                 openGitRepositoryFolder()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .newFileRequested)) { _ in
+                createNewFileInActiveWorktree()
+            }
             .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
                 guard let url = fileURL else { return }
                 AppState.shared.pendingOpenFileURL = nil
@@ -104,6 +113,19 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             await sessionCoordinator.handleFolderOpened(url)
+        }
+    }
+
+    private func createNewFileInActiveWorktree() {
+        guard sessionCoordinator.activeSession != nil else { return }
+        do {
+            let url = try appViewModel.fileTreeViewModel.createNewFileInRoot()
+            Task { await appViewModel.openNewArtifact(url: url) }
+        } catch {
+            appViewModel.showAppError(.fileWriteFailed(
+                url: appViewModel.fileTreeViewModel.rootURL ?? URL(fileURLWithPath: "/"),
+                underlying: error
+            ))
         }
     }
 }
