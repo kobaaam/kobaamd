@@ -9,6 +9,7 @@ struct E1SessionRailView: View {
     private let sessionsFraction: CGFloat = 0.42
 
     var body: some View {
+        @Bindable var fileTree = appViewModel.fileTreeViewModel
         GeometryReader { geo in
             let sessionsHeight = max(80, geo.size.height * sessionsFraction)
             VStack(spacing: 0) {
@@ -17,8 +18,9 @@ struct E1SessionRailView: View {
 
                 KobaHDivider()
 
-                E1ScopedFileTreeView(fileTreeViewModel: appViewModel.fileTreeViewModel)
+                E1ScopedFileTreeView(fileTreeViewModel: fileTree)
                     .frame(maxHeight: .infinity)
+                    .id(coordinator.activeSessionID)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

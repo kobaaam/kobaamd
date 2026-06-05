@@ -87,7 +87,7 @@ final class SessionCoordinator {
 
     func selectSession(id: UUID, skipRefresh: Bool = false) {
         guard let session = sessions.first(where: { $0.id == id }) else { return }
-        guard activeSessionID != id else { return }
+        let switchingSession = activeSessionID != id
 
         activeSessionID = id
         if let idx = sessions.firstIndex(where: { $0.id == id }) {
@@ -96,7 +96,10 @@ final class SessionCoordinator {
 
         guard let vm = appViewModel else { return }
 
-        vm.resetEditorStateForSessionSwitch()
+        if switchingSession {
+            vm.resetEditorStateForSessionSwitch()
+        }
+        // 初回 bootstrap や同一セッション再選択でも Files ツリーを必ず同期する
         vm.fileTreeViewModel.setScopedWorktree(session.worktreePath)
         vm.refreshQuickOpenIndex()
         AppState.saveLastFolder(session.worktreePath)

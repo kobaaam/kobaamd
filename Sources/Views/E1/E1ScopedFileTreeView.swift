@@ -33,6 +33,21 @@ struct E1ScopedFileTreeView: View {
                     .foregroundStyle(Color.kobaMute)
                     .padding(.horizontal, 12)
                 Spacer(minLength: 0)
+            } else if fileTreeViewModel.isLoading, fileTreeViewModel.nodes.isEmpty {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small).scaleEffect(0.7)
+                    Text("読み込み中…")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.kobaMute)
+                }
+                .padding(.horizontal, 12)
+                Spacer(minLength: 0)
+            } else if fileTreeViewModel.nodes.isEmpty {
+                Text("このフォルダに表示できるファイルがありません")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.kobaMute)
+                    .padding(.horizontal, 12)
+                Spacer(minLength: 0)
             } else {
                 E1FileTreeList(
                     fileTreeViewModel: fileTreeViewModel,

@@ -4,6 +4,23 @@ import Foundation
 
 @Suite("SessionCoordinator")
 struct SessionCoordinatorTests {
+    @Test("bootstrap applies file tree even when session already active")
+    @MainActor
+    func bootstrapScopesFileTreeOnFirstLoad() {
+        let vm = AppViewModel()
+        let coordinator = SessionCoordinator()
+        let path = FileManager.default.homeDirectoryForCurrentUser
+        let session = WorktreeSession.localDirectory(name: "Home", path: path)
+        coordinator.sessions = [session]
+        coordinator.activeSessionID = session.id
+        coordinator.attach(appViewModel: vm)
+
+        coordinator.bootstrapIfNeeded()
+
+        #expect(vm.fileTreeViewModel.rootURL == path.standardizedFileURL)
+        #expect(!vm.fileTreeViewModel.folders.isEmpty)
+    }
+
     @Test("selectSession scopes file tree and clears editor tabs")
     @MainActor
     func selectSessionScopesWorktreeAndResetsEditor() {
