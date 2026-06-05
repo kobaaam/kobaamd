@@ -10,13 +10,19 @@ struct kobaamdApp: App {
 
     var body: some Scene {
         WindowGroup("kobaamd") {
-            MainWindowView()
-                .environment(appViewModel)
-                .alert("Error", isPresented: Bindable(appViewModel).showError) {
-                    Button("OK") {}
-                } message: {
-                    Text(appViewModel.errorMessage ?? "")
+            Group {
+                if AppState.shared.useE1Shell {
+                    E1MainWindowView()
+                } else {
+                    MainWindowView()
                 }
+            }
+            .environment(appViewModel)
+            .alert("Error", isPresented: Bindable(appViewModel).showError) {
+                Button("OK") {}
+            } message: {
+                Text(appViewModel.errorMessage ?? "")
+            }
         }
         .handlesExternalEvents(matching: ["*"])
         .defaultSize(width: 1000, height: 680)

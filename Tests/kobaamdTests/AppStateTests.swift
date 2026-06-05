@@ -104,6 +104,18 @@ struct AppStateTests {
         #expect(paths.isEmpty)
     }
 
+    // MARK: - E1 shell flag
+
+    @Test("useE1Shell defaults to false and persists")
+    func useE1ShellPersists() {
+        #expect(state.useE1Shell == false)
+        state.useE1Shell = true
+        #expect(defaults.bool(forKey: "useE1Shell") == true)
+        #expect(state.useE1Shell == true)
+        state.useE1Shell = false
+        #expect(state.useE1Shell == false)
+    }
+
     // MARK: - Color theme
 
     @Test("selectedTheme assignment persists raw value to UserDefaults")

@@ -43,6 +43,12 @@ import Observation
         set { defaults.set(newValue.rawValue, forKey: "updateCheckInterval") }
     }
 
+    /// E1 terminal + session shell (KMD-231). Default off during Phase A.
+    var useE1Shell: Bool {
+        get { defaults.bool(forKey: "useE1Shell") }
+        set { defaults.set(newValue, forKey: "useE1Shell") }
+    }
+
     // MARK: - Instance API (preferred for testing)
 
     func saveLastFolder(_ url: URL) {
@@ -122,4 +128,9 @@ import Observation
     static func loadLastFile() -> URL?     { shared.loadLastFile() }
     static func loadRecentFiles() -> [URL] { shared.loadRecentFiles() }
     static func clearRecentFiles()         { shared.clearRecentFiles() }
+
+    static var useE1Shell: Bool {
+        get { shared.useE1Shell }
+        set { shared.useE1Shell = newValue }
+    }
 }
