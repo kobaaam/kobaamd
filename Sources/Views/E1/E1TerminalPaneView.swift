@@ -10,49 +10,51 @@ struct E1TerminalPaneView: View {
 
     var body: some View {
         ZStack {
-            if coordinator.sessions.isEmpty {
-                terminalEmptyState
-            } else {
-                ForEach(coordinator.sessions) { session in
-                    let isActive = coordinator.activeSessionID == session.id
-                    E1TerminalRepresentable(
-                        terminal: terminalController.terminalView(for: session),
-                        isActive: isActive
-                    ) {
-                        if isActive {
-                            terminalController.ensureProcessStarted(for: session)
-                        }
+            ForEach(coordinator.terminalSessions) { session in
+                let isActive = session.id == coordinator.activeTerminalSession.id
+                E1TerminalRepresentable(
+                    terminal: terminalController.terminalView(for: session),
+                    isActive: isActive
+                ) {
+                    if isActive {
+                        terminalController.ensureProcessStarted(for: session)
                     }
-                    .opacity(isActive ? 1 : 0)
-                    .allowsHitTesting(isActive)
                 }
+                .opacity(isActive ? 1 : 0)
+                .allowsHitTesting(isActive)
+            }
+
+            if coordinator.sessions.isEmpty {
+                terminalGitHint
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.kobaPaper)
-        .onChange(of: coordinator.activeSessionID) { _, newID in
-            guard let id = newID,
-                  let session = coordinator.sessions.first(where: { $0.id == id }) else { return }
-            terminalController.ensureProcessStarted(for: session)
+        .onChange(of: coordinator.activeSessionID) { _, _ in
+            terminalController.ensureProcessStarted(for: coordinator.activeTerminalSession)
         }
         .onAppear {
-            if let session = coordinator.activeSession {
-                terminalController.ensureProcessStarted(for: session)
-            }
+            terminalController.ensureProcessStarted(for: coordinator.activeTerminalSession)
         }
     }
 
-    private var terminalEmptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "terminal")
-                .font(.system(size: 32))
-                .foregroundStyle(Color.kobaMute)
-            Text("リポジトリを開くとターミナルが起動します")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.kobaMute)
+    /// git worktree セッションがまだ無いときの薄いヒント（PTY は Local で起動済み）。
+    private var terminalGitHint: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Text("フォルダから git リポジトリを開くと worktree セッションが追加されます")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.kobaMute.opacity(0.9))
+                    .padding(8)
+                    .background(Color.kobaPaper.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(12)
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("ターミナル。リポジトリを開いてください。")
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

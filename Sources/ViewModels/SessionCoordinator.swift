@@ -19,6 +19,16 @@ final class SessionCoordinator {
         return sessions.first { $0.id == id }
     }
 
+    /// PTY 用セッション一覧。git worktree が無いときは Local のみ。
+    var terminalSessions: [WorktreeSession] {
+        sessions.isEmpty ? [WorktreeSession.localShell()] : sessions
+    }
+
+    /// 中央ターミナルが起動するセッション（worktree 未選択時は Local）。
+    var activeTerminalSession: WorktreeSession {
+        activeSession ?? WorktreeSession.localShell()
+    }
+
     func attach(appViewModel: AppViewModel) {
         self.appViewModel = appViewModel
     }
@@ -96,6 +106,16 @@ final class SessionCoordinator {
             await refreshSessions(anchorDirectory: last)
             return
         }
+        activateLocalShell()
+    }
+
+    /// git 未接続でもターミナルとファイルツリーをホームで使えるようにする。
+    func activateLocalShell() {
+        activeSessionID = nil
+        guard let vm = appViewModel else { return }
+        let home = WorktreeSession.localShell()
+        vm.fileTreeViewModel.setScopedWorktree(home.worktreePath)
+        vm.refreshQuickOpenIndex()
     }
 
     func handleFolderOpened(_ url: URL) async {

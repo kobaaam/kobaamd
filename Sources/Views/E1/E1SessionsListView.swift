@@ -34,7 +34,15 @@ struct E1SessionsListView: View {
             }
 
             if coordinator.sessions.isEmpty && !coordinator.isLoading {
-                e1EmptySessions
+                VStack(alignment: .leading, spacing: 2) {
+                    E1SessionRow(
+                        session: WorktreeSession.localShell(),
+                        isSelected: coordinator.activeSessionID == nil
+                    ) {
+                        coordinator.activateLocalShell()
+                    }
+                    e1EmptySessions
+                }
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
@@ -57,10 +65,10 @@ struct E1SessionsListView: View {
 
     private var e1EmptySessions: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("worktree がありません")
+            Text("git worktree は未登録")
                 .font(.system(size: 11))
                 .foregroundStyle(Color.kobaMute)
-            Text("ツールバーのフォルダボタンで git リポジトリを開いてください。")
+            Text("ツールバーのフォルダでリポジトリを開くと worktree 一覧が表示されます。")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.kobaMute2)
                 .fixedSize(horizontal: false, vertical: true)

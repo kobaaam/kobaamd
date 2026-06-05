@@ -27,6 +27,19 @@ struct WorktreeSession: Identifiable, Equatable {
         self.isMainWorktree = isMainWorktree
         self.lastAccessedAt = lastAccessedAt
     }
+
+    /// git 未接続時のフォールバック（PTY の cwd = ホーム）。
+    static let localShellID = UUID(uuidString: "E1A10000-0000-4000-8000-000000000001")!
+
+    static func localShell(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> WorktreeSession {
+        WorktreeSession(
+            id: localShellID,
+            name: "Local",
+            worktreePath: home,
+            branchName: nil,
+            isMainWorktree: false
+        )
+    }
 }
 
 /// `git worktree list --porcelain` の 1 ブロック。
