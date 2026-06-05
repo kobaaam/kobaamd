@@ -10,31 +10,48 @@ struct E1MainWindowView: View {
     @State private var leftWidth: CGFloat = 240
     @State private var rightWidth: CGFloat = 360
 
-    private let leftMinWidth: CGFloat = 200
-    private let rightMinWidth: CGFloat = 280
+    private let leftMinWidth: CGFloat = 180
+    private let rightMinWidth: CGFloat = 240
+    private let centerMinWidth: CGFloat = 280
+    private let dividerHitWidth: CGFloat = 8
 
     var body: some View {
-        HStack(spacing: 0) {
-            E1SessionRailView(coordinator: sessionCoordinator)
-                .frame(width: leftWidth)
-
-            E1WidthDivider(
-                width: $leftWidth,
-                minWidth: leftMinWidth,
-                dragMultiplier: 1
+        GeometryReader { geo in
+            let dividerTracks = dividerHitWidth * 2
+            let maxLeft = max(
+                leftMinWidth,
+                geo.size.width - rightWidth - centerMinWidth - dividerTracks
+            )
+            let maxRight = max(
+                rightMinWidth,
+                geo.size.width - leftWidth - centerMinWidth - dividerTracks
             )
 
-            E1TerminalPaneView(coordinator: sessionCoordinator)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 0) {
+                E1SessionRailView(coordinator: sessionCoordinator)
+                    .frame(width: min(leftWidth, maxLeft))
 
-            E1WidthDivider(
-                width: $rightWidth,
-                minWidth: rightMinWidth,
-                dragMultiplier: -1
-            )
+                E1WidthDivider(
+                    width: $leftWidth,
+                    minWidth: leftMinWidth,
+                    maxWidth: maxLeft,
+                    hitWidth: dividerHitWidth
+                )
 
-            E1ViewerTabsView()
-                .frame(width: rightWidth)
+                E1TerminalPaneView(coordinator: sessionCoordinator)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+
+                E1WidthDivider(
+                    width: $rightWidth,
+                    minWidth: rightMinWidth,
+                    maxWidth: maxRight,
+                    hitWidth: dividerHitWidth
+                )
+
+                E1ViewerTabsView()
+                    .frame(width: min(rightWidth, maxRight))
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.kobaPaper)
@@ -123,30 +140,35 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
 struct E1WidthDivider: View {
     @Binding var width: CGFloat
     let minWidth: CGFloat
-    /// `1` when divider is to the right of the pane (left rail); `-1` for right viewer pane.
-    let dragMultiplier: CGFloat
+    let maxWidth: CGFloat
+    let hitWidth: CGFloat
     @State private var baseWidth: CGFloat = 0
     @State private var isDragging = false
 
     var body: some View {
-        KobaDivider()
-            .padding(.horizontal, 3)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                    .onChanged { value in
-                        if !isDragging {
-                            isDragging = true
-                            baseWidth = width
-                        }
-                        let delta = value.translation.width * dragMultiplier
-                        width = max(minWidth, baseWidth + delta)
+        ZStack {
+            KobaDivider()
+        }
+        .frame(width: hitWidth)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    if !isDragging {
+                        isDragging = true
+                        baseWidth = width
                     }
-                    .onEnded { _ in isDragging = false }
-            )
-            .onHover { inside in
-                if inside { NSCursor.resizeLeftRight.push() }
-                else { NSCursor.pop() }
-            }
+                    let proposed = baseWidth + value.translation.width
+                    width = min(maxWidth, max(minWidth, proposed))
+                }
+                .onEnded { _ in isDragging = false }
+        )
+        .onHover { inside in
+            if inside { NSCursor.resizeLeftRight.push() }
+            else { NSCursor.pop() }
+        }
+        .zIndex(1)
+        .accessibilityLabel("列の幅を調整")
     }
 }
