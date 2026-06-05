@@ -321,7 +321,11 @@ extension MainWindowView {
                 .onChange(of: appViewModel.selectedFileURL) { _, url in
                     let ext = url?.pathExtension.lowercased() ?? ""
                     let isMD = ext == "md" || ext == "markdown" || ext.isEmpty
-                    if !isMD && (appViewModel.previewMode == .wysiwyg || appViewModel.previewMode == .viewer) {
+                    let needsSplitPreview = ext == "csv" || ext == "d2"
+                    if needsSplitPreview, appViewModel.previewMode != .split {
+                        appViewModel.previewMode = .split
+                    } else if !isMD,
+                              appViewModel.previewMode == .wysiwyg || appViewModel.previewMode == .viewer {
                         appViewModel.previewMode = .split
                     }
                 }

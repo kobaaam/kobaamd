@@ -260,6 +260,7 @@ private struct NodeRow: View {
     private func iconName(for url: URL) -> String {
         switch url.pathExtension.lowercased() {
         case "md", "markdown": return "doc.text"
+        case "csv":            return "tablecells"
         case "swift":          return "swift"
         case "json", "yaml", "yml", "toml": return "curlybraces"
         case "html", "css", "scss", "xml": return "globe"

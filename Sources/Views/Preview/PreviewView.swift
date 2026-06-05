@@ -12,6 +12,8 @@ struct PreviewView: View {
         Group {
             if isD2File {
                 D2PreviewView()
+            } else if isCSVFile {
+                CSVPreviewView()
             } else {
                 ZStack {
                     if isReady {
@@ -44,25 +46,25 @@ struct PreviewView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: appViewModel.editorText) { oldValue, newValue in
             PerfLogger.event("PreviewView.editorTextChanged", "old=\(oldValue.count) new=\(newValue.count) isReady=\(isReady) hasFirst=\(hasReceivedFirstRender)")
-            guard !isD2File else { return }
+            guard !isD2File && !isCSVFile else { return }
             if !isReady && !newValue.isEmpty { isReady = true }
             previewViewModel.update(text: newValue, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: appViewModel.selectedFileURL) { _, newURL in
             // ファイル切替直後は debounce を飛ばして即時 render（preview の stale 表示回避）
             PerfLogger.event("PreviewView.selectedFileURLChanged", "url=\(newURL?.lastPathComponent ?? "nil")")
-            guard !isD2File else { return }
+            guard !isD2File && !isCSVFile else { return }
             if !appViewModel.editorText.isEmpty {
                 isReady = true
                 previewViewModel.updateImmediate(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
             }
         }
         .onChange(of: appViewModel.previewMode) { _, _ in
-            guard !isD2File else { return }
+            guard !isD2File && !isCSVFile else { return }
             previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: appState.selectedTheme) { _, _ in
-            guard !isD2File else { return }
+            guard !isD2File && !isCSVFile else { return }
             previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: previewViewModel.bodyHTML) { _, newValue in
@@ -72,8 +74,8 @@ struct PreviewView: View {
             }
         }
         .onAppear {
-            PerfLogger.event("PreviewView.onAppear", "isD2=\(isD2File) hasFirst=\(hasReceivedFirstRender) textLen=\(appViewModel.editorText.count)")
-            guard !isD2File else { return }
+            PerfLogger.event("PreviewView.onAppear", "isD2=\(isD2File) isCSV=\(isCSVFile) hasFirst=\(hasReceivedFirstRender) textLen=\(appViewModel.editorText.count)")
+            guard !isD2File && !isCSVFile else { return }
             if !appViewModel.editorText.isEmpty {
                 isReady = true
                 previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
@@ -83,6 +85,10 @@ struct PreviewView: View {
 
     private var isD2File: Bool {
         appViewModel.selectedFileURL?.pathExtension.lowercased() == "d2"
+    }
+
+    private var isCSVFile: Bool {
+        appViewModel.selectedFileURL?.pathExtension.lowercased() == "csv"
     }
 }
 
