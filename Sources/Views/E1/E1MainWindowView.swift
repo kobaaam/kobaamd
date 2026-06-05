@@ -13,7 +13,7 @@ struct E1MainWindowView: View {
     private let leftMinWidth: CGFloat = 180
     private let rightMinWidth: CGFloat = 240
     private let centerMinWidth: CGFloat = 280
-    private let dividerHitWidth: CGFloat = 8
+    private let dividerHitWidth: CGFloat = 18
 
     var body: some View {
         GeometryReader { geo in
@@ -35,7 +35,8 @@ struct E1MainWindowView: View {
                     width: $leftWidth,
                     minWidth: leftMinWidth,
                     maxWidth: maxLeft,
-                    hitWidth: dividerHitWidth
+                    hitWidth: dividerHitWidth,
+                    dragAxis: .growOnDragRight
                 )
 
                 E1TerminalPaneView(coordinator: sessionCoordinator)
@@ -46,7 +47,8 @@ struct E1MainWindowView: View {
                     width: $rightWidth,
                     minWidth: rightMinWidth,
                     maxWidth: maxRight,
-                    hitWidth: dividerHitWidth
+                    hitWidth: dividerHitWidth,
+                    dragAxis: .shrinkOnDragRight
                 )
 
                 E1ViewerTabsView()
@@ -137,38 +139,60 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
 
 // MARK: - Draggable width divider (ADR-0010 pattern)
 
+/// 左カラム: 境界を右へドラッグすると広がる。右カラム: 境界を右へドラッグすると狭まる（VS Code 等と同じ）。
+enum E1ColumnResizeDrag {
+    case growOnDragRight
+    case shrinkOnDragRight
+}
+
 struct E1WidthDivider: View {
     @Binding var width: CGFloat
     let minWidth: CGFloat
     let maxWidth: CGFloat
     let hitWidth: CGFloat
+    let dragAxis: E1ColumnResizeDrag
     @State private var baseWidth: CGFloat = 0
     @State private var isDragging = false
+    @State private var isHovering = false
 
     var body: some View {
         ZStack {
+            if isHovering || isDragging {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.kobaAccent.opacity(0.12))
+                    .padding(.vertical, 4)
+            }
             KobaDivider()
         }
         .frame(width: hitWidth)
         .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .highPriorityGesture(
-            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+            DragGesture(minimumDistance: 0, coordinateSpace: .global)
                 .onChanged { value in
                     if !isDragging {
                         isDragging = true
                         baseWidth = width
                     }
-                    let proposed = baseWidth + value.translation.width
+                    let delta = value.translation.width
+                    let proposed: CGFloat
+                    switch dragAxis {
+                    case .growOnDragRight:
+                        proposed = baseWidth + delta
+                    case .shrinkOnDragRight:
+                        proposed = baseWidth - delta
+                    }
                     width = min(maxWidth, max(minWidth, proposed))
                 }
                 .onEnded { _ in isDragging = false }
         )
         .onHover { inside in
+            isHovering = inside
             if inside { NSCursor.resizeLeftRight.push() }
             else { NSCursor.pop() }
         }
-        .zIndex(1)
+        .zIndex(100)
         .accessibilityLabel("列の幅を調整")
+        .help("ドラッグして列幅を変更")
     }
 }
