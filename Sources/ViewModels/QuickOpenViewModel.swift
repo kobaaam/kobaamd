@@ -18,38 +18,59 @@ final class QuickOpenViewModel {
     }
 
     private var allItems: [QuickOpenItem] = []
+    /// E1 active session ルート（KMD-229）。nil なら folders 全体。
+    private(set) var scopedRootURL: URL?
 
     // MARK: - Indexing
 
     /// FileTreeViewModel の folders からファイルノードをフラット化してインデックス化する。
     /// ディレクトリは除外し、最大 500 件でキャップ。
-    func indexFiles(from folders: [WorkspaceFolder]) {
+    func indexFiles(from folders: [WorkspaceFolder], scopedTo root: URL? = nil) {
+        scopedRootURL = root?.standardizedFileURL
+        let scopePath = scopedRootURL?.path
         var items: [QuickOpenItem] = []
         for folder in folders {
-            flatten(nodes: folder.nodes, folderURL: folder.url, into: &items)
+            if let scopePath {
+                let folderPath = folder.url.standardizedFileURL.path
+                guard folderPath == scopePath || folderPath.hasPrefix(scopePath + "/") else { continue }
+            }
+            flatten(nodes: folder.nodes, folderURL: folder.url, scopePath: scopePath, into: &items)
             if items.count >= 500 { break }
         }
         allItems = Array(items.prefix(500))
     }
 
-    private func flatten(nodes: [FileNode], folderURL: URL, into items: inout [QuickOpenItem]) {
+    private func flatten(
+        nodes: [FileNode],
+        folderURL: URL,
+        scopePath: String?,
+        into items: inout [QuickOpenItem]
+    ) {
         for node in nodes {
             if node.isDirectory {
                 if let children = node.children {
-                    flatten(nodes: children, folderURL: folderURL, into: &items)
+                    flatten(nodes: children, folderURL: folderURL, scopePath: scopePath, into: &items)
                 }
             } else {
-                let relativePath = node.url.path
+                let std = node.url.standardizedFileURL
+                if let scopePath, !std.path.hasPrefix(scopePath) { continue }
+                let relativePath = std.path
                     .replacingOccurrences(of: folderURL.path + "/", with: "")
                 items.append(QuickOpenItem(
-                    id: node.url,
+                    id: std,
                     fileName: node.name,
                     relativePath: relativePath,
-                    url: node.url
+                    url: std
                 ))
             }
             if items.count >= 500 { return }
         }
+    }
+
+    func isWithinScope(_ url: URL) -> Bool {
+        guard let root = scopedRootURL else { return true }
+        let path = url.standardizedFileURL.path
+        return path == root.path || path.hasPrefix(root.path + "/")
     }
 
     // MARK: - Filtering

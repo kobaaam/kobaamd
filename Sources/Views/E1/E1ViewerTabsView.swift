@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// MARK: - E1 right pane viewer tabs (KMD-227, KMD-235 split)
+// MARK: - E1 right pane viewer tabs (KMD-227, KMD-235/236/237)
 
 enum E1ViewerTab: String, CaseIterable, Identifiable {
     case rendered = "Rendered"
@@ -12,7 +12,6 @@ enum E1ViewerTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Rendered + Source share one split pane for Markdown.
     var isMarkdownPane: Bool {
         self == .rendered || self == .source
     }
@@ -22,10 +21,15 @@ struct E1ViewerTabsView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var selectedTab: E1ViewerTab = .rendered
     @State private var mdSplitFraction: CGFloat = E1ViewerTabsView.loadMdSplitFraction()
+    @AppStorage("e1ViewerMdSplitEnabled") private var mdSplitEnabled: Bool = true
 
     private let mdSplitMin: CGFloat = 0.25
     private let mdSplitMax: CGFloat = 0.75
     private let mdSplitDividerHit: CGFloat = 10
+
+    private var fileKind: E1FileKind {
+        E1ViewerLayoutPolicy.fileKind(for: appViewModel.selectedFileURL)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +47,12 @@ struct E1ViewerTabsView: View {
         }
         .onChange(of: mdSplitFraction) { _, newValue in
             Self.saveMdSplitFraction(newValue)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .e1ToggleMdSplitRequested)) { _ in
+            mdSplitEnabled.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .e1FocusViewerRequested)) { _ in
+            focusViewerEditor()
         }
     }
 
@@ -67,6 +77,12 @@ struct E1ViewerTabsView: View {
                 .accessibilityAddTraits(isTabHighlighted(tab) ? .isSelected : [])
             }
             Spacer()
+            if fileKind == .markdown {
+                Text(mdSplitEnabled ? "Split" : "Tab")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.kobaMute2)
+                    .help("⌘\\ で Split のオン/オフ")
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -85,7 +101,14 @@ struct E1ViewerTabsView: View {
         }
     }
 
-    /// Phase 2a: Rendered (top) + Source (bottom) for Markdown.
+    private var usesMarkdownSplit: Bool {
+        E1ViewerLayoutPolicy.usesMarkdownSplit(
+            kind: fileKind,
+            splitEnabled: mdSplitEnabled,
+            selectedTab: selectedTab
+        )
+    }
+
     private var markdownSplitPane: some View {
         GeometryReader { geo in
             let minTop = geo.size.height * mdSplitMin
@@ -118,7 +141,7 @@ struct E1ViewerTabsView: View {
     private var exclusiveTabContent: some View {
         switch selectedTab {
         case .rendered:
-            if isMDFile {
+            if fileKind == .markdown {
                 PreviewView()
                     .background(Color.kobaSurface)
             } else {
@@ -128,14 +151,14 @@ struct E1ViewerTabsView: View {
             EditorView()
                 .background(Color.kobaPaper)
         case .d2:
-            if isD2File {
+            if fileKind == .d2 {
                 D2PreviewView()
                     .background(Color.kobaSurface)
             } else {
                 tabMismatchHint(".d2 ファイルを選択してください")
             }
         case .csv:
-            if isCSVFile {
+            if fileKind == .csv {
                 CSVPreviewView()
                     .background(Color.kobaSurface)
             } else {
@@ -179,33 +202,8 @@ struct E1ViewerTabsView: View {
         .background(Color.kobaPaper)
     }
 
-    private var fileExtension: String {
-        appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
-    }
-
-    private var isMDFile: Bool {
-        let ext = fileExtension
-        return ext == "md" || ext == "markdown" || ext.isEmpty
-    }
-
-    private var isD2File: Bool { fileExtension == "d2" }
-    private var isCSVFile: Bool { fileExtension == "csv" }
-
-    private var usesMarkdownSplit: Bool {
-        isMDFile && selectedTab.isMarkdownPane
-    }
-
     private func isTabEnabled(_ tab: E1ViewerTab) -> Bool {
-        guard appViewModel.selectedFileURL != nil else {
-            return tab == .source
-        }
-        switch tab {
-        case .rendered: return isMDFile
-        case .source: return true
-        case .d2: return isD2File
-        case .csv: return isCSVFile
-        case .diff: return true
-        }
+        E1ViewerLayoutPolicy.isTabEnabled(tab, kind: fileKind)
     }
 
     private func isTabHighlighted(_ tab: E1ViewerTab) -> Bool {
@@ -216,19 +214,16 @@ struct E1ViewerTabsView: View {
     }
 
     private func syncTabToFileType() {
-        guard appViewModel.selectedFileURL != nil else {
+        selectedTab = E1ViewerLayoutPolicy.defaultTab(for: fileKind)
+    }
+
+    private func focusViewerEditor() {
+        if fileKind == .markdown, !mdSplitEnabled {
             selectedTab = .source
-            return
-        }
-        if isCSVFile {
-            selectedTab = .csv
-        } else if isD2File {
-            selectedTab = .d2
-        } else if isMDFile {
-            selectedTab = .rendered
-        } else {
+        } else if fileKind != .markdown {
             selectedTab = .source
         }
+        NotificationCenter.default.post(name: .e1FocusEditorRequested, object: nil)
     }
 
     private static let mdSplitFractionKey = "e1ViewerMdSplitFraction"

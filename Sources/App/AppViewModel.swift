@@ -117,7 +117,10 @@ final class AppViewModel {
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
     func refreshQuickOpenIndex() {
-        quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
+        quickOpenViewModel.indexFiles(
+            from: fileTreeViewModel.folders,
+            scopedTo: fileTreeViewModel.rootURL
+        )
         quickOpenViewModel.filter()
         let folderURLs = fileTreeViewModel.folders.map(\.url)
         todoViewModel.updateWorkspaceRoots(folderURLs)

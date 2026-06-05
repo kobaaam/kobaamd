@@ -67,6 +67,7 @@ private struct E1FileTreeList: View {
     @State private var renamingNode: FileNode? = nil
     @State private var showRenameAlert: Bool = false
     @State private var renameText: String = ""
+    @FocusState private var isFileTreeFocused: Bool
 
     var body: some View {
         List {
@@ -85,6 +86,10 @@ private struct E1FileTreeList: View {
             }
         }
         .listStyle(.sidebar)
+        .focused($isFileTreeFocused)
+        .onReceive(NotificationCenter.default.publisher(for: .e1FocusFileTree)) { _ in
+            isFileTreeFocused = true
+        }
     }
 
     private func select(node: FileNode) {

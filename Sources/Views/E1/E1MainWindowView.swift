@@ -6,6 +6,7 @@ import SwiftUI
 struct E1MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var sessionCoordinator = SessionCoordinator()
+    @State private var isQuickOpenPresented = false
 
     @State private var leftWidth: CGFloat = 240
     @State private var rightWidth: CGFloat = 360
@@ -87,9 +88,30 @@ struct E1MainWindowView: View {
             sessionCoordinator.attach(appViewModel: appViewModel)
             sessionCoordinator.bootstrapIfNeeded()
         }
+        .overlay(alignment: .top) {
+            if isQuickOpenPresented {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.001)
+                        .ignoresSafeArea()
+                        .onTapGesture { isQuickOpenPresented = false }
+                    QuickOpenView(
+                        viewModel: appViewModel.quickOpenViewModel,
+                        onSelect: { url in
+                            isQuickOpenPresented = false
+                            guard appViewModel.quickOpenViewModel.isWithinScope(url) else { return }
+                            Task { await appViewModel.openFile(url: url) }
+                        },
+                        onDismiss: { isQuickOpenPresented = false }
+                    )
+                    .padding(.top, 44)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
         .modifier(E1MainWindowCommandReceiver(
             appViewModel: appViewModel,
-            sessionCoordinator: sessionCoordinator
+            sessionCoordinator: sessionCoordinator,
+            isQuickOpenPresented: $isQuickOpenPresented
         ))
     }
 }
@@ -99,9 +121,25 @@ struct E1MainWindowView: View {
 private struct E1MainWindowCommandReceiver: ViewModifier {
     let appViewModel: AppViewModel
     let sessionCoordinator: SessionCoordinator
+    @Binding var isQuickOpenPresented: Bool
 
     func body(content: Content) -> some View {
         content
+            .onReceive(NotificationCenter.default.publisher(for: .quickOpenRequested)) { _ in
+                appViewModel.refreshQuickOpenIndex()
+                appViewModel.quickOpenViewModel.query = ""
+                appViewModel.quickOpenViewModel.filter()
+                isQuickOpenPresented = true
+            }
+            .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
+                appViewModel.refreshQuickOpenIndex()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalRequested)) { _ in
+                NotificationCenter.default.post(name: .e1FocusTerminalPane, object: nil)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .e1FocusFilesRequested)) { _ in
+                NotificationCenter.default.post(name: .e1FocusFileTree, object: nil)
+            }
             .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
                 if AppState.shared.autoFormatOnSave {
                     appViewModel.formatCurrentDocument()

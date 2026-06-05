@@ -36,6 +36,11 @@ struct E1TerminalPaneView: View {
             guard let session = coordinator.activeTerminalSession else { return }
             terminalController.ensureProcessStarted(for: session)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalPane)) { _ in
+            guard let session = coordinator.activeTerminalSession else { return }
+            let view = terminalController.terminalView(for: session)
+            view.window?.makeFirstResponder(view)
+        }
     }
 }
 
