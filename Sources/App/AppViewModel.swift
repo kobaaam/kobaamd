@@ -96,6 +96,7 @@ final class AppViewModel {
     // MARK: - Tabs
     var tabs: [EditorTab] = []
     var activeTabID: UUID? = nil
+    private var isRestoringEditorSession = false
 
     /// 現在アクティブなタブ。
     var activeTab: EditorTab? {
@@ -113,6 +114,41 @@ final class AppViewModel {
         let tab = EditorTab(url: url, content: content)
         tabs.append(tab)
         activate(tab: tab)
+        if !isRestoringEditorSession {
+            persistEditorSession()
+        }
+    }
+
+    /// 開いているタブ一覧を UserDefaults に保存（dev リロード後に復元）。
+    func persistEditorSession() {
+        flushActiveTab()
+        let urls = tabs.compactMap(\.url)
+        AppState.saveEditorSession(tabURLs: urls, activeURL: activeTab?.url)
+    }
+
+    /// 前回のタブ構成を復元。タブが無い場合は lastFile にフォールバック。
+    @MainActor
+    func restoreEditorSession() async {
+        let (tabURLs, activeURL) = AppState.loadEditorSession()
+        if tabURLs.isEmpty {
+            if let lastURL = AppState.loadLastFile(),
+               FileManager.default.fileExists(atPath: lastURL.path) {
+                await openFile(url: lastURL)
+            }
+            return
+        }
+        isRestoringEditorSession = true
+        defer {
+            isRestoringEditorSession = false
+            persistEditorSession()
+        }
+        for url in tabURLs {
+            await openFile(url: url)
+        }
+        if let activeURL,
+           let tab = tabs.first(where: { $0.url == activeURL }) {
+            switchToTab(id: tab.id)
+        }
     }
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
@@ -208,6 +244,9 @@ final class AppViewModel {
               let tab = tabs.first(where: { $0.id == id }) else { return }
         flushActiveTab()
         activate(tab: tab)
+        if !isRestoringEditorSession {
+            persistEditorSession()
+        }
     }
 
     /// タブを閉じる。
@@ -218,6 +257,7 @@ final class AppViewModel {
         if wasActive {
             activate(tab: tabs.isEmpty ? nil : tabs[min(idx, tabs.count - 1)])
         }
+        persistEditorSession()
     }
 
     /// アクティブタブの現在状態を保存する。

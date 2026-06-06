@@ -174,6 +174,7 @@ extension Notification.Name {
     static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
+    static let persistEditorSessionRequested   = Notification.Name("kobaamd.persistEditorSessionRequested")
 }
 
 // MARK: - App Delegate (window frame save/restore)
@@ -212,6 +213,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.post(name: .persistEditorSessionRequested, object: nil)
         saveWindowFrame()
         removeWindowNotifications()
     }

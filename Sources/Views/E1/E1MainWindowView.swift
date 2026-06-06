@@ -87,6 +87,7 @@ struct E1MainWindowView: View {
         .onAppear {
             sessionCoordinator.attach(appViewModel: appViewModel)
             sessionCoordinator.bootstrapIfNeeded()
+            Task { await appViewModel.restoreEditorSession() }
         }
         .overlay(alignment: .top) {
             if isQuickOpenPresented {
@@ -139,6 +140,9 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
             }
             .onReceive(NotificationCenter.default.publisher(for: .e1FocusFilesRequested)) { _ in
                 NotificationCenter.default.post(name: .e1FocusFileTree, object: nil)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .persistEditorSessionRequested)) { _ in
+                appViewModel.persistEditorSession()
             }
             .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
                 if AppState.shared.autoFormatOnSave {
