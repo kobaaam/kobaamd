@@ -45,9 +45,9 @@ struct SessionCoordinatorTests {
         #expect(vm.selectedFileURL == nil)
     }
 
-    @Test("addLocalSession deduplicates same directory")
+    @Test("same directory can spawn multiple sessions")
     @MainActor
-    func addLocalSessionDeduplicates() async {
+    func sameDirectoryAllowsMultipleSessions() async {
         let vm = AppViewModel()
         let coordinator = SessionCoordinator()
         coordinator.attach(appViewModel: vm)
@@ -56,8 +56,31 @@ struct SessionCoordinatorTests {
         coordinator.activeSessionID = coordinator.sessions[0].id
 
         await coordinator.handleFolderOpened(path)
-        #expect(coordinator.sessions.count == 1)
-        #expect(coordinator.activeSessionID == coordinator.sessions[0].id)
+
+        #expect(coordinator.sessions.count == 2)
+        #expect(Set(coordinator.sessions.map(\.worktreePath)) == [path.standardizedFileURL])
+        #expect(Set(coordinator.sessions.map(\.id)).count == 2)
+        #expect(coordinator.sessions[1].name == "tmp 2")
+    }
+
+    @Test("duplicateSession clones active directory")
+    @MainActor
+    func duplicateSessionCreatesSibling() {
+        let vm = AppViewModel()
+        let coordinator = SessionCoordinator()
+        coordinator.attach(appViewModel: vm)
+        let path = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let original = WorktreeSession.localDirectory(name: "project", path: path)
+        coordinator.sessions = [original]
+        coordinator.activeSessionID = original.id
+        coordinator.attach(appViewModel: vm)
+
+        coordinator.duplicateSession(id: original.id)
+
+        #expect(coordinator.sessions.count == 2)
+        #expect(coordinator.sessions[1].worktreePath == path.standardizedFileURL)
+        #expect(coordinator.sessions[1].name == "project 2")
+        #expect(coordinator.activeSessionID == coordinator.sessions[1].id)
     }
 
     @Test("E2E fixture builds alpha/beta sessions and scopes Quick Open")

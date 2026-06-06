@@ -73,11 +73,19 @@ final class SessionCoordinator {
         selectSession(id: targetID, skipRefresh: true)
     }
 
-    /// フォルダを選んで Local セッションを追加する。
+    /// フォルダを選んで Local セッションを追加する（同一パスでも新規セッションを作成）。
     @discardableResult
     func addLocalSession() -> Bool {
         guard let url = pickDirectory(prompt: "セッションの作業フォルダ") else { return false }
         insertLocalSession(at: url)
+        return true
+    }
+
+    /// 既存セッションと同じディレクトリで新しいセッションを追加する。
+    @discardableResult
+    func duplicateSession(id: UUID) -> Bool {
+        guard let source = sessions.first(where: { $0.id == id }) else { return false }
+        insertLocalSession(at: source.worktreePath)
         return true
     }
 
@@ -193,10 +201,6 @@ final class SessionCoordinator {
         let standardized = url.standardizedFileURL
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDir), isDir.boolValue else {
-            return
-        }
-        if let existing = sessions.first(where: { $0.worktreePath == standardized }) {
-            selectSession(id: existing.id)
             return
         }
         let name = uniqueLocalName(for: standardized)

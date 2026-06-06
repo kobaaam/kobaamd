@@ -46,6 +46,8 @@ struct E1SessionsListView: View {
                             canRemove: coordinator.canRemoveSessions
                         ) {
                             coordinator.selectSession(id: session.id)
+                        } onDuplicate: {
+                            coordinator.duplicateSession(id: session.id)
                         } onRemove: {
                             coordinator.removeLocalSession(id: session.id)
                         }
@@ -64,6 +66,7 @@ private struct E1SessionRow: View {
     let isSelected: Bool
     let canRemove: Bool
     let onSelect: () -> Void
+    let onDuplicate: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -100,6 +103,12 @@ private struct E1SessionRow: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
+            Button {
+                onDuplicate()
+            } label: {
+                Label("同じフォルダで複製", systemImage: "plus.square.on.square")
+            }
+            Divider()
             Button(role: .destructive) {
                 onRemove()
             } label: {
