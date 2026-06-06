@@ -58,21 +58,19 @@ struct E1ViewerTabsView: View {
             if fileKind == .markdown {
                 markdownModePicker(chrome: chrome)
             } else {
-                ForEach(E1ViewerTab.allCases) { tab in
+                ForEach(E1ViewerLayoutPolicy.visibleTabs(for: fileKind)) { tab in
                     Button {
                         selectedTab = tab
                     } label: {
                         Text(tab.rawValue)
                             .font(.system(size: 10, weight: isTabHighlighted(tab) ? .semibold : .regular))
-                            .foregroundStyle(isTabHighlighted(tab) ? chrome.chromeSelectedInk : chrome.chromeMute)
+                            .foregroundStyle(isTabHighlighted(tab) ? chrome.chromeSelectedInk : chrome.chromeInk)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(isTabHighlighted(tab) ? chrome.chromeSelection : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!isTabEnabled(tab))
-                    .opacity(isTabEnabled(tab) ? 1 : 0.4)
                 }
             }
             Spacer()
@@ -166,11 +164,14 @@ struct E1ViewerTabsView: View {
         let chrome = appState.selectedTheme
         switch selectedTab {
         case .rendered:
-            if fileKind == .markdown {
+            switch fileKind {
+            case .markdown:
                 PreviewView()
                     .background(chrome.chromePaper)
-            } else {
-                tabMismatchHint("Markdown ファイルを開くとプレビューが表示されます")
+            case .html:
+                HTMLPreviewView()
+            default:
+                tabMismatchHint("プレビューに対応していないファイルです")
             }
         case .source:
             EditorView()
