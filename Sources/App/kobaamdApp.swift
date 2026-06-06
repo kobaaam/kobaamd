@@ -6,7 +6,11 @@ struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
     @State private var appViewModel = AppViewModel()
-    @State private var updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    @State private var updaterController = SPUStandardUpdaterController(
+        startingUpdater: SparkleConfiguration.isConfigured,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     var body: some Scene {
         WindowGroup("kobaamd") {
@@ -109,8 +113,10 @@ struct kobaamdApp: App {
                 Button("Markdown Split の表示/非表示") { AppCommand.e1ToggleMdSplit.post() }
                     .keyboardShortcut("\\", modifiers: .command)
             }
-            CommandGroup(after: .appInfo) {
-                CheckForUpdatesView(updater: updaterController.updater)
+            if SparkleConfiguration.isConfigured {
+                CommandGroup(after: .appInfo) {
+                    CheckForUpdatesView(updater: updaterController.updater)
+                }
             }
             CommandGroup(replacing: .help) {
                 Button("kobaamd ヘルプ") {
@@ -122,8 +128,10 @@ struct kobaamdApp: App {
 
         // Settings window (⌘,)
         Settings {
-            SettingsView(updater: updaterController.updater)
-                .environment(appViewModel)
+            SettingsView(
+                updater: SparkleConfiguration.isConfigured ? updaterController.updater : nil
+            )
+            .environment(appViewModel)
         }
 
         // Help window
