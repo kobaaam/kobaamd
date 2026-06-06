@@ -108,6 +108,7 @@ private struct E1SessionRow: View {
             .disabled(!canRemove)
         }
         .accessibilityLabel(accessibilitySummary)
+        .accessibilityIdentifier("e1.session.\(session.name)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 

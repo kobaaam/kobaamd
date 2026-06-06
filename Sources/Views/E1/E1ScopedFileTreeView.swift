@@ -20,6 +20,7 @@ struct E1ScopedFileTreeView: View {
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(Color.kobaAccent)
                         .lineLimit(1)
+                        .accessibilityIdentifier("e1.files.root")
                 }
                 Spacer()
             }

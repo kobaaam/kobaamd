@@ -60,6 +60,31 @@ struct SessionCoordinatorTests {
         #expect(coordinator.activeSessionID == coordinator.sessions[0].id)
     }
 
+    @Test("E2E fixture builds alpha/beta sessions and scopes Quick Open")
+    @MainActor
+    func e2eFixtureScopesQuickOpen() throws {
+        let vm = AppViewModel()
+        let coordinator = SessionCoordinator()
+        coordinator.attach(appViewModel: vm)
+        coordinator.applyE2ESessionFixture()
+
+        #expect(coordinator.sessions.count == 2)
+        #expect(vm.fileTreeViewModel.rootURL?.lastPathComponent == "alpha")
+        vm.quickOpenViewModel.filter()
+        #expect(vm.quickOpenViewModel.candidates.allSatisfy { vm.quickOpenViewModel.isWithinScope($0.url) })
+
+        guard let betaID = coordinator.sessions.first(where: { $0.name == "beta" })?.id else {
+            Issue.record("beta session missing")
+            return
+        }
+        coordinator.selectSession(id: betaID)
+        #expect(vm.fileTreeViewModel.rootURL?.lastPathComponent == "beta")
+        vm.quickOpenViewModel.filter()
+        let names = Set(vm.quickOpenViewModel.candidates.map(\.fileName))
+        #expect(names.contains("beta.md"))
+        #expect(!names.contains("alpha.md"))
+    }
+
     @Test("two-worktree fixture sessions remain distinct paths")
     func twoWorktreePathsDistinct() {
         let records = WorktreeService.parsePorcelain("""

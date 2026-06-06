@@ -52,7 +52,13 @@ final class SessionCoordinator {
         self.appViewModel = appViewModel
     }
 
+    static let e2eSessionFixtureArgument = "-E2ESessionFixture"
+
     func bootstrapIfNeeded() {
+        if ProcessInfo.processInfo.arguments.contains(Self.e2eSessionFixtureArgument) {
+            applyE2ESessionFixture()
+            return
+        }
         loadPersistedLocalSessions()
         if sessions.isEmpty {
             appendDefaultHomeSession()
@@ -209,6 +215,31 @@ final class SessionCoordinator {
             counter += 1
         }
         return candidate
+    }
+
+    /// XCUITest 用: alpha/beta の 2 セッションを一時ディレクトリに構築（KMD-232）。
+    func applyE2ESessionFixture() {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("kobaamd-e2e-sessions", isDirectory: true)
+        let alpha = base.appendingPathComponent("alpha", isDirectory: true)
+        let beta = base.appendingPathComponent("beta", isDirectory: true)
+        try? fm.createDirectory(at: alpha, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: beta, withIntermediateDirectories: true)
+        try? "# Alpha".write(
+            to: alpha.appendingPathComponent("alpha.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try? "# Beta".write(
+            to: beta.appendingPathComponent("beta.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let alphaSession = WorktreeSession.localDirectory(name: "alpha", path: alpha)
+        let betaSession = WorktreeSession.localDirectory(name: "beta", path: beta)
+        sessions = [alphaSession, betaSession]
+        activeSessionID = alphaSession.id
+        selectSession(id: alphaSession.id, skipRefresh: true)
     }
 
     private func pickDirectory(prompt: String) -> URL? {
