@@ -7,7 +7,6 @@ struct EditorView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Bindable var appState = AppState.shared
     @State private var showFindReplace: Bool = false
-    @State private var showAIPanel:    Bool = false
     @State private var scrollRatio: Double = 0
     @State private var autoSaveTask: Task<Void, Never>? = nil
     @State private var isDragTargeted: Bool = false
@@ -47,19 +46,6 @@ struct EditorView: View {
                         .foregroundStyle(Color.kobaMute)
                         .allowsHitTesting(false)
                 }
-
-                if !appViewModel.pendingAIText.isEmpty || appViewModel.isAIGenerating {
-                    GeometryReader { geo in
-                        AIInlineSectionView()
-                            .frame(maxWidth: 520)
-                            .position(
-                                x: min(max(appViewModel.aiInlineOverlayPosition.x, 260), geo.size.width - 260),
-                                y: min(max(appViewModel.aiInlineOverlayPosition.y + 80, 80), geo.size.height - 40)
-                            )
-                            .allowsHitTesting(true)
-                            .transition(.opacity)
-                    }
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onDrop(of: [.fileURL], isTargeted: $isDragTargeted, perform: handleDrop(providers:))
@@ -67,13 +53,6 @@ struct EditorView: View {
             if showFindReplace {
                 Rectangle().fill(Color.kobaLine).frame(height: 1)
                 FindReplaceBar(isVisible: $showFindReplace, text: $vm.editorText)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if showAIPanel {
-                AIAssistPanel(isVisible: $showAIPanel, editorText: $vm.editorText)
-                    .frame(width: 400)
-                    .padding(16)
             }
         }
         .overlay {
@@ -86,13 +65,6 @@ struct EditorView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 40)
-            }
-        }
-        .overlay {
-            if appViewModel.isAIInlinePromptVisible {
-                AIInlinePopover()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding(.top, 60)
             }
         }
         .onChange(of: scrollRatio) { _, r in
@@ -112,19 +84,8 @@ struct EditorView: View {
         .onReceive(NotificationCenter.default.publisher(for: .findRequested)) { _ in
             showFindReplace.toggle()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .aiAssistRequested)) { _ in
-            showAIPanel.toggle()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .quickInsertRequested)) { _ in
             appViewModel.showQuickInsert.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .aiInlineRequested)) { note in
-            guard let lineContent = note.userInfo?["lineContent"] as? String else { return }
-            appViewModel.startAIInlineCompletion(lineContent: lineContent)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .aiInlineSpaceRequested)) { note in
-            guard let loc = note.userInfo?["cursorLocation"] as? Int else { return }
-            appViewModel.showAIInlinePrompt(cursorLocation: loc)
         }
     }
 

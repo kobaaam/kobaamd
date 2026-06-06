@@ -1,27 +1,13 @@
 import AppKit
 import SwiftUI
 
-// MARK: - E1 right pane viewer tabs (KMD-227, KMD-235/236/237)
-
-enum E1ViewerTab: String, CaseIterable, Identifiable {
-    case rendered = "Rendered"
-    case source = "Source"
-    case d2 = "D2"
-    case diff = "Diff"
-    case csv = "CSV"
-
-    var id: String { rawValue }
-
-    var isMarkdownPane: Bool {
-        self == .rendered || self == .source
-    }
-}
+// MARK: - E1 right pane viewer (Re-concept MD-first layout)
 
 struct E1ViewerTabsView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var selectedTab: E1ViewerTab = .rendered
+    @State private var markdownMode: E1MarkdownViewMode = .split
     @State private var mdSplitFraction: CGFloat = E1ViewerTabsView.loadMdSplitFraction()
-    @AppStorage("e1ViewerMdSplitEnabled") private var mdSplitEnabled: Bool = true
 
     private let mdSplitMin: CGFloat = 0.25
     private let mdSplitMax: CGFloat = 0.75
@@ -34,22 +20,30 @@ struct E1ViewerTabsView: View {
     var body: some View {
         VStack(spacing: 0) {
             tabBar
+            if fileKind == .markdown, appViewModel.selectedFileURL != nil {
+                E1MarkdownToolbar()
+            }
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if fileKind == .markdown, appViewModel.selectedFileURL != nil {
+                E1EditorStatusBar()
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.kobaSurface)
         .onChange(of: appViewModel.selectedFileURL) { _, _ in
-            syncTabToFileType()
+            syncToFileType()
         }
         .onAppear {
-            syncTabToFileType()
+            syncToFileType()
         }
         .onChange(of: mdSplitFraction) { _, newValue in
             Self.saveMdSplitFraction(newValue)
         }
         .onReceive(NotificationCenter.default.publisher(for: .e1ToggleMdSplitRequested)) { _ in
-            mdSplitEnabled.toggle()
+            if fileKind == .markdown {
+                markdownMode = markdownMode == .split ? .editor : .split
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .e1FocusViewerRequested)) { _ in
             focusViewerEditor()
@@ -58,30 +52,43 @@ struct E1ViewerTabsView: View {
 
     private var tabBar: some View {
         HStack(spacing: 0) {
-            ForEach(E1ViewerTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Text(tab.rawValue)
-                        .font(.system(size: 10, weight: isTabHighlighted(tab) ? .semibold : .regular))
-                        .foregroundStyle(isTabHighlighted(tab) ? Color.white : Color.kobaMute)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(isTabHighlighted(tab) ? Color.kobaInk : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+            if fileKind == .markdown {
+                Picker("表示", selection: $markdownMode) {
+                    ForEach(E1MarkdownViewMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(!isTabEnabled(tab))
-                .opacity(isTabEnabled(tab) ? 1 : 0.4)
-                .accessibilityLabel(tab.rawValue)
-                .accessibilityAddTraits(isTabHighlighted(tab) ? .isSelected : [])
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 220)
+            } else {
+                ForEach(E1ViewerTab.allCases) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.system(size: 10, weight: isTabHighlighted(tab) ? .semibold : .regular))
+                            .foregroundStyle(isTabHighlighted(tab) ? Color.white : Color.kobaMute)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(isTabHighlighted(tab) ? Color.kobaInk : Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isTabEnabled(tab))
+                    .opacity(isTabEnabled(tab) ? 1 : 0.4)
+                }
             }
             Spacer()
             if fileKind == .markdown {
-                Text(mdSplitEnabled ? "Split" : "Tab")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color.kobaMute2)
-                    .help("⌘\\ で Split のオン/オフ")
+                Button("Diff") {
+                    selectedTab = .diff
+                    markdownMode = .editor
+                }
+                .font(.system(size: 10, weight: .medium))
+                .buttonStyle(.plain)
+                .foregroundStyle(selectedTab == .diff ? Color.kobaInk : Color.kobaMute2)
+                .help("差分ビュー")
             }
         }
         .padding(.horizontal, 10)
@@ -94,45 +101,63 @@ struct E1ViewerTabsView: View {
     private var tabContent: some View {
         if appViewModel.selectedFileURL == nil {
             viewerEmptyState
-        } else if usesMarkdownSplit {
-            markdownSplitPane
+        } else if selectedTab == .diff {
+            DiffInlineView(
+                preloadText: appViewModel.editorText,
+                preloadFileName: appViewModel.selectedFileURL?.lastPathComponent ?? "Untitled"
+            )
+            .background(Color.kobaPaper)
+        } else if fileKind == .markdown {
+            markdownPane
         } else {
             exclusiveTabContent
         }
     }
 
-    private var usesMarkdownSplit: Bool {
-        E1ViewerLayoutPolicy.usesMarkdownSplit(
-            kind: fileKind,
-            splitEnabled: mdSplitEnabled,
-            selectedTab: selectedTab
-        )
+    @ViewBuilder
+    private var markdownPane: some View {
+        switch markdownMode {
+        case .split:
+            markdownHorizontalSplit
+        case .editor:
+            EditorView()
+                .background(Color.kobaPaper)
+        case .preview:
+            PreviewView()
+                .background(Color.kobaSurface)
+        }
     }
 
-    private var markdownSplitPane: some View {
+    private var markdownHorizontalSplit: some View {
         GeometryReader { geo in
-            let minTop = geo.size.height * mdSplitMin
-            let maxTop = geo.size.height * mdSplitMax
-            let topHeight = min(maxTop, max(minTop, geo.size.height * mdSplitFraction))
+            let minLeft = geo.size.width * mdSplitMin
+            let maxLeft = geo.size.width * mdSplitMax
+            let leftWidth = min(maxLeft, max(minLeft, geo.size.width * mdSplitFraction))
 
-            VStack(spacing: 0) {
-                PreviewView()
-                    .frame(height: topHeight)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.kobaSurface)
+            HStack(spacing: 0) {
+                EditorView()
+                    .frame(width: leftWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.kobaPaper)
                     .clipped()
 
-                E1HeightDivider(
-                    fraction: $mdSplitFraction,
-                    availableHeight: geo.size.height,
-                    minFraction: mdSplitMin,
-                    maxFraction: mdSplitMax,
-                    hitHeight: mdSplitDividerHit
+                E1WidthDivider(
+                    width: Binding(
+                        get: { leftWidth },
+                        set: { newWidth in
+                            mdSplitFraction = newWidth / max(geo.size.width, 1)
+                        }
+                    ),
+                    minWidth: minLeft,
+                    maxWidth: maxLeft,
+                    hitWidth: mdSplitDividerHit,
+                    dragAxis: .growOnDragRight
                 )
 
-                EditorView()
+                PreviewView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.kobaPaper)
+                    .background(Color.kobaSurface)
+                    .clipped()
             }
         }
     }
@@ -165,11 +190,7 @@ struct E1ViewerTabsView: View {
                 tabMismatchHint(".csv ファイルを選択してください")
             }
         case .diff:
-            DiffInlineView(
-                preloadText: appViewModel.editorText,
-                preloadFileName: appViewModel.selectedFileURL?.lastPathComponent ?? "Untitled"
-            )
-            .background(Color.kobaPaper)
+            EmptyView()
         }
     }
 
@@ -207,81 +228,32 @@ struct E1ViewerTabsView: View {
     }
 
     private func isTabHighlighted(_ tab: E1ViewerTab) -> Bool {
-        if usesMarkdownSplit, tab.isMarkdownPane {
-            return true
-        }
-        return selectedTab == tab
+        selectedTab == tab
     }
 
-    private func syncTabToFileType() {
+    private func syncToFileType() {
         selectedTab = E1ViewerLayoutPolicy.defaultTab(for: fileKind)
+        markdownMode = E1ViewerLayoutPolicy.defaultMarkdownMode(for: fileKind)
     }
 
     private func focusViewerEditor() {
-        if fileKind == .markdown, !mdSplitEnabled {
-            selectedTab = .source
-        } else if fileKind != .markdown {
+        if fileKind == .markdown {
+            markdownMode = .editor
+        } else {
             selectedTab = .source
         }
         NotificationCenter.default.post(name: .e1FocusEditorRequested, object: nil)
     }
 
     private static let mdSplitFractionKey = "e1ViewerMdSplitFraction"
-    private static let defaultMdSplitFraction: CGFloat = 0.45
 
     private static func loadMdSplitFraction() -> CGFloat {
         let stored = UserDefaults.standard.double(forKey: mdSplitFractionKey)
         if stored > 0 { return CGFloat(stored) }
-        return defaultMdSplitFraction
+        return E1ViewerLayoutPolicy.defaultMdSplitFraction
     }
 
     private static func saveMdSplitFraction(_ value: CGFloat) {
         UserDefaults.standard.set(Double(value), forKey: mdSplitFractionKey)
-    }
-}
-
-// MARK: - Vertical split divider (KMD-235)
-
-struct E1HeightDivider: View {
-    @Binding var fraction: CGFloat
-    let availableHeight: CGFloat
-    let minFraction: CGFloat
-    let maxFraction: CGFloat
-    let hitHeight: CGFloat
-    @State private var baseFraction: CGFloat = 0
-    @State private var isDragging = false
-    @State private var isHovering = false
-
-    var body: some View {
-        ZStack {
-            if isHovering || isDragging {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.kobaAccent.opacity(0.12))
-                    .padding(.horizontal, 8)
-            }
-            KobaHDivider()
-        }
-        .frame(height: hitHeight)
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                .onChanged { value in
-                    if !isDragging {
-                        isDragging = true
-                        baseFraction = fraction
-                    }
-                    let delta = value.translation.height / max(availableHeight, 1)
-                    fraction = min(maxFraction, max(minFraction, baseFraction + delta))
-                }
-                .onEnded { _ in isDragging = false }
-        )
-        .onHover { inside in
-            isHovering = inside
-            if inside { NSCursor.resizeUpDown.push() }
-            else { NSCursor.pop() }
-        }
-        .accessibilityLabel("プレビューとエディタの境界を調整")
-        .help("ドラッグして上下の比率を変更")
     }
 }

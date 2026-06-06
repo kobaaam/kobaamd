@@ -89,16 +89,6 @@ cp "$BUILD_BINARY" "$BINARY_DST"
 chmod +x "$BINARY_DST"
 echo "[post-build] binary updated → $BINARY_DST"
 
-SPARKLE_SRC=".build/arm64-apple-macosx/$CONFIG/Sparkle.framework"
-if [ -d "$SPARKLE_SRC" ]; then
-  rm -rf "$FRAMEWORKS/Sparkle.framework"
-  cp -a "$SPARKLE_SRC" "$FRAMEWORKS/"
-  if ! otool -l "$BINARY_DST" | grep -q '@loader_path/../Frameworks'; then
-    install_name_tool -add_rpath '@loader_path/../Frameworks' "$BINARY_DST" 2>/dev/null
-  fi
-  echo "[post-build] Sparkle.framework copied → $FRAMEWORKS/Sparkle.framework"
-fi
-
 cp Sources/Resources/AppIcon.icns "$RESOURCES/AppIcon.icns"
 echo "[post-build] icon injected → $RESOURCES/AppIcon.icns"
 
@@ -118,62 +108,15 @@ if [ "$PROFILE" = "dev" ]; then
 fi
 echo "[post-build] Info.plist updated → $PLIST ($BUNDLE_ID)"
 
-PUBLIC_ED_KEY="${KOBAAMD_SU_PUBLIC_ED_KEY:-}"
-if [ -n "$PUBLIC_ED_KEY" ]; then
-  if [[ ! "$PUBLIC_ED_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
-    echo "[post-build] ERROR: KOBAAMD_SU_PUBLIC_ED_KEY does not match Ed25519 Base64 format (43 base64 chars + '=')."
-    echo "[post-build]        Received ${#PUBLIC_ED_KEY} chars: '${PUBLIC_ED_KEY:0:20}...'"
-    echo "[post-build]        Refusing to inject invalid key. Re-run generate_keys to obtain the correct public key."
-    exit 1
-  fi
-  /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey \"$PUBLIC_ED_KEY\"" "$PLIST"
-  WRITTEN_KEY=$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$PLIST" 2>/dev/null || echo "")
-  if [ "$WRITTEN_KEY" != "$PUBLIC_ED_KEY" ]; then
-    echo "[post-build] ERROR: SUPublicEDKey write verification failed."
-    echo "[post-build]        Expected: '$PUBLIC_ED_KEY'"
-    echo "[post-build]        Got:      '$WRITTEN_KEY'"
-    exit 1
-  fi
-  echo "[post-build] SUPublicEDKey injected and verified from KOBAAMD_SU_PUBLIC_ED_KEY (${#PUBLIC_ED_KEY} chars)"
-else
-  if [ "$CONFIG" = "release" ] && [ "$PROFILE" != "dev" ]; then
-    echo "[post-build] ERROR: KOBAAMD_SU_PUBLIC_ED_KEY is not set for release build."
-    echo "[post-build]        Sparkle update signature verification will be DISABLED — refusing to ship."
-    echo "[post-build]        See docs/wiki/articles/practices/sparkle-release.md for setup."
-    exit 1
-  else
-    echo "[post-build] warning: KOBAAMD_SU_PUBLIC_ED_KEY not set; SUPublicEDKey left empty (debug/dev build OK)"
-  fi
-fi
+/usr/libexec/PlistBuddy -c "Delete :SUPublicEDKey" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$PLIST" 2>/dev/null || true
+echo "[post-build] Sparkle keys removed from Info.plist (auto-update disabled)"
 
 if [ "$REGISTER_LS" = true ]; then
   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
     -f "$APP" 2>/dev/null && echo "[post-build] Launch Services registered"
 else
   echo "[post-build] skipping Launch Services registration (dev profile)"
-fi
-
-SPARKLE_SOURCE=""
-for candidate in \
-  ".build/arm64-apple-macosx/$CONFIG/Sparkle.framework" \
-  ".build/arm64-apple-macosx/$CONFIG/PackageFrameworks/Sparkle.framework" \
-  ".build/$CONFIG/Sparkle.framework"
-do
-  if [ -d "$candidate" ]; then
-    SPARKLE_SOURCE="$candidate"
-    break
-  fi
-done
-
-if [ -n "$SPARKLE_SOURCE" ]; then
-  echo "[post-build] Sparkle.framework found → $SPARKLE_SOURCE"
-  rm -rf "$FRAMEWORKS/Sparkle.framework"
-  cp -a "$SPARKLE_SOURCE" "$FRAMEWORKS/"
-fi
-
-if ! otool -l "$BINARY_DST" | grep -q '@loader_path/../Frameworks'; then
-  install_name_tool -add_rpath '@loader_path/../Frameworks' "$BINARY_DST"
-  echo "[post-build] LC_RPATH added → @loader_path/../Frameworks"
 fi
 
 ENTITLEMENTS="Sources/Resources/kobaamd.entitlements"

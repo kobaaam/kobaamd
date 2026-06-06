@@ -4,7 +4,6 @@ enum HelpSection: String, CaseIterable, Identifiable {
     case gettingStarted = "はじめに"
     case shortcuts = "ショートカット"
     case features = "機能ガイド"
-    case ai = "AI 機能"
     case integrations = "連携"
     case faq = "FAQ"
 
@@ -15,7 +14,6 @@ enum HelpSection: String, CaseIterable, Identifiable {
         case .gettingStarted: return "book"
         case .shortcuts: return "keyboard"
         case .features: return "square.grid.2x2"
-        case .ai: return "sparkles"
         case .integrations: return "link"
         case .faq: return "questionmark.circle"
         }

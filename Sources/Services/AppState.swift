@@ -48,14 +48,6 @@ import Observation
         set { defaults.set(newValue, forKey: "autoOpenNewArtifacts") }
     }
 
-    var updateCheckInterval: UpdateCheckInterval {
-        get {
-            let raw = defaults.string(forKey: "updateCheckInterval") ?? UpdateCheckInterval.atLaunch.rawValue
-            return UpdateCheckInterval(rawValue: raw) ?? .atLaunch
-        }
-        set { defaults.set(newValue.rawValue, forKey: "updateCheckInterval") }
-    }
-
     /// E1 terminal + session shell (KMD-231). 未設定時は ON（Re-concept を正とする）。
     var useE1Shell: Bool {
         get {
