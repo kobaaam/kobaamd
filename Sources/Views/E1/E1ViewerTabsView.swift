@@ -56,14 +56,7 @@ struct E1ViewerTabsView: View {
         let chrome = appState.selectedTheme
         return HStack(spacing: 0) {
             if fileKind == .markdown {
-                Picker("表示", selection: $markdownMode) {
-                    ForEach(E1MarkdownViewMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 220)
+                markdownModePicker(chrome: chrome)
             } else {
                 ForEach(E1ViewerTab.allCases) { tab in
                     Button {
@@ -243,6 +236,39 @@ struct E1ViewerTabsView: View {
     private func syncToFileType() {
         selectedTab = E1ViewerLayoutPolicy.defaultTab(for: fileKind)
         markdownMode = E1ViewerLayoutPolicy.defaultMarkdownMode(for: fileKind)
+    }
+
+    private func markdownModePicker(chrome: ColorTheme) -> some View {
+        HStack(spacing: 2) {
+            ForEach(E1MarkdownViewMode.allCases) { mode in
+                let isSelected = markdownMode == mode && selectedTab != .diff
+                Button {
+                    markdownMode = mode
+                    if selectedTab == .diff {
+                        selectedTab = .rendered
+                    }
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? chrome.chromeSelectedInk : chrome.chromeInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
+                        .background(isSelected ? chrome.chromeSelection : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(chrome.chromePaper.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(chrome.chromeLine.opacity(0.5), lineWidth: 1)
+        )
+        .frame(maxWidth: 240)
+        .accessibilityLabel("表示モード")
     }
 
     private func focusViewerEditor() {
