@@ -5,6 +5,7 @@ import SwiftUI
 
 struct E1ViewerTabsView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
     @State private var selectedTab: E1ViewerTab = .rendered
     @State private var markdownMode: E1MarkdownViewMode = .split
     @State private var mdSplitFraction: CGFloat = E1ViewerTabsView.loadMdSplitFraction()
@@ -18,6 +19,7 @@ struct E1ViewerTabsView: View {
     }
 
     var body: some View {
+        let chrome = appState.selectedTheme
         VStack(spacing: 0) {
             tabBar
             if fileKind == .markdown, appViewModel.selectedFileURL != nil {
@@ -30,7 +32,7 @@ struct E1ViewerTabsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaSurface)
+        .background(chrome.chromeSurface)
         .onChange(of: appViewModel.selectedFileURL) { _, _ in
             syncToFileType()
         }
@@ -51,7 +53,8 @@ struct E1ViewerTabsView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
+        let chrome = appState.selectedTheme
+        return HStack(spacing: 0) {
             if fileKind == .markdown {
                 Picker("表示", selection: $markdownMode) {
                     ForEach(E1MarkdownViewMode.allCases) { mode in
@@ -68,10 +71,10 @@ struct E1ViewerTabsView: View {
                     } label: {
                         Text(tab.rawValue)
                             .font(.system(size: 10, weight: isTabHighlighted(tab) ? .semibold : .regular))
-                            .foregroundStyle(isTabHighlighted(tab) ? Color.white : Color.kobaMute)
+                            .foregroundStyle(isTabHighlighted(tab) ? chrome.chromeSelectedInk : chrome.chromeMute)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(isTabHighlighted(tab) ? Color.kobaInk : Color.clear)
+                            .background(isTabHighlighted(tab) ? chrome.chromeSelection : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     .buttonStyle(.plain)
@@ -87,18 +90,19 @@ struct E1ViewerTabsView: View {
                 }
                 .font(.system(size: 10, weight: .medium))
                 .buttonStyle(.plain)
-                .foregroundStyle(selectedTab == .diff ? Color.kobaInk : Color.kobaMute2)
+                .foregroundStyle(selectedTab == .diff ? chrome.chromeInk : chrome.chromeMute2)
                 .help("差分ビュー")
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.kobaSurface)
+        .background(chrome.chromeSurface)
         .overlay(KobaHDivider(), alignment: .bottom)
     }
 
     @ViewBuilder
     private var tabContent: some View {
+        let chrome = appState.selectedTheme
         if appViewModel.selectedFileURL == nil {
             viewerEmptyState
         } else if selectedTab == .diff {
@@ -106,7 +110,7 @@ struct E1ViewerTabsView: View {
                 preloadText: appViewModel.editorText,
                 preloadFileName: appViewModel.selectedFileURL?.lastPathComponent ?? "Untitled"
             )
-            .background(Color.kobaPaper)
+            .background(chrome.chromePaper)
         } else if fileKind == .markdown {
             markdownPane
         } else {
@@ -116,20 +120,22 @@ struct E1ViewerTabsView: View {
 
     @ViewBuilder
     private var markdownPane: some View {
+        let chrome = appState.selectedTheme
         switch markdownMode {
         case .split:
             markdownHorizontalSplit
         case .editor:
             EditorView()
-                .background(Color.kobaPaper)
+                .background(chrome.chromePaper)
         case .preview:
             PreviewView()
-                .background(Color.kobaSurface)
+                .background(chrome.chromePaper)
         }
     }
 
     private var markdownHorizontalSplit: some View {
-        GeometryReader { geo in
+        let chrome = appState.selectedTheme
+        return GeometryReader { geo in
             let minLeft = geo.size.width * mdSplitMin
             let maxLeft = geo.size.width * mdSplitMax
             let leftWidth = min(maxLeft, max(minLeft, geo.size.width * mdSplitFraction))
@@ -138,7 +144,7 @@ struct E1ViewerTabsView: View {
                 EditorView()
                     .frame(width: leftWidth)
                     .frame(maxHeight: .infinity)
-                    .background(Color.kobaPaper)
+                    .background(chrome.chromePaper)
                     .clipped()
 
                 E1WidthDivider(
@@ -156,7 +162,7 @@ struct E1ViewerTabsView: View {
 
                 PreviewView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.kobaSurface)
+                    .background(chrome.chromePaper)
                     .clipped()
             }
         }
@@ -164,28 +170,29 @@ struct E1ViewerTabsView: View {
 
     @ViewBuilder
     private var exclusiveTabContent: some View {
+        let chrome = appState.selectedTheme
         switch selectedTab {
         case .rendered:
             if fileKind == .markdown {
                 PreviewView()
-                    .background(Color.kobaSurface)
+                    .background(chrome.chromePaper)
             } else {
                 tabMismatchHint("Markdown ファイルを開くとプレビューが表示されます")
             }
         case .source:
             EditorView()
-                .background(Color.kobaPaper)
+                .background(chrome.chromePaper)
         case .d2:
             if fileKind == .d2 {
                 D2PreviewView()
-                    .background(Color.kobaSurface)
+                    .background(chrome.chromePaper)
             } else {
                 tabMismatchHint(".d2 ファイルを選択してください")
             }
         case .csv:
             if fileKind == .csv {
                 CSVPreviewView()
-                    .background(Color.kobaSurface)
+                    .background(chrome.chromePaper)
             } else {
                 tabMismatchHint(".csv ファイルを選択してください")
             }
@@ -195,32 +202,34 @@ struct E1ViewerTabsView: View {
     }
 
     private var viewerEmptyState: some View {
-        VStack(spacing: 10) {
+        let chrome = appState.selectedTheme
+        return VStack(spacing: 10) {
             Spacer()
             Image(systemName: "doc.richtext")
                 .font(.system(size: 28))
-                .foregroundStyle(Color.kobaMute)
+                .foregroundStyle(chrome.chromeMute)
             Text("ファイルを選択してください")
                 .font(.system(size: 12))
-                .foregroundStyle(Color.kobaMute)
+                .foregroundStyle(chrome.chromeMute)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaPaper)
+        .background(chrome.chromePaper)
     }
 
     private func tabMismatchHint(_ message: String) -> some View {
-        VStack {
+        let chrome = appState.selectedTheme
+        return VStack {
             Spacer()
             Text(message)
                 .font(.system(size: 12))
-                .foregroundStyle(Color.kobaMute)
+                .foregroundStyle(chrome.chromeMute)
                 .multilineTextAlignment(.center)
                 .padding()
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaPaper)
+        .background(chrome.chromePaper)
     }
 
     private func isTabEnabled(_ tab: E1ViewerTab) -> Bool {

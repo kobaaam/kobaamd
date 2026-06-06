@@ -6,9 +6,11 @@ import SwiftTerm
 
 struct E1TerminalPaneView: View {
     @Bindable var coordinator: SessionCoordinator
+    @Bindable var appState = AppState.shared
     @State private var terminalController = E1TerminalSessionController()
 
     var body: some View {
+        let chrome = appState.selectedTheme
         ZStack {
             if let active = coordinator.activeTerminalSession {
                 ForEach(coordinator.terminalSessions) { session in
@@ -27,7 +29,7 @@ struct E1TerminalPaneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaPaper)
+        .background(chrome.chromePaper)
         .onChange(of: coordinator.activeSessionID) { _, _ in
             guard let session = coordinator.activeTerminalSession else { return }
             terminalController.ensureProcessStarted(for: session)

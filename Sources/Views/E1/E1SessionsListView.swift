@@ -4,23 +4,25 @@ import SwiftUI
 
 struct E1SessionsListView: View {
     @Bindable var coordinator: SessionCoordinator
+    @Bindable private var appState = AppState.shared
 
     var body: some View {
+        let chrome = appState.selectedTheme
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "terminal")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                 Text("Sessions")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.kobaInk)
+                    .foregroundStyle(chrome.chromeInk)
                 Spacer()
                 Button {
                     coordinator.addLocalSession()
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.kobaMute)
+                        .foregroundStyle(chrome.chromeMute)
                 }
                 .buttonStyle(.plain)
                 .help("セッションを追加")
@@ -62,6 +64,7 @@ struct E1SessionsListView: View {
 }
 
 private struct E1SessionRow: View {
+    @Bindable private var appState = AppState.shared
     let session: WorktreeSession
     let isSelected: Bool
     let canRemove: Bool
@@ -70,35 +73,36 @@ private struct E1SessionRow: View {
     let onRemove: () -> Void
 
     var body: some View {
+        let chrome = appState.selectedTheme
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(isSelected ? Color.kobaAccent : Color.kobaMute2)
+                        .fill(isSelected ? Color.kobaAccent : chrome.chromeMute2)
                         .frame(width: 7, height: 7)
                     Text(session.name)
                         .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(Color.kobaInk)
+                        .foregroundStyle(chrome.chromeInk)
                         .lineLimit(1)
                     if session.isMainWorktree, !session.isLocalSession {
                         Text("main")
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Color.kobaMute)
+                            .foregroundStyle(chrome.chromeMute)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(Color.kobaSurface)
+                            .background(chrome.chromeSurface)
                             .clipShape(Capsule())
                     }
                 }
                 Text(subtitle)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 7)
-            .background(isSelected ? Color.kobaAccentSoft : Color.clear)
+            .background(isSelected ? chrome.chromeSelection : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)

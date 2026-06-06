@@ -135,13 +135,13 @@ struct AppStateTests {
         #expect(preset.selectedTheme == .dark)
     }
 
-    @Test("selectedTheme falls back to .light on invalid raw value")
+    @Test("selectedTheme falls back to .dark on invalid raw value")
     func selectedThemeFallbackOnInvalid() throws {
         let suiteName = "kobaamd.test.\(UUID().uuidString)"
         let suite = try #require(UserDefaults(suiteName: suiteName))
         suite.set("not-a-real-theme", forKey: "selectedColorTheme")
         let preset = AppState(defaults: suite)
-        #expect(preset.selectedTheme == .light)
+        #expect(preset.selectedTheme == .dark)
     }
 
     @Test("selectedTheme assignment fires @Observable change notification")

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct E1MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
     @State private var sessionCoordinator = SessionCoordinator()
     @State private var isQuickOpenPresented = false
 
@@ -65,7 +66,7 @@ struct E1MainWindowView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaPaper)
+        .background(appState.selectedTheme.chromePaper)
         .navigationTitle("kobaamd (E1)")
         .frame(minWidth: 720, minHeight: 400)
         .toolbar {
