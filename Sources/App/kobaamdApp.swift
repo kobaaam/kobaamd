@@ -1,16 +1,10 @@
 import SwiftUI
 import AppKit
-import Sparkle
 
 struct kobaamdApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.openWindow) private var openWindow
     @State private var appViewModel = AppViewModel()
-    @State private var updaterController = SPUStandardUpdaterController(
-        startingUpdater: SparkleConfiguration.isConfigured,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
 
     var body: some Scene {
         WindowGroup("kobaamd") {
@@ -62,21 +56,11 @@ struct kobaamdApp: App {
             CommandGroup(after: .saveItem) {
                 Button("PDFに書き出し...") { AppCommand.exportPDF.post() }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
-                Divider()
-                Button("Confluence に同期") { AppCommand.confluenceSync.post() }
-                    .keyboardShortcut("u", modifiers: [.command, .shift])
-                Button("Confluence ページ設定...") { AppCommand.confluencePageSettings.post() }
             }
             CommandGroup(after: .textEditing) {
                 Button("Find & Replace") { AppCommand.find.post() }
                     .keyboardShortcut("f", modifiers: .command)
                 Divider()
-                Button("AI アシスト…") { AppCommand.aiAssist.post() }
-                    .keyboardShortcut("e", modifiers: .command)
-                Button("AI チャット") { AppCommand.aiChat.post() }
-                    .keyboardShortcut("e", modifiers: [.command, .shift])
-                Button("AI 生成をキャンセル") { AppCommand.cancelAIGeneration.post() }
-                    .keyboardShortcut(".", modifiers: .command)
                 Button("クイックインサート") { AppCommand.quickInsert.post() }
                     .keyboardShortcut("k", modifiers: [.command, .option])
             }
@@ -113,11 +97,6 @@ struct kobaamdApp: App {
                 Button("Markdown Split の表示/非表示") { AppCommand.e1ToggleMdSplit.post() }
                     .keyboardShortcut("\\", modifiers: .command)
             }
-            if SparkleConfiguration.isConfigured {
-                CommandGroup(after: .appInfo) {
-                    CheckForUpdatesView(updater: updaterController.updater)
-                }
-            }
             CommandGroup(replacing: .help) {
                 Button("kobaamd ヘルプ") {
                     openWindow(id: "help")
@@ -126,15 +105,11 @@ struct kobaamdApp: App {
             }
         }
 
-        // Settings window (⌘,)
         Settings {
-            SettingsView(
-                updater: SparkleConfiguration.isConfigured ? updaterController.updater : nil
-            )
-            .environment(appViewModel)
+            SettingsView()
+                .environment(appViewModel)
         }
 
-        // Help window
         Window("kobaamd ヘルプ", id: "help") {
             HelpWindowView()
         }
@@ -149,8 +124,6 @@ extension Notification.Name {
     static let newFileRequested       = AppCommand.newFile.notificationName
     static let findRequested          = AppCommand.find.notificationName
     static let openFolderRequested    = AppCommand.openFolder.notificationName
-    static let aiAssistRequested      = AppCommand.aiAssist.notificationName
-    static let aiChatRequested        = AppCommand.aiChat.notificationName
     static let quickInsertRequested   = AppCommand.quickInsert.notificationName
     static let sidebarToggleRequested = AppCommand.toggleSidebar.notificationName
     static let toggleReadingModeRequested = AppCommand.toggleReadingMode.notificationName
@@ -162,15 +135,11 @@ extension Notification.Name {
     static let openRecentNotification  = Notification.Name("kobaamd.openRecentRequested")
     static let openFileRequested      = Notification.Name("kobaamd.openFileRequested")
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
-    static let aiInlineRequested      = Notification.Name("kobaamd.aiInlineRequested")
-    static let aiInlineSpaceRequested = Notification.Name("kobaamd.aiInlineSpaceRequested")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let previewScrollRatioChanged = Notification.Name("kobaamd.previewScrollRatioChanged")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
-    static let confluenceSyncRequested         = AppCommand.confluenceSync.notificationName
-    static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
     static let quickOpenRequested              = AppCommand.quickOpen.notificationName
     static let e1FocusTerminalRequested        = AppCommand.e1FocusTerminal.notificationName
     static let e1FocusViewerRequested          = AppCommand.e1FocusViewer.notificationName
@@ -179,7 +148,6 @@ extension Notification.Name {
     static let e1FocusEditorRequested          = Notification.Name("kobaamd.e1FocusEditorRequested")
     static let e1FocusTerminalPane             = Notification.Name("kobaamd.e1FocusTerminalPane")
     static let e1FocusFileTree                 = Notification.Name("kobaamd.e1FocusFileTree")
-    static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
     static let persistEditorSessionRequested   = Notification.Name("kobaamd.persistEditorSessionRequested")
@@ -192,7 +160,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var moveObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
 
-    /// Finder ダブルクリック（URL配列版・現代的 API）
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first,
               FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
@@ -201,7 +168,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         application.windows.first?.makeKeyAndOrderFront(nil)
     }
 
-    /// Finder ダブルクリック（レガシー単一ファイル API）。true を返して新規ウィンドウ生成を抑制。
     func application(_ application: NSApplication, openFile filename: String) -> Bool {
         let url = URL(fileURLWithPath: filename)
         guard FileService.supportedExtensions.contains(url.pathExtension.lowercased()) else { return false }
@@ -212,7 +178,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // ツールチップを 0.5秒で表示（デフォルト ~1秒）
         UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
         subscribeToWindowNotifications()
         DispatchQueue.main.async { [weak self] in

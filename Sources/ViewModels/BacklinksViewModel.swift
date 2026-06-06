@@ -7,7 +7,7 @@ final class BacklinksViewModel {
     var linked: [Backlink] = []
     var unlinked: [Backlink] = []
     var isLoading: Bool = false
-    var hasAnthropicKey: Bool = false
+
     weak var appViewModel: AppViewModel?
 
     private let checker: BacklinkContextCheckerProtocol
@@ -46,14 +46,7 @@ final class BacklinksViewModel {
 
         let checker = self.checker
         let cache = self.cache
-        PerfLogger.begin("Backlinks.APIKeyStore.load")
-        let hasKey = {
-            guard let key = APIKeyStore.load(for: .anthropic) else { return false }
-            return !key.isEmpty
-        }()
-        PerfLogger.end("Backlinks.APIKeyStore.load")
         currentTargetURL = currentURL
-        hasAnthropicKey = hasKey
 
         refreshTask = Task { [weak self] in
             // 800ms 待機: ファイル切替直後はエディタ・プレビューのスクロール／編集体験を優先。
@@ -81,7 +74,6 @@ final class BacklinksViewModel {
                 await Self.scanWorkspace(
                     targetURL: targetURL,
                     workspaceFolders: workspaceFolders,
-                    hasAnthropicKey: hasKey,
                     checker: checker,
                     cache: cache
                 )
@@ -130,7 +122,6 @@ final class BacklinksViewModel {
     private static func scanWorkspace(
         targetURL: URL,
         workspaceFolders: [URL],
-        hasAnthropicKey: Bool,
         checker: BacklinkContextCheckerProtocol,
         cache: BacklinkContextCache
     ) async -> (linked: [Backlink], unlinked: [Backlink]) {
@@ -209,9 +200,7 @@ final class BacklinksViewModel {
                     )
                     return FileScanResult(
                         linked: scan.linked,
-                        unlinked: hasAnthropicKey
-                            ? scan.unlinked.map { UnlinkedCandidate(backlink: $0, sourceContent: content) }
-                            : []
+                        unlinked: []
                     )
                 }
             }
@@ -232,9 +221,7 @@ final class BacklinksViewModel {
                         )
                         return FileScanResult(
                             linked: scan.linked,
-                            unlinked: hasAnthropicKey
-                                ? scan.unlinked.map { UnlinkedCandidate(backlink: $0, sourceContent: content) }
-                                : []
+                            unlinked: []
                         )
                     }
                 }
@@ -249,7 +236,7 @@ final class BacklinksViewModel {
 
         linkedResults.sort(by: backlinksSort)
 
-        guard hasAnthropicKey, !targetBasename.isEmpty else {
+        guard !targetBasename.isEmpty else {
             return (linkedResults, [])
         }
 

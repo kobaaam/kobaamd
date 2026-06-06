@@ -8,25 +8,25 @@ struct E1MainWindowView: View {
     @State private var sessionCoordinator = SessionCoordinator()
     @State private var isQuickOpenPresented = false
 
-    @State private var leftWidth: CGFloat = 240
-    @State private var rightWidth: CGFloat = 360
+    @State private var leftWidth: CGFloat = E1ViewerLayoutPolicy.defaultLeftWidth
+    @State private var rightFraction: CGFloat = E1MainWindowView.loadRightFraction()
 
     private let leftMinWidth: CGFloat = 180
-    private let rightMinWidth: CGFloat = 240
+    private let leftMaxWidth: CGFloat = 350
+    private let rightMinWidth: CGFloat = 280
     private let centerMinWidth: CGFloat = 280
     private let dividerHitWidth: CGFloat = 18
 
     var body: some View {
         GeometryReader { geo in
             let dividerTracks = dividerHitWidth * 2
-            let maxLeft = max(
-                leftMinWidth,
-                geo.size.width - rightWidth - centerMinWidth - dividerTracks
+            let remainder = max(geo.size.width - leftWidth - dividerTracks, centerMinWidth + rightMinWidth)
+            let maxLeft = min(
+                leftMaxWidth,
+                max(leftMinWidth, geo.size.width - rightMinWidth - centerMinWidth - dividerTracks)
             )
-            let maxRight = max(
-                rightMinWidth,
-                geo.size.width - leftWidth - centerMinWidth - dividerTracks
-            )
+            let rightWidth = max(rightMinWidth, remainder * rightFraction)
+            let centerWidth = max(centerMinWidth, remainder - rightWidth)
 
             HStack(spacing: 0) {
                 E1SessionRailView(coordinator: sessionCoordinator)
@@ -41,19 +41,27 @@ struct E1MainWindowView: View {
                 )
 
                 E1TerminalPaneView(coordinator: sessionCoordinator)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: centerWidth)
+                    .frame(maxHeight: .infinity)
                     .clipped()
 
                 E1WidthDivider(
-                    width: $rightWidth,
+                    width: Binding(
+                        get: { rightWidth },
+                        set: { newWidth in
+                            let newFraction = newWidth / max(remainder, 1)
+                            rightFraction = min(0.75, max(0.35, newFraction))
+                            Self.saveRightFraction(rightFraction)
+                        }
+                    ),
                     minWidth: rightMinWidth,
-                    maxWidth: maxRight,
+                    maxWidth: max(rightMinWidth, remainder - centerMinWidth),
                     hitWidth: dividerHitWidth,
                     dragAxis: .shrinkOnDragRight
                 )
 
                 E1ViewerTabsView()
-                    .frame(width: min(rightWidth, maxRight))
+                    .frame(width: rightWidth)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,11 +117,26 @@ struct E1MainWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
+        .onChange(of: rightFraction) { _, newValue in
+            Self.saveRightFraction(newValue)
+        }
         .modifier(E1MainWindowCommandReceiver(
             appViewModel: appViewModel,
             sessionCoordinator: sessionCoordinator,
             isQuickOpenPresented: $isQuickOpenPresented
         ))
+    }
+
+    private static let rightFractionKey = "e1RightPaneFraction"
+
+    private static func loadRightFraction() -> CGFloat {
+        let stored = UserDefaults.standard.double(forKey: rightFractionKey)
+        if stored > 0 { return CGFloat(stored) }
+        return E1ViewerLayoutPolicy.defaultRightFraction
+    }
+
+    private static func saveRightFraction(_ value: CGFloat) {
+        UserDefaults.standard.set(Double(value), forKey: rightFractionKey)
     }
 }
 

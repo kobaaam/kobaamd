@@ -21,7 +21,7 @@ struct HelpContentView: View {
         case .gettingStarted:
             sectionCard {
                 VStack(alignment: .leading, spacing: 14) {
-                    bodyText("kobaamd は AI が生成した Markdown を Mac で最も快適に扱えるエディタです。")
+                    bodyText("kobaamd は Markdown を Mac で快適に編集・プレビューできるエディタです。E1 Re-concept では Session | Terminal | Viewer の 3 ペインで作業できます。")
                     bodyText("使い始め: ⌘O でフォルダを開く、または Finder から .md ファイルをダブルクリック。")
                     bodyText("エディタ左にサイドバー（⌥⌘S で表示切替）、右にプレビューが表示されます。")
                 }
@@ -69,26 +69,6 @@ struct HelpContentView: View {
                 )
             }
 
-        case .ai:
-            VStack(alignment: .leading, spacing: 16) {
-                featureBlock(
-                    title: "AI アシスト（⌘E）",
-                    text: "テキストを選択して AI に書き換え・翻訳・要約を依頼。"
-                )
-                featureBlock(
-                    title: "AI チャット（⌘⇧E）",
-                    text: "サイドバーで AI とマルチターン会話。現在のドキュメントをコンテキストとして共有。"
-                )
-                featureBlock(
-                    title: "AI インライン補完",
-                    text: "{{プロンプト}} 記法で Cmd+Return するとその場で AI が文章を生成。ストリーミング対応。"
-                )
-                featureBlock(
-                    title: "クイックインサート（⌥⌘K）",
-                    text: "AI プロンプトスニペットをワンキーで挿入。"
-                )
-            }
-
         case .integrations:
             VStack(alignment: .leading, spacing: 16) {
                 featureBlock(
@@ -98,10 +78,6 @@ struct HelpContentView: View {
                 featureBlock(
                     title: "D2 ダイアグラム",
                     text: "d2 記法にも対応（要 brew install d2）。"
-                )
-                featureBlock(
-                    title: "Confluence 同期（⌘⇧U）",
-                    text: "Markdown を Confluence ページとして同期。API トークンを設定画面で登録。"
                 )
                 featureBlock(
                     title: "PDF 書き出し（⌘⇧P）",
@@ -121,16 +97,8 @@ struct HelpContentView: View {
             sectionCard {
                 VStack(alignment: .leading, spacing: 10) {
                     faqItem(
-                        question: "AI アシストが動かない",
-                        answer: "設定画面で API キーと API エンドポイントを正しく設定してください。"
-                    )
-                    faqItem(
                         question: "Mermaid がレンダリングされない",
                         answer: "コードブロックの言語指定が ```mermaid であることを確認してください。"
-                    )
-                    faqItem(
-                        question: "Confluence 同期に失敗する",
-                        answer: "設定画面で Confluence URL・ユーザー名・API トークンが正しいか確認してください。"
                     )
                     faqItem(
                         question: "D2 が表示されない",
@@ -156,12 +124,10 @@ struct HelpContentView: View {
             ("⌘K", "リンク挿入"),
             ("⌥⌘K", "クイックインサート"),
             ("⌥⌘S", "サイドバー表示切替"),
-            ("⌘E", "AI アシスト"),
-            ("⌘⇧E", "AI チャット"),
-            ("⌘.", "AI 生成キャンセル"),
             ("⌘P", "クイックオープン"),
             ("⌘⇧P", "PDF 書き出し"),
-            ("⌘⇧U", "Confluence 同期"),
+            ("⌘1/2/3", "E1 ペインフォーカス"),
+            ("⌘\\", "Markdown 分割の切替"),
             ("⌘,", "設定")
         ]
     }

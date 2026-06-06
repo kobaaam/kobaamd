@@ -27,6 +27,7 @@ struct NSTextViewWrapper: View {
     var body: some View {
         TextEditor(text: $text)
             .font(Self.editorFont)
+            .lineSpacing(6)
             .foregroundStyle(inkColor)
             .scrollContentBackground(.hidden)
             .background(
@@ -69,11 +70,6 @@ struct EditorObserver: NSViewRepresentable {
                 MainActor.assumeIsolated {
                     context.coordinator.refreshHighlightForThemeChange(in: tv)
                 }
-            }
-        }
-        if let tv = context.coordinator.textViewRef {
-            MainActor.assumeIsolated {
-                context.coordinator.updateAIOverlayPosition(in: tv)
             }
         }
     }
@@ -190,15 +186,6 @@ struct EditorObserver: NSViewRepresentable {
                 let maxScroll = max(docHeight - visHeight, 1)
                 let r = sv.contentView.bounds.origin.y / maxScroll
                 ratio.wrappedValue = max(0, min(1, r))
-                if let self,
-                   let textView = self.textViewRef,
-                   let appViewModel = self.appViewModel {
-                    MainActor.assumeIsolated {
-                        if appViewModel.isAIInlinePromptVisible || appViewModel.isAIGenerating || !appViewModel.pendingAIText.isEmpty {
-                            self.updateAIOverlayPosition(in: textView)
-                        }
-                    }
-                }
             }
         }
 
@@ -213,9 +200,6 @@ struct EditorObserver: NSViewRepresentable {
             ) { [weak self, weak tv] _ in
                 guard let self, let tv else { return }
                 self.highlightCurrentLine(in: tv)
-                MainActor.assumeIsolated {
-                    self.updateAIOverlayPosition(in: tv)
-                }
             }
             textDidChangeObserver = NotificationCenter.default.addObserver(
                 forName: NSText.didChangeNotification,
@@ -232,11 +216,8 @@ struct EditorObserver: NSViewRepresentable {
                 applySyntaxHighlight(in: tv)
             }
             highlightCurrentLine(in: tv)
-            MainActor.assumeIsolated {
-                updateAIOverlayPosition(in: tv)
-            }
 
-            // Return キーで箇条書き自動継続 / ⌘Return で AI インライン補完
+            // Return キーで箇条書き自動継続
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self,
                       let tv = self.textViewRef,
@@ -245,68 +226,12 @@ struct EditorObserver: NSViewRepresentable {
 
                 let mods = event.modifierFlags.intersection([.shift, .option, .command, .control])
 
-                // Cmd+Z: ストリーミング中なら AI キャンセルを優先
-                if event.keyCode == 6,
-                   mods == .command,
-                   !tv.hasMarkedText()
-                {
-                    guard let appViewModel = self.appViewModel else { return event }
-                    let consumed = MainActor.assumeIsolated {
-                        self.handleCmdZ(isStreaming: appViewModel.isAIGenerating)
-                    }
-                    return consumed ? nil : event
-                }
-
-                // Space キー → 空行で AI インラインポップオーバー起動
-                if event.keyCode == 49, // Space
-                   mods.isEmpty,        // 修飾キーなし
-                   !tv.hasMarkedText()  // IME変換中は無視
-                {
-                    let nsStr = tv.string as NSString
-                    let loc = min(tv.selectedRange().location, nsStr.length)
-                    let lineRange = nsStr.lineRange(for: NSRange(location: loc, length: 0))
-                    let lineContent = nsStr.substring(with: lineRange).trimmingCharacters(in: .newlines)
-                    // 空行（ホワイトスペースのみも含む）の場合
-                    if lineContent.trimmingCharacters(in: .whitespaces).isEmpty {
-                        // スペースは通常通り入力させ、入力後の位置を通知
-                        NotificationCenter.default.post(
-                            name: .aiInlineSpaceRequested,
-                            object: nil,
-                            userInfo: ["cursorLocation": loc + 1]
-                        )
-                        return event // スペース文字を入力する
-                    }
-                    return event
-                }
-
                 guard event.keyCode == 36, // Return
-                      !tv.hasMarkedText()  // IME 変換中は無視
+                      !tv.hasMarkedText(),
+                      mods.isEmpty
                 else { return event }
 
-                // ⌘Return → AI インライン補完（カーソル行を通知で送るだけ）
-                if mods == .command {
-                    let nsStr = tv.string as NSString
-                    let loc = min(tv.selectedRange().location, nsStr.length)
-                    let lineRange = nsStr.lineRange(for: NSRange(location: loc, length: 0))
-                    let lineContent = nsStr.substring(with: lineRange)
-                    let trimmed = lineContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmed.hasPrefix("{{"), trimmed.hasSuffix("}}"), trimmed.count > 4 {
-                        NotificationCenter.default.post(
-                            name: .aiInlineRequested,
-                            object: nil,
-                            userInfo: ["lineContent": lineContent]
-                        )
-                        return nil
-                    }
-                    return event
-                }
-
-                // 修飾キーなし → 箇条書き自動継続
-                if mods.isEmpty {
-                    return self.handleAutoListReturn(in: tv) ? nil : event
-                }
-
-                return event
+                return self.handleAutoListReturn(in: tv) ? nil : event
             }
         }
 
@@ -328,19 +253,6 @@ struct EditorObserver: NSViewRepresentable {
             textStorage.replaceCharacters(in: edit.replacementRange, with: edit.replacementText)
             tv.didChangeText()
             tv.setSelectedRange(edit.selectedRange)
-            return true
-        }
-
-        /// Cmd+Z を処理する。ストリーミング中なら AI 生成をキャンセルして true を返す。
-        /// それ以外は false を返し通常 Undo に委譲する。
-        /// `isStreaming` を引数として受け取るのは、`AppViewModel` への依存を最小化し
-        /// XCTest から呼び出せるようにするため。
-        @MainActor
-        func handleCmdZ(isStreaming: Bool) -> Bool {
-            guard let appViewModel else { return false }
-            guard isStreaming else { return false }
-
-            appViewModel.rejectPendingAIText()
             return true
         }
 
@@ -399,34 +311,6 @@ struct EditorObserver: NSViewRepresentable {
             }
 
             return false
-        }
-
-        @MainActor
-        func updateAIOverlayPosition(in tv: NSTextView) {
-            guard let appViewModel,
-                  let scrollView = tv.enclosingScrollView,
-                  let window = tv.window
-            else { return }
-
-            let length = (tv.string as NSString).length
-            let clampedLocation = min(max(appViewModel.aiInlineCursorLocation, 0), length)
-            let caretRectOnScreen = tv.firstRect(
-                forCharacterRange: NSRange(location: clampedLocation, length: 0),
-                actualRange: nil
-            )
-            guard !caretRectOnScreen.isEmpty else { return }
-
-            let caretRectInWindow = window.convertFromScreen(caretRectOnScreen)
-            let caretRectInClipView = scrollView.contentView.convert(caretRectInWindow, from: nil)
-            let clipBounds = scrollView.contentView.bounds
-
-            appViewModel.aiInlineOverlayPosition = CGPoint(
-                x: clipBounds.midX,
-                y: max(24, caretRectInClipView.minY - clipBounds.minY)
-            )
-
-            // TODO(KMD-42-followup): TextEditor 内部の text storage delegate 連携で
-            // Undo 層の補正も検討する。現状は Cmd+Z の第1層防御のみ実装。
         }
 
         @MainActor

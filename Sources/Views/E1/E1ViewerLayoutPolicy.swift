@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - E1 viewer layout (KMD-237)
+// MARK: - E1 viewer layout (KMD-237, Re-concept refresh)
 
 enum E1FileKind: Equatable {
     case none
@@ -10,7 +10,34 @@ enum E1FileKind: Equatable {
     case other
 }
 
+/// Markdown ビューアの表示モード（Gemini レイアウト提案）
+enum E1MarkdownViewMode: String, CaseIterable, Identifiable {
+    case split = "分割"
+    case editor = "エディタ"
+    case preview = "プレビュー"
+
+    var id: String { rawValue }
+}
+
+enum E1ViewerTab: String, CaseIterable, Identifiable {
+    case rendered = "Rendered"
+    case source = "Source"
+    case d2 = "D2"
+    case diff = "Diff"
+    case csv = "CSV"
+
+    var id: String { rawValue }
+
+    var isMarkdownPane: Bool {
+        self == .rendered || self == .source
+    }
+}
+
 enum E1ViewerLayoutPolicy {
+    static let defaultLeftWidth: CGFloat = 240
+    static let defaultRightFraction: CGFloat = 0.6
+    static let defaultMdSplitFraction: CGFloat = 0.5
+
     static func fileKind(for url: URL?) -> E1FileKind {
         guard let url else { return .none }
         let ext = url.pathExtension.lowercased()
@@ -20,7 +47,6 @@ enum E1ViewerLayoutPolicy {
         return .other
     }
 
-    /// 拡張子に応じた初期 Viewer タブ。
     static func defaultTab(for kind: E1FileKind) -> E1ViewerTab {
         switch kind {
         case .none: return .source
@@ -33,6 +59,10 @@ enum E1ViewerLayoutPolicy {
 
     static func defaultTab(for url: URL?) -> E1ViewerTab {
         defaultTab(for: fileKind(for: url))
+    }
+
+    static func defaultMarkdownMode(for kind: E1FileKind) -> E1MarkdownViewMode {
+        kind == .markdown ? .split : .editor
     }
 
     static func isTabEnabled(_ tab: E1ViewerTab, kind: E1FileKind) -> Bool {
@@ -53,8 +83,7 @@ enum E1ViewerLayoutPolicy {
         }
     }
 
-    /// Markdown で Rendered+Source の Split を使うか（KMD-235/236）。
-    static func usesMarkdownSplit(kind: E1FileKind, splitEnabled: Bool, selectedTab: E1ViewerTab) -> Bool {
-        kind == .markdown && splitEnabled && selectedTab.isMarkdownPane
+    static func usesMarkdownSplit(kind: E1FileKind, mode: E1MarkdownViewMode) -> Bool {
+        kind == .markdown && mode == .split
     }
 }

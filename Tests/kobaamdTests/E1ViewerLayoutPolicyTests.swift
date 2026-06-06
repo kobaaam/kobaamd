@@ -12,27 +12,33 @@ struct E1ViewerLayoutPolicyTests {
         #expect(E1ViewerLayoutPolicy.defaultTab(for: url) == .rendered)
     }
 
+    @Test("markdown の既定モードは分割")
+    func markdownDefaultModeIsSplit() {
+        #expect(E1ViewerLayoutPolicy.defaultMarkdownMode(for: .markdown) == .split)
+        #expect(E1ViewerLayoutPolicy.defaultMarkdownMode(for: .d2) == .editor)
+    }
+
     @Test("d2 / csv は専用タブが既定")
     func specializedDefaultTabs() {
         #expect(E1ViewerLayoutPolicy.defaultTab(for: URL(fileURLWithPath: "/a.d2")) == .d2)
         #expect(E1ViewerLayoutPolicy.defaultTab(for: URL(fileURLWithPath: "/b.csv")) == .csv)
     }
 
-    @Test("Split は markdown + 有効 + Rendered/Source タブのときのみ")
+    @Test("Split は markdown + split モードのときのみ")
     func markdownSplitGate() {
         #expect(
             E1ViewerLayoutPolicy.usesMarkdownSplit(
-                kind: .markdown, splitEnabled: true, selectedTab: .rendered
+                kind: .markdown, mode: .split
             )
         )
         #expect(
             !E1ViewerLayoutPolicy.usesMarkdownSplit(
-                kind: .csv, splitEnabled: true, selectedTab: .rendered
+                kind: .csv, mode: .split
             )
         )
         #expect(
             !E1ViewerLayoutPolicy.usesMarkdownSplit(
-                kind: .markdown, splitEnabled: false, selectedTab: .rendered
+                kind: .markdown, mode: .editor
             )
         )
     }

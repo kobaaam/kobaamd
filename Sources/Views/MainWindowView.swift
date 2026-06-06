@@ -10,8 +10,6 @@ struct MainWindowView: View {
     @State private var diffInitialFileName: String = ""
     @State private var isWindowDragTargeted: Bool = false
     @State private var isQuickOpenPresented: Bool = false
-    @State private var isChatSidebarVisible: Bool = false
-
     private var isMDFile: Bool {
         let ext = appViewModel.selectedFileURL?.pathExtension.lowercased() ?? ""
         return ext == "md" || ext == "markdown" || ext.isEmpty
@@ -111,22 +109,6 @@ struct MainWindowView: View {
             .disabled(vm.previewMode == .viewer)
 
             Button {
-                NotificationCenter.default.post(name: .aiAssistRequested, object: nil)
-            } label: {
-                Image(systemName: "sparkles")
-            }
-            .help("AI アシスト (⌘E)")
-            .disabled(vm.previewMode == .viewer)
-
-            Button {
-                NotificationCenter.default.post(name: .aiChatRequested, object: nil)
-            } label: {
-                Image(systemName: "bubble.left.and.bubble.right")
-            }
-            .help("AI チャット (⌘⇧E)")
-            .disabled(vm.previewMode == .viewer)
-
-            Button {
                 diffInitialText = appViewModel.activeTab?.content ?? ""
                 diffInitialFileName = appViewModel.activeTab?.title ?? ""
                 isDiffSheetPresented = true
@@ -189,21 +171,9 @@ struct MainWindowView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    if isChatSidebarVisible {
-                        KobaDivider()
-                        AIChatView(
-                            viewModel: appViewModel.aiChatViewModel,
-                            onInsertToEditor: { text in
-                                appViewModel.editorText += "\n\n" + text
-                            }
-                        )
-                        .frame(width: 320)
-                        .transition(.move(edge: .trailing))
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut(duration: 0.2), value: appViewModel.isSidebarVisible)
-                .animation(.easeInOut(duration: 0.2), value: isChatSidebarVisible)
                 .overlay {
                     if isWindowDragTargeted {
                         ZStack {
@@ -230,9 +200,7 @@ struct MainWindowView: View {
                 // ── Status / command bar ───────────────────────────────
                 StatusCommandBar(
                     previewMode: $vm.previewMode,
-                    isMDFile: isMDFile,
-                    confluenceSyncMessage: appViewModel.confluenceSyncViewModel.syncStatusMessage,
-                    isConfluenceSyncing: appViewModel.confluenceSyncViewModel.isSyncing
+                    isMDFile: isMDFile
                 )
             }
 
@@ -267,17 +235,13 @@ struct MainWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
-        .onAppear {
-            isChatSidebarVisible = appViewModel.isChatSidebarVisible
-        }
         .modifier(
             MainWindowCommandReceiver(
                 appViewModel: appViewModel,
                 isDiffSheetPresented: $isDiffSheetPresented,
                 diffInitialText: $diffInitialText,
                 diffInitialFileName: $diffInitialFileName,
-                isQuickOpenPresented: $isQuickOpenPresented,
-                isChatSidebarVisible: $isChatSidebarVisible
+                isQuickOpenPresented: $isQuickOpenPresented
             )
         )
         .navigationTitle(appViewModel.selectedFileURL?.lastPathComponent ?? "kobaamd")
@@ -309,7 +273,6 @@ extension MainWindowView {
         @Binding var diffInitialText: String
         @Binding var diffInitialFileName: String
         @Binding var isQuickOpenPresented: Bool
-        @Binding var isChatSidebarVisible: Bool
 
         func body(content: Content) -> some View {
             content
@@ -365,18 +328,8 @@ extension MainWindowView {
                 }
                 .modifier(MainWindowCommandReceiverPart2(
                     appViewModel: appViewModel,
-                    isDiffSheetPresented: $isDiffSheetPresented,
-                    confluenceSheetPresented: Bindable(appViewModel.confluenceSyncViewModel).isPageSettingSheetPresented
+                    isDiffSheetPresented: $isDiffSheetPresented
                 ))
-                .onReceive(NotificationCenter.default.publisher(for: .cancelAIGenerationRequested)) { _ in
-                    appViewModel.cancelAIGeneration()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .aiChatRequested)) { _ in
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isChatSidebarVisible.toggle()
-                        appViewModel.isChatSidebarVisible = isChatSidebarVisible
-                    }
-                }
         }
     }
 }
@@ -386,7 +339,6 @@ extension MainWindowView {
 private struct MainWindowCommandReceiverPart2: ViewModifier {
     let appViewModel: AppViewModel
     @Binding var isDiffSheetPresented: Bool
-    @Binding var confluenceSheetPresented: Bool
 
     func body(content: Content) -> some View {
         content
@@ -403,22 +355,9 @@ private struct MainWindowCommandReceiverPart2: ViewModifier {
                     appViewModel.handlePDFExportResult(result)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .confluenceSyncRequested)) { _ in
-                appViewModel.syncToConfluence()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .confluencePageSettingsRequested)) { _ in
-                appViewModel.confluenceSyncViewModel.currentFileURL = appViewModel.selectedFileURL
-                appViewModel.confluenceSyncViewModel.isPageSettingSheetPresented = true
-            }
             .sheet(isPresented: $isDiffSheetPresented) {
                 DiffSheetView(preloadText: appViewModel.activeTab?.content ?? "",
                               preloadFileName: appViewModel.activeTab?.title ?? "")
-            }
-            .sheet(isPresented: $confluenceSheetPresented) {
-                if let url = appViewModel.confluenceSyncViewModel.currentFileURL {
-                    ConfluencePageSettingSheet(fileURL: url)
-                        .environment(appViewModel.confluenceSyncViewModel)
-                }
             }
             .sheet(isPresented: Bindable(appViewModel).showTemplatePicker) {
                 TemplatePickerView(isPresented: Bindable(appViewModel).showTemplatePicker)
@@ -433,8 +372,6 @@ struct StatusCommandBar: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Binding var previewMode: PreviewMode
     var isMDFile: Bool = true
-    var confluenceSyncMessage: String? = nil
-    var isConfluenceSyncing: Bool = false
 
     var filePath: String {
         guard let url = appViewModel.selectedFileURL else { return "" }
@@ -471,38 +408,10 @@ struct StatusCommandBar: View {
 
             Spacer()
 
-            // AI生成ステータス
-            if appViewModel.isAIGenerating {
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .scaleEffect(0.6)
-                    Text("AI生成中... ⌘. でキャンセル")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Color.kobaMute)
-                }
-                .padding(.horizontal, 8)
-            }
-
             // PDF書き出しステータス
             if let msg = appViewModel.pdfStatusMessage {
                 HStack(spacing: 4) {
                     if appViewModel.isPDFExporting {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .scaleEffect(0.6)
-                    }
-                    Text(msg)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Color.kobaMute)
-                }
-                .padding(.horizontal, 8)
-            }
-
-            // Confluence 同期ステータス
-            if let msg = confluenceSyncMessage {
-                HStack(spacing: 4) {
-                    if isConfluenceSyncing {
                         ProgressView()
                             .progressViewStyle(.circular)
                             .scaleEffect(0.6)
