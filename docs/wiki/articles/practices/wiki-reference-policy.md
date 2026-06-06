@@ -234,6 +234,7 @@ KMD-46 / KMD-47 のヘルパーが未整備の段階、もしくは手元で素�
 - [[external-teams]] — Anthropic API を含む外部依存の運用ポリシー
 - [[role-dispatch]] — Wiki 参照経路（ask.sh）と Phase 移行の連動軸
 - [[team-structure]] — wiki query を担うコアチーム
+- [[cli-argument-conventions]] — §1.2 で規定する Claude Code subagent 経由起動の `printf '%s' "$prompt" | claude -p ...` パターンを CLI 引数規約として一般化した記事。KMD-154 で本ファイル §1.3 が記録した variadic option バグの予防策を集約
 
 ## Sources
 
