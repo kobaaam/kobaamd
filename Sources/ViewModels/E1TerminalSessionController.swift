@@ -59,8 +59,8 @@ final class E1TerminalSessionController {
 }
 
 private extension LocalProcessTerminalView {
-    func configureAppearance() {
-        nativeForegroundColor = NSColor.labelColor
-        nativeBackgroundColor = NSColor.textBackgroundColor
+    func configureAppearance(theme: ColorTheme = AppState.shared.selectedTheme) {
+        nativeForegroundColor = theme.editorText
+        nativeBackgroundColor = theme.editorBackground
     }
 }

@@ -5,16 +5,18 @@ import SwiftUI
 struct E1ScopedFileTreeView: View {
     @Bindable var fileTreeViewModel: FileTreeViewModel
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
 
     var body: some View {
+        let chrome = appState.selectedTheme
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "folder")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                 Text("Files")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.kobaInk)
+                    .foregroundStyle(chrome.chromeInk)
                 if let path = fileTreeViewModel.rootURL {
                     Text(path.lastPathComponent)
                         .font(.system(size: 10, design: .monospaced))
@@ -31,7 +33,7 @@ struct E1ScopedFileTreeView: View {
             if fileTreeViewModel.folders.isEmpty {
                 Text("セッションを選択してください")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                     .padding(.horizontal, 12)
                 Spacer(minLength: 0)
             } else if fileTreeViewModel.isLoading, fileTreeViewModel.nodes.isEmpty {
@@ -39,14 +41,14 @@ struct E1ScopedFileTreeView: View {
                     ProgressView().controlSize(.small).scaleEffect(0.7)
                     Text("読み込み中…")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color.kobaMute)
+                        .foregroundStyle(chrome.chromeMute)
                 }
                 .padding(.horizontal, 12)
                 Spacer(minLength: 0)
             } else if fileTreeViewModel.nodes.isEmpty {
                 Text("このフォルダに表示できるファイルがありません")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                     .padding(.horizontal, 12)
                 Spacer(minLength: 0)
             } else {

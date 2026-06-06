@@ -30,8 +30,8 @@ import Observation
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.light.rawValue
-        self.selectedTheme = ColorTheme(rawValue: raw) ?? .light
+        let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.dark.rawValue
+        self.selectedTheme = ColorTheme(rawValue: raw) ?? .dark
     }
 
     var autoFormatOnSave: Bool {

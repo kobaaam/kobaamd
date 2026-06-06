@@ -4,15 +4,17 @@ import SwiftUI
 
 struct E1EditorStatusBar: View {
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
 
     private var charCount: Int { appViewModel.editorText.count }
 
     var body: some View {
+        let chrome = appState.selectedTheme
         HStack(spacing: 12) {
             if let url = appViewModel.selectedFileURL {
                 Text(url.lastPathComponent)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Color.kobaMute)
+                    .foregroundStyle(chrome.chromeMute)
                     .lineLimit(1)
             }
 
@@ -33,13 +35,14 @@ struct E1EditorStatusBar: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(Color.kobaSurface)
+        .background(chrome.chromeSurface)
         .overlay(KobaHDivider(), alignment: .top)
     }
 
     private func statLabel(_ text: String) -> some View {
-        Text(text)
+        let chrome = appState.selectedTheme
+        return Text(text)
             .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(Color.kobaMute2)
+            .foregroundStyle(chrome.chromeMute2)
     }
 }

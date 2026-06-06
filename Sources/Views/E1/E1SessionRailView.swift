@@ -5,6 +5,7 @@ import SwiftUI
 struct E1SessionRailView: View {
     @Bindable var coordinator: SessionCoordinator
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
 
     private let sessionsFraction: CGFloat = 0.42
 
@@ -24,6 +25,6 @@ struct E1SessionRailView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.kobaSurface)
+        .background(appState.selectedTheme.chromeSurface)
     }
 }
