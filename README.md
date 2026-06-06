@@ -90,9 +90,9 @@ macOS の Hardened Runtime では実行中バイナリの上書きができな�
 swift build && ./scripts/post-build.sh debug dev && open .build/kobaamd-dev.app
 ```
 
-**E1 shell (experimental):** In **Settings**, enable **「E1 シェル（実験的）」** to open the in-development Session rail | Terminal | Viewer layout. The flag is off by default; restart the app after toggling.
+**E1 shell (Re-concept):** The default UI is Session rail | Terminal | Viewer. In **Settings**, turn off **「E1 シェル」** to use the legacy Markdown 3-pane layout. Restart the app after toggling.
 
-**E1 シェル（実験的）:** **設定**で **「E1 シェル（実験的）」** を ON にすると、開発中の Session rail | Terminal | Viewer レイアウトが開きます。デフォルトは OFF です。切り替え後はアプリを再起動してください。
+**E1 シェル（Re-concept）:** デフォルトは Session rail | Terminal | Viewer です。**設定**で **「E1 シェル」** を OFF にすると従来の Markdown 3ペイン UI に戻ります。切り替え後はアプリを再起動してください。
 
 If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, run the development ACL helper described in [`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md).
 ローカルの ad-hoc 再ビルド後に API キーの Keychain アクセス確認が繰り返される場合は、[`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md) の開発用 ACL ヘルパーを使用してください。
