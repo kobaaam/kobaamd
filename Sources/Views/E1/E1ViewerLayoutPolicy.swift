@@ -5,6 +5,7 @@ import Foundation
 enum E1FileKind: Equatable {
     case none
     case markdown
+    case html
     case d2
     case csv
     case other
@@ -42,6 +43,7 @@ enum E1ViewerLayoutPolicy {
         guard let url else { return .none }
         let ext = url.pathExtension.lowercased()
         if ext == "md" || ext == "markdown" || ext.isEmpty { return .markdown }
+        if ext == "html" || ext == "htm" { return .html }
         if ext == "d2" { return .d2 }
         if ext == "csv" { return .csv }
         return .other
@@ -51,6 +53,7 @@ enum E1ViewerLayoutPolicy {
         switch kind {
         case .none: return .source
         case .markdown: return .rendered
+        case .html: return .rendered
         case .d2: return .d2
         case .csv: return .csv
         case .other: return .source
@@ -74,6 +77,8 @@ enum E1ViewerLayoutPolicy {
             case .rendered, .source, .diff: return true
             case .d2, .csv: return false
             }
+        case .html:
+            return tab == .rendered || tab == .source || tab == .diff
         case .d2:
             return tab == .d2 || tab == .diff || tab == .source
         case .csv:
@@ -85,5 +90,10 @@ enum E1ViewerLayoutPolicy {
 
     static func usesMarkdownSplit(kind: E1FileKind, mode: E1MarkdownViewMode) -> Bool {
         kind == .markdown && mode == .split
+    }
+
+    /// 現在のファイル種別で意味のあるタブだけ返す（無効タブを薄く並べない）
+    static func visibleTabs(for kind: E1FileKind) -> [E1ViewerTab] {
+        E1ViewerTab.allCases.filter { isTabEnabled($0, kind: kind) }
     }
 }
