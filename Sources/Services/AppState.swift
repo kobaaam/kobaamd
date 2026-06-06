@@ -56,15 +56,11 @@ import Observation
         set { defaults.set(newValue.rawValue, forKey: "updateCheckInterval") }
     }
 
-    /// E1 terminal + session shell (KMD-231). Release では OFF。DEBUG ビルドは未設定時 ON（開発用）。
+    /// E1 terminal + session shell (KMD-231). 未設定時は ON（Re-concept を正とする）。
     var useE1Shell: Bool {
         get {
             if defaults.object(forKey: "useE1Shell") == nil {
-                #if DEBUG
                 return true
-                #else
-                return false
-                #endif
             }
             return defaults.bool(forKey: "useE1Shell")
         }

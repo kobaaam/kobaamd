@@ -97,9 +97,9 @@ struct SettingsView: View {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
 
-            Section("E1 シェル（実験的）") {
-                Toggle("E1 シェル（実験的）", isOn: $appState.useE1Shell)
-                Text("Session rail | Terminal | Viewer の開発中レイアウトです。変更は再起動後に反映されます。DEBUG ビルドは未設定時 ON、Release は OFF です。")
+            Section("E1 シェル") {
+                Toggle("E1 シェル（Session | Terminal | Viewer）", isOn: $appState.useE1Shell)
+                Text("Re-concept レイアウトです。OFF にすると従来の Markdown 3ペイン UI に戻ります。変更は再起動後に反映されます。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
