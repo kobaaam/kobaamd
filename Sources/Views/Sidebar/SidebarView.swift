@@ -93,18 +93,7 @@ struct SidebarView: View {
         }
         .onAppear {
             fileTreeViewModel.restoreWorkspace()
-
-            // 前回開いていたファイルを復元（Finder 経由のオープンは MainWindowView.onChange が担当）
-            if let lastURL = AppState.loadLastFile(),
-               FileManager.default.fileExists(atPath: lastURL.path) {
-                Task.detached {
-                    if let content = try? FileService().readFile(at: lastURL) {
-                        await MainActor.run {
-                            appViewModel.openInTab(url: lastURL, content: content)
-                        }
-                    }
-                }
-            }
+            Task { await appViewModel.restoreEditorSession() }
         }
     }
 

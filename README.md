@@ -68,6 +68,28 @@ swift build
 open .build/kobaamd.app
 ```
 
+### Daily dev loop / 日常開発
+
+macOS の Hardened Runtime では実行中バイナリの上書きができないため、コード変更のたびに**開発用インスタンス**の再起動は必要です。本番用アプリとは切り離して運用できます。
+
+| 用途 | バンドル | プロセス名 | Bundle ID |
+|------|----------|------------|-----------|
+| 日常利用（安定版） | `/Applications/kobaamd.app` | `kobaamd` | `com.kobaamd.app` |
+| 開発・検証 | `.build/kobaamd-dev.app` | `kobaamd-dev` | `com.kobaamd.app.dev` |
+
+`dev-run.sh` は **開発用だけ** ビルド→再起動します。`/Applications/kobaamd.app` は止まりません。設定・タブは Bundle ID ごとに別管理です（API キーは Keychain サービス名が共通のため共有されます）。
+
+```bash
+# 開発用を1回ビルドして起動（本番 kobaamd はそのまま）
+./scripts/dev-run.sh
+
+# 保存を監視して開発用だけ自動リロード（初回: brew install fswatch）
+./scripts/dev-run.sh --watch
+
+# 手動で開発バンドルだけ作る場合
+swift build && ./scripts/post-build.sh debug dev && open .build/kobaamd-dev.app
+```
+
 **E1 shell (experimental):** In **Settings**, enable **「E1 シェル（実験的）」** to open the in-development Session rail | Terminal | Viewer layout. The flag is off by default; restart the app after toggling.
 
 **E1 シェル（実験的）:** **設定**で **「E1 シェル（実験的）」** を ON にすると、開発中の Session rail | Terminal | Viewer レイアウトが開きます。デフォルトは OFF です。切り替え後はアプリを再起動してください。

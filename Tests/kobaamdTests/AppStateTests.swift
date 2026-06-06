@@ -159,6 +159,43 @@ struct AppStateTests {
 
     // MARK: - loadRecentFiles filtering
 
+    // MARK: - Editor session
+
+    @Test("Editor session round-trips tab URLs and active tab")
+    func editorSessionRoundTrip() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let a = dir.appendingPathComponent("a.md")
+        let b = dir.appendingPathComponent("b.md")
+        try "# A".write(to: a, atomically: true, encoding: .utf8)
+        try "# B".write(to: b, atomically: true, encoding: .utf8)
+
+        state.saveEditorSession(tabURLs: [a, b], activeURL: b)
+        let loaded = state.loadEditorSession()
+        #expect(loaded.tabURLs.map(\.path) == [a.path, b.path])
+        #expect(loaded.activeURL?.path == b.path)
+    }
+
+    @Test("loadEditorSession drops missing tab files")
+    func loadEditorSessionSkipsMissing() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let live = dir.appendingPathComponent("live.md")
+        try "# live".write(to: live, atomically: true, encoding: .utf8)
+        let gone = dir.appendingPathComponent("gone.md")
+
+        state.saveEditorSession(tabURLs: [live, gone], activeURL: live)
+        let loaded = state.loadEditorSession()
+        #expect(loaded.tabURLs == [live])
+        #expect(loaded.activeURL == live)
+    }
+
     @Test("loadRecentFiles skips missing files")
     func loadRecentFilesSkipsMissingFiles() throws {
         let dir = FileManager.default.temporaryDirectory

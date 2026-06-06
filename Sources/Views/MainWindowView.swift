@@ -339,6 +339,9 @@ extension MainWindowView {
                         await appViewModel.openFile(url: url)
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .persistEditorSessionRequested)) { _ in
+                    appViewModel.persistEditorSession()
+                }
                 .onReceive(NotificationCenter.default.publisher(for: .saveRequested)) { _ in
                     if AppState.shared.autoFormatOnSave {
                         appViewModel.formatCurrentDocument()

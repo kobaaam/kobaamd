@@ -19,6 +19,8 @@ import Observation
     private static let selectedThemeKey   = "selectedColorTheme"
     private static let e1LocalSessionsKey = "e1LocalSessions"
     private static let e1ActiveSessionIDKey = "e1ActiveSessionID"
+    private static let openTabURLsKey = "openTabURLs"
+    private static let activeTabURLKey = "activeTabURL"
 
     var selectedTheme: ColorTheme {
         didSet {
@@ -196,5 +198,34 @@ import Observation
 
     static func loadE1LocalSessions() -> ([WorktreeSession], UUID?) {
         shared.loadE1LocalSessions()
+    }
+
+    // MARK: - Editor session (open tabs survive dev relaunch)
+
+    func saveEditorSession(tabURLs: [URL], activeURL: URL?) {
+        defaults.set(tabURLs.map(\.path), forKey: Self.openTabURLsKey)
+        if let activeURL {
+            defaults.set(activeURL.path, forKey: Self.activeTabURLKey)
+        } else {
+            defaults.removeObject(forKey: Self.activeTabURLKey)
+        }
+    }
+
+    func loadEditorSession() -> (tabURLs: [URL], activeURL: URL?) {
+        let tabURLs = (defaults.stringArray(forKey: Self.openTabURLsKey) ?? [])
+            .map { URL(filePath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        let activeURL = defaults.string(forKey: Self.activeTabURLKey)
+            .map { URL(filePath: $0) }
+            .flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+        return (tabURLs, activeURL)
+    }
+
+    static func saveEditorSession(tabURLs: [URL], activeURL: URL?) {
+        shared.saveEditorSession(tabURLs: tabURLs, activeURL: activeURL)
+    }
+
+    static func loadEditorSession() -> (tabURLs: [URL], activeURL: URL?) {
+        shared.loadEditorSession()
     }
 }
