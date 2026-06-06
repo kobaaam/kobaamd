@@ -132,12 +132,18 @@ struct QuickOpenView: View {
     private var emptyStateView: some View {
         VStack(spacing: 8) {
             if viewModel.query.isEmpty {
-                Text("ワークスペースにフォルダを追加してください")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.kobaMute)
-                Text("⌘O でフォルダを開く")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Color.kobaMute2)
+                if let root = viewModel.scopedRootURL {
+                    Text("アクティブセッション: \(root.lastPathComponent)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.kobaMute)
+                } else {
+                    Text("ワークスペースにフォルダを追加してください")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.kobaMute)
+                    Text("⌘O でフォルダを開く")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.kobaMute2)
+                }
             } else {
                 Text("「\(viewModel.query)」に一致するファイルが見つかりません")
                     .font(.system(size: 12))

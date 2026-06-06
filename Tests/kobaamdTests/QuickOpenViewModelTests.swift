@@ -55,6 +55,32 @@ struct QuickOpenViewModelTests {
         #expect(vm.selectedItem?.url.lastPathComponent == "Readme.md")
     }
 
+    @Test("scopedTo は指定ルート配下のファイルのみインデックスする")
+    func scopedIndexFiltersOutsideRoot() throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kobaamd-qo-scope-\(UUID().uuidString)", isDirectory: true)
+        let session = parent.appendingPathComponent("session", isDirectory: true)
+        let other = parent.appendingPathComponent("other", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        try Data().write(to: session.appendingPathComponent("in-scope.md"))
+        try Data().write(to: other.appendingPathComponent("out-scope.md"))
+
+        let sessionFolder = WorkspaceFolder(url: session, nodes: FileService().loadNodes(at: session))
+        let otherFolder = WorkspaceFolder(url: other, nodes: FileService().loadNodes(at: other))
+        let vm = QuickOpenViewModel()
+        vm.indexFiles(from: [sessionFolder, otherFolder], scopedTo: session)
+
+        vm.query = ""
+        vm.filter()
+        #expect(vm.candidates.count == 1)
+        #expect(vm.candidates.first?.fileName == "in-scope.md")
+        #expect(vm.isWithinScope(session.appendingPathComponent("in-scope.md")))
+        #expect(!vm.isWithinScope(other.appendingPathComponent("out-scope.md")))
+    }
+
     @Test("selectNext / selectPrev は端でクランプされる")
     func selectionNavigationClampsAtEdges() throws {
         let vm = try makeVM(withFileNames: ["a.md", "b.md", "c.md"])

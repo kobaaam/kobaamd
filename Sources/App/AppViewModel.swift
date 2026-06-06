@@ -117,7 +117,10 @@ final class AppViewModel {
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
     func refreshQuickOpenIndex() {
-        quickOpenViewModel.indexFiles(from: fileTreeViewModel.folders)
+        quickOpenViewModel.indexFiles(
+            from: fileTreeViewModel.folders,
+            scopedTo: fileTreeViewModel.rootURL
+        )
         quickOpenViewModel.filter()
         let folderURLs = fileTreeViewModel.folders.map(\.url)
         todoViewModel.updateWorkspaceRoots(folderURLs)
@@ -150,6 +153,33 @@ final class AppViewModel {
     func openFileAndJump(url: URL, line: Int) async {
         await openFile(url: url)
         pendingJumpLine = line
+    }
+
+    /// 新規作成した成果物を開く（KMD-228）。`autoOpenNewArtifacts` が OFF のときは URL のみセット。
+    @MainActor
+    func openNewArtifact(url: URL) async {
+        AppState.saveLastFile(url)
+        guard AppState.shared.autoOpenNewArtifacts else {
+            selectedFileURL = url
+            editorText = ""
+            markSaved()
+            return
+        }
+        await openFile(url: url)
+    }
+
+    /// セッション切替時にエディタ・タブ・プレビュー状態をクリアする（KMD-224）。
+    func resetEditorStateForSessionSwitch() {
+        flushActiveTab()
+        tabs = []
+        activate(tab: nil)
+        isDiffMode = false
+        pendingJumpLine = nil
+        outlineViewModel.update(text: "")
+        backlinksViewModel.refresh(
+            currentURL: nil,
+            workspaceFolders: fileTreeViewModel.folders.map(\.url)
+        )
     }
 
     /// 新しい空タブを追加する。

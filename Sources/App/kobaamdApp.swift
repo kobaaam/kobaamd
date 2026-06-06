@@ -10,13 +10,19 @@ struct kobaamdApp: App {
 
     var body: some Scene {
         WindowGroup("kobaamd") {
-            MainWindowView()
-                .environment(appViewModel)
-                .alert("Error", isPresented: Bindable(appViewModel).showError) {
-                    Button("OK") {}
-                } message: {
-                    Text(appViewModel.errorMessage ?? "")
+            Group {
+                if AppState.shared.useE1Shell {
+                    E1MainWindowView()
+                } else {
+                    MainWindowView()
                 }
+            }
+            .environment(appViewModel)
+            .alert("Error", isPresented: Bindable(appViewModel).showError) {
+                Button("OK") {}
+            } message: {
+                Text(appViewModel.errorMessage ?? "")
+            }
         }
         .handlesExternalEvents(matching: ["*"])
         .defaultSize(width: 1000, height: 680)
@@ -92,6 +98,17 @@ struct kobaamdApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
             }
+            CommandMenu("E1") {
+                Button("フォーカス: ターミナル") { AppCommand.e1FocusTerminal.post() }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("フォーカス: ビューア") { AppCommand.e1FocusViewer.post() }
+                    .keyboardShortcut("2", modifiers: .command)
+                Button("フォーカス: ファイル") { AppCommand.e1FocusFiles.post() }
+                    .keyboardShortcut("3", modifiers: .command)
+                Divider()
+                Button("Markdown Split の表示/非表示") { AppCommand.e1ToggleMdSplit.post() }
+                    .keyboardShortcut("\\", modifiers: .command)
+            }
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
@@ -147,6 +164,13 @@ extension Notification.Name {
     static let confluenceSyncRequested         = AppCommand.confluenceSync.notificationName
     static let confluencePageSettingsRequested = AppCommand.confluencePageSettings.notificationName
     static let quickOpenRequested              = AppCommand.quickOpen.notificationName
+    static let e1FocusTerminalRequested        = AppCommand.e1FocusTerminal.notificationName
+    static let e1FocusViewerRequested          = AppCommand.e1FocusViewer.notificationName
+    static let e1FocusFilesRequested           = AppCommand.e1FocusFiles.notificationName
+    static let e1ToggleMdSplitRequested          = AppCommand.e1ToggleMdSplit.notificationName
+    static let e1FocusEditorRequested          = Notification.Name("kobaamd.e1FocusEditorRequested")
+    static let e1FocusTerminalPane             = Notification.Name("kobaamd.e1FocusTerminalPane")
+    static let e1FocusFileTree                 = Notification.Name("kobaamd.e1FocusFileTree")
     static let cancelAIGenerationRequested     = AppCommand.cancelAIGeneration.notificationName
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")

@@ -127,6 +127,15 @@ struct EditorObserver: NSViewRepresentable {
                 current = parent
             }
 
+            NotificationCenter.default.addObserver(
+                forName: .e1FocusEditorRequested,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let tv = self?.textViewRef else { return }
+                tv.window?.makeFirstResponder(tv)
+            }
+
             insertSnippetObserver = NotificationCenter.default.addObserver(
                 forName: .insertSnippetAtCursor,
                 object: nil,

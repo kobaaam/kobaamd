@@ -6,6 +6,7 @@ final class FileService {
     static let supportedExtensions: Set<String> = [
         "d2",
         "md", "markdown",
+        "csv",
         "txt", "text",
         "json", "yaml", "yml", "toml",
         "swift", "py", "rb", "js", "ts", "jsx", "tsx",

@@ -71,6 +71,7 @@ struct FileTreeView: View {
     private func select(node: FileNode) {
         guard !node.isDirectory else { return }
         fileTreeViewModel.selectedNode = node
+        fileTreeViewModel.clearNewMark(for: node.url)
         appViewModel.isFileLoading = true
         AppState.saveLastFile(node.url)
         Task.detached {
@@ -116,7 +117,7 @@ struct FileTreeView: View {
 
 // MARK: - Per-folder section
 
-private struct FolderSection: View {
+struct FolderSection: View {
     @Binding var folder: WorkspaceFolder
     var fileTreeViewModel: FileTreeViewModel
     @Binding var renamingNode: FileNode?
@@ -157,10 +158,7 @@ private struct FolderSection: View {
                     Button {
                         do {
                             let url = try fileTreeViewModel.createNewFile(in: folder.url)
-                            appViewModel.selectedFileURL = url
-                            appViewModel.editorText = ""
-                            appViewModel.markSaved()
-                            AppState.saveLastFile(url)
+                            Task { await appViewModel.openNewArtifact(url: url) }
                         } catch {
                             appViewModel.showAppError(.fileWriteFailed(url: folder.url, underlying: error))
                         }
@@ -203,23 +201,33 @@ private struct NodeRow: View {
     @Environment(AppViewModel.self) private var appViewModel
 
     var body: some View {
-        Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
-            .lineLimit(1)
-            .font(.system(size: 12))
-            .foregroundStyle(Color.kobaInk)
-            .onTapGesture {
-                guard !node.isDirectory else { return }
-                onSelect(node)
+        HStack(spacing: 6) {
+            Label(node.name, systemImage: node.isDirectory ? "folder" : iconName(for: node.url))
+                .lineLimit(1)
+            if !node.isDirectory, fileTreeViewModel.isNewFile(node.url) {
+                Text("NEW")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.kobaAccent)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.kobaAccent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .accessibilityLabel("新規ファイル")
             }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(Color.kobaInk)
+        .onTapGesture {
+            guard !node.isDirectory else { return }
+            onSelect(node)
+        }
             .contextMenu {
                 if node.isDirectory {
                     Button {
                         do {
                             let newURL = try fileTreeViewModel.createNewFile(in: node.url)
-                            appViewModel.selectedFileURL = newURL
-                            appViewModel.editorText = ""
-                            appViewModel.markSaved()
-                            AppState.saveLastFile(newURL)
+                            Task { await appViewModel.openNewArtifact(url: newURL) }
                             renamingNode = FileNode(name: newURL.lastPathComponent,
                                                     url: newURL,
                                                     isDirectory: false,
@@ -252,6 +260,7 @@ private struct NodeRow: View {
     private func iconName(for url: URL) -> String {
         switch url.pathExtension.lowercased() {
         case "md", "markdown": return "doc.text"
+        case "csv":            return "tablecells"
         case "swift":          return "swift"
         case "json", "yaml", "yml", "toml": return "curlybraces"
         case "html", "css", "scss", "xml": return "globe"

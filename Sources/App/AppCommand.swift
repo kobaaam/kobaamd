@@ -24,6 +24,10 @@ enum AppCommand: String {
     case toggleBold             = "kobaamd.toggleBoldRequested"
     case toggleItalic           = "kobaamd.toggleItalicRequested"
     case insertLink             = "kobaamd.insertLinkRequested"
+    case e1FocusTerminal        = "kobaamd.e1FocusTerminalRequested"
+    case e1FocusViewer          = "kobaamd.e1FocusViewerRequested"
+    case e1FocusFiles           = "kobaamd.e1FocusFilesRequested"
+    case e1ToggleMdSplit        = "kobaamd.e1ToggleMdSplitRequested"
 
     var notificationName: Notification.Name { Notification.Name(rawValue) }
 

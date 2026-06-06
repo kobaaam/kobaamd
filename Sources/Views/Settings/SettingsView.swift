@@ -97,6 +97,13 @@ struct SettingsView: View {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
 
+            Section("E1 シェル（実験的）") {
+                Toggle("E1 シェル（実験的）", isOn: $appState.useE1Shell)
+                Text("Session rail | Terminal | Viewer の開発中レイアウトです。変更は再起動後に反映されます。DEBUG ビルドは未設定時 ON、Release は OFF です。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("テンプレート") {
                 HStack {
                     Text("カスタムテンプレートフォルダ")
@@ -176,7 +183,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 560)
+        .frame(width: 520, height: 600)
         .navigationTitle("設定")
     }
 
