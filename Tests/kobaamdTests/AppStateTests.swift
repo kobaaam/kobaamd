@@ -122,6 +122,9 @@ struct AppStateTests {
         state.showHiddenFiles = true
         #expect(defaults.bool(forKey: "showHiddenFiles") == true)
         #expect(state.showHiddenFiles == true)
+        state.showHiddenFiles = false
+        #expect(defaults.bool(forKey: "showHiddenFiles") == false)
+        #expect(state.showHiddenFiles == false)
     }
 
     @Test("terminalFontSize defaults to 14 and persists")

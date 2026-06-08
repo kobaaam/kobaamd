@@ -18,6 +18,7 @@ import Observation
     private static let maxRecentFiles     = 10
     private static let selectedThemeKey   = "selectedColorTheme"
     private static let terminalFontSizeKey = "terminalFontSize"
+    private static let showHiddenFilesKey = "showHiddenFiles"
 
     enum CodeFontSize {
         static let min: Double = 11
@@ -43,12 +44,20 @@ import Observation
         }
     }
 
+    /// ファイルツリーにドット始まりの項目（`.scratch`, `.git` 等）を含める。
+    var showHiddenFiles: Bool {
+        didSet {
+            defaults.set(showHiddenFiles, forKey: Self.showHiddenFilesKey)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.dark.rawValue
         self.selectedTheme = ColorTheme(rawValue: raw) ?? .dark
         let storedFontSize = defaults.double(forKey: Self.terminalFontSizeKey)
         self.terminalFontSize = storedFontSize > 0 ? storedFontSize : Self.CodeFontSize.defaultSize
+        self.showHiddenFiles = defaults.bool(forKey: Self.showHiddenFilesKey)
     }
 
     func adjustCodeFontSize(by delta: Double) {
@@ -91,12 +100,6 @@ import Observation
             return defaults.bool(forKey: "useE1Shell")
         }
         set { defaults.set(newValue, forKey: "useE1Shell") }
-    }
-
-    /// ファイルツリーにドット始まりの項目（`.scratch`, `.git` 等）を含める。
-    var showHiddenFiles: Bool {
-        get { defaults.bool(forKey: "showHiddenFiles") }
-        set { defaults.set(newValue, forKey: "showHiddenFiles") }
     }
 
     // MARK: - Instance API (preferred for testing)
