@@ -26,6 +26,17 @@ struct SettingsView: View {
                 }
             }
 
+            Section("ファイル") {
+                Toggle("隠しファイルを表示", isOn: $appState.showHiddenFiles)
+                    .onChange(of: appState.showHiddenFiles) { _, _ in
+                        appViewModel.fileTreeViewModel.reload()
+                        appViewModel.refreshQuickOpenIndex()
+                    }
+                Text("ON にすると `.scratch` や `.git` などドット始まりのフォルダが Files に表示されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Formatting") {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }

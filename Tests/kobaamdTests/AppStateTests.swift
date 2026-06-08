@@ -116,6 +116,14 @@ struct AppStateTests {
         #expect(state.useE1Shell == false)
     }
 
+    @Test("showHiddenFiles defaults to false and persists")
+    func showHiddenFilesPersists() {
+        #expect(state.showHiddenFiles == false)
+        state.showHiddenFiles = true
+        #expect(defaults.bool(forKey: "showHiddenFiles") == true)
+        #expect(state.showHiddenFiles == true)
+    }
+
     // MARK: - Color theme
 
     @Test("selectedTheme assignment persists raw value to UserDefaults")

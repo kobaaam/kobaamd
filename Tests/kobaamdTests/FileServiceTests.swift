@@ -96,8 +96,8 @@ struct FileServiceTests {
         #expect(svc.loadNodes(at: tmpDir).isEmpty)
     }
 
-    @Test("Dot directories with supported files are visible")
-    func loadNodesIncludesScratchDirectory() throws {
+    @Test("Hidden off skips dot directories")
+    func loadNodesHidesScratchWhenHiddenOff() throws {
         let scratch = tmpDir.appendingPathComponent(".scratch/member-create", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         try "# PRD".write(
@@ -106,23 +106,32 @@ struct FileServiceTests {
             encoding: .utf8
         )
 
-        let nodes = svc.loadNodes(at: tmpDir)
-        let scratchNode = nodes.first { $0.name == ".scratch" }
-        #expect(scratchNode != nil)
-        #expect(scratchNode?.isDirectory == true)
-        let prd = scratchNode?.children?.first { $0.name == "member-create" }?
-            .children?.first { $0.name == "PRD.md" }
-        #expect(prd != nil)
+        let names = svc.loadNodes(at: tmpDir, showHiddenFiles: false).map(\.name)
+        #expect(!names.contains(".scratch"))
     }
 
-    @Test("Excluded dot directories are hidden")
-    func loadNodesHidesGitDirectory() throws {
+    @Test("Hidden on shows scratch and empty dot directories like .git")
+    func loadNodesShowsDotDirectoriesWhenHiddenOn() throws {
+        let scratch = tmpDir.appendingPathComponent(".scratch/member-create", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        try "# PRD".write(
+            to: scratch.appendingPathComponent("PRD.md"),
+            atomically: true,
+            encoding: .utf8
+        )
         let gitDir = tmpDir.appendingPathComponent(".git/objects", isDirectory: true)
         try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
         try "obj".write(to: gitDir.appendingPathComponent("dummy"), atomically: true, encoding: .utf8)
 
-        let names = svc.loadNodes(at: tmpDir).map(\.name)
-        #expect(!names.contains(".git"))
+        let nodes = svc.loadNodes(at: tmpDir, showHiddenFiles: true)
+        let names = nodes.map(\.name)
+        #expect(names.contains(".scratch"))
+        #expect(names.contains(".git"))
+
+        let scratchNode = nodes.first { $0.name == ".scratch" }
+        let prd = scratchNode?.children?.first { $0.name == "member-create" }?
+            .children?.first { $0.name == "PRD.md" }
+        #expect(prd != nil)
     }
 
     // MARK: - createNewFile
