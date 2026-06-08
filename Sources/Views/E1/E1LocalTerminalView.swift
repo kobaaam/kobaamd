@@ -87,6 +87,26 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
     }
 }
 
+enum E1TerminalTypography {
+    static let defaultSize: CGFloat = 14
+    private static let fontCandidates = [
+        "SFMono-Regular",
+        "SF Mono",
+        "Menlo-Regular",
+        "Menlo",
+        "Monaco",
+    ]
+
+    static func monospaceFont(size: CGFloat) -> NSFont {
+        for name in fontCandidates {
+            if let font = NSFont(name: name, size: size) {
+                return font
+            }
+        }
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
+    }
+}
+
 enum E1TerminalPasteSupport {
     static func imageFromPasteboard(_ pasteboard: NSPasteboard) -> NSImage? {
         if let data = pasteboard.data(forType: .png), let image = NSImage(data: data) {

@@ -34,6 +34,12 @@ struct E1TerminalPaneView: View {
             let view = terminalController.terminalView(for: session)
             view.window?.makeFirstResponder(view)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .e1TerminalAppearanceChanged)) { _ in
+            terminalController.refreshAppearance()
+        }
+        .onChange(of: AppState.shared.selectedTheme) { _, _ in
+            terminalController.refreshAppearance()
+        }
     }
 }
 

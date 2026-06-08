@@ -17,6 +17,7 @@ import Observation
     private static let workspaceBookmarks = "workspaceFolderBookmarks"
     private static let maxRecentFiles     = 10
     private static let selectedThemeKey   = "selectedColorTheme"
+    private static let terminalFontSizeKey = "terminalFontSize"
     private static let e1LocalSessionsKey = "e1LocalSessions"
     private static let e1ActiveSessionIDKey = "e1ActiveSessionID"
     private static let openTabURLsKey = "openTabURLs"
@@ -28,10 +29,19 @@ import Observation
         }
     }
 
+    /// ターミナルとエディタの等幅フォントサイズ（pt）。既定 14pt。
+    var terminalFontSize: Double {
+        didSet {
+            defaults.set(terminalFontSize, forKey: Self.terminalFontSizeKey)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.dark.rawValue
         self.selectedTheme = ColorTheme(rawValue: raw) ?? .dark
+        let storedFontSize = defaults.double(forKey: Self.terminalFontSizeKey)
+        self.terminalFontSize = storedFontSize > 0 ? storedFontSize : 14
     }
 
     var autoFormatOnSave: Bool {

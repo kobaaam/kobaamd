@@ -64,10 +64,18 @@ final class E1TerminalSessionController {
         accessOrder.removeAll { $0 == id }
         accessOrder.append(id)
     }
+
+    func refreshAppearance() {
+        for view in terminals.values {
+            view.configureAppearance()
+        }
+    }
 }
 
-private extension E1LocalTerminalView {
+extension E1LocalTerminalView {
     func configureAppearance(theme: ColorTheme = AppState.shared.selectedTheme) {
+        let size = CGFloat(AppState.shared.terminalFontSize)
+        font = E1TerminalTypography.monospaceFont(size: size)
         nativeForegroundColor = theme.editorText
         nativeBackgroundColor = theme.editorBackground
     }

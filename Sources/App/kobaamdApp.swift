@@ -137,6 +137,7 @@ extension Notification.Name {
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let previewScrollRatioChanged = Notification.Name("kobaamd.previewScrollRatioChanged")
+    static let e1TerminalAppearanceChanged = Notification.Name("kobaamd.e1TerminalAppearanceChanged")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")

@@ -17,7 +17,12 @@ struct NSTextViewWrapper: View {
 
     private var paperColor: Color { Color(appState.selectedTheme.editorBackground) }
     private var inkColor: Color   { Color(appState.selectedTheme.editorText) }
-    private static let editorFont = Font.system(size: 14, design: .monospaced)
+    private var editorFont: Font {
+        Font(E1TerminalTypography.monospaceFont(size: CGFloat(appState.terminalFontSize)))
+    }
+    private var editorLineSpacing: CGFloat {
+        CGFloat(appState.terminalFontSize) * 0.43
+    }
 
     init(binding: Binding<String>, scrollRatio: Binding<Double>) {
         self._text        = binding
@@ -26,8 +31,8 @@ struct NSTextViewWrapper: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(Self.editorFont)
-            .lineSpacing(6)
+            .font(editorFont)
+            .lineSpacing(editorLineSpacing)
             .foregroundStyle(inkColor)
             .scrollContentBackground(.hidden)
             .background(

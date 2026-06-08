@@ -124,6 +124,14 @@ struct AppStateTests {
         #expect(state.showHiddenFiles == true)
     }
 
+    @Test("terminalFontSize defaults to 14 and persists")
+    func terminalFontSizePersists() {
+        #expect(state.terminalFontSize == 14)
+        state.terminalFontSize = 16
+        #expect(defaults.double(forKey: "terminalFontSize") == 16)
+        #expect(state.terminalFontSize == 16)
+    }
+
     // MARK: - Color theme
 
     @Test("selectedTheme assignment persists raw value to UserDefaults")

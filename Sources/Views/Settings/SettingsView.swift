@@ -24,6 +24,23 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(width: 160)
                 }
+                .onChange(of: appState.selectedTheme) { _, _ in
+                    NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
+                }
+                LabeledContent("コードフォント") {
+                    HStack(spacing: 8) {
+                        Slider(value: $appState.terminalFontSize, in: 11...22, step: 1)
+                        Text("\(Int(appState.terminalFontSize)) pt")
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
+                .onChange(of: appState.terminalFontSize) { _, _ in
+                    NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
+                }
+                Text("ターミナルとエディタの等幅フォントサイズです。既定は 14pt（SF Mono）。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("ファイル") {
@@ -101,7 +118,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 480)
+        .frame(width: 520, height: 520)
         .navigationTitle("設定")
     }
 }
