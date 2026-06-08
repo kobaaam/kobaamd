@@ -3,6 +3,7 @@ import SwiftUI
 struct FileTreeView: View {
     @Bindable var fileTreeViewModel: FileTreeViewModel
     @Environment(AppViewModel.self) private var appViewModel
+    @Bindable private var appState = AppState.shared
 
     @State private var renamingNode: FileNode? = nil
     @State private var showRenameAlert: Bool = false
@@ -12,6 +13,16 @@ struct FileTreeView: View {
 
     var body: some View {
         List {
+            Toggle("隠しファイルを表示", isOn: $appState.showHiddenFiles)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 11))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .onChange(of: appState.showHiddenFiles) { _, _ in
+                    fileTreeViewModel.reload()
+                    appViewModel.refreshQuickOpenIndex()
+                }
+
             // ── Add Folder to Workspace ───────────────────────────
             Button {
                 fileTreeViewModel.addFolder()
