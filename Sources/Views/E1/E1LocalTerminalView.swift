@@ -33,7 +33,7 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
 
     /// Kitty keyboard protocol — Shift+Enter と修飾キーを Claude Code が識別できるようにする。
     func enableClaudeCodeKeyboard() {
-        feed(text: "\u{1b}[>1u")
+        feed(text: E1TerminalKeyboardSupport.enableKittyDisambiguate)
     }
 
     override func paste(_ sender: Any) {
@@ -44,17 +44,30 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
     private func installKeyMonitorIfNeeded() {
         guard window != nil, keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.window?.firstResponder === self else { return event }
-            if self.handleShiftEnter(event) { return nil }
+            guard let self, self.isReceivingKeyboardFocus else { return event }
+            if self.sendShiftEnterIfNeeded(event) { return nil }
             if self.handleOptionVImagePaste(event) { return nil }
             return event
         }
     }
 
-    private func handleShiftEnter(_ event: NSEvent) -> Bool {
-        guard event.keyCode == 36, event.modifierFlags.contains(.shift) else { return false }
-        guard terminal.keyboardEnhancementFlags.isEmpty else { return false }
-        send(txt: "\n")
+    private var isReceivingKeyboardFocus: Bool {
+        guard let window, let responder = window.firstResponder else { return false }
+        if responder === self { return true }
+        guard let view = responder as? NSView else { return false }
+        return view.isDescendant(of: self)
+    }
+
+    /// Claude Code のプロンプト改行（cmux 同等）— Kitty CSI u `\e[13;2u` を常に送る。
+    @discardableResult
+    private func sendShiftEnterIfNeeded(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 36 else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(.shift),
+              !flags.contains(.command),
+              !flags.contains(.control),
+              !flags.contains(.option) else { return false }
+        send(txt: E1TerminalKeyboardSupport.shiftEnter)
         return true
     }
 
@@ -85,6 +98,13 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         }
         return true
     }
+}
+
+enum E1TerminalKeyboardSupport {
+    /// Push kitty disambiguate mode (Shift+Enter 等を CSI u で送れるようにする).
+    static let enableKittyDisambiguate = "\u{1b}[>1u"
+    /// Shift+Enter — Claude Code / Ink が改行として扱うシーケンス。
+    static let shiftEnter = "\u{1b}[13;2u"
 }
 
 enum E1TerminalTypography {
