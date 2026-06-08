@@ -59,6 +59,12 @@ import Observation
         set { defaults.set(newValue, forKey: "useE1Shell") }
     }
 
+    /// ファイルツリーにドット始まりの項目（`.scratch`, `.git` 等）を含める。
+    var showHiddenFiles: Bool {
+        get { defaults.bool(forKey: "showHiddenFiles") }
+        set { defaults.set(newValue, forKey: "showHiddenFiles") }
+    }
+
     // MARK: - Instance API (preferred for testing)
 
     func saveLastFolder(_ url: URL) {

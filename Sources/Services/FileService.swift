@@ -15,18 +15,14 @@ final class FileService {
         "gitignore", "env", "conf", "ini", "log"
     ]
 
-    /// ファイルツリーに出さないディレクトリ（`.scratch` 等のドットディレクトリは対象外）
-    static let excludedDirectoryNames: Set<String> = [
-        ".git", ".svn", ".hg", ".bzr",
-        "node_modules", ".build", "DerivedData",
-        "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache",
-        ".gradle", "Pods", "Carthage", ".bundle",
+    /// macOS システム由来でツリーに出す意味がないディレクトリ（設定に関わらず除外）
+    static let alwaysExcludedDirectoryNames: Set<String> = [
         ".Trash", ".Spotlight-V100", ".DocumentRevisions-V100", ".fseventsd",
     ]
 
-    func loadNodes(at url: URL) -> [FileNode] {
+    func loadNodes(at url: URL, showHiddenFiles: Bool = AppState.shared.showHiddenFiles) -> [FileNode] {
         guard isDirectory(url) else { return [] }
-        return children(of: url)
+        return children(of: url, showHiddenFiles: showHiddenFiles)
     }
 
     func readFile(at url: URL) throws -> String {
@@ -52,22 +48,36 @@ final class FileService {
         return folderURL
     }
 
-    private func children(of directory: URL, depth: Int = 0, maxDepth: Int = 5) -> [FileNode] {
+    private func children(
+        of directory: URL,
+        depth: Int = 0,
+        maxDepth: Int = 5,
+        showHiddenFiles: Bool
+    ) -> [FileNode] {
         guard depth < maxDepth else { return [] }
         do {
+            let listingOptions: FileManager.DirectoryEnumerationOptions =
+                showHiddenFiles ? [] : [.skipsHiddenFiles]
             let contents = try fileManager.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: [.isDirectoryKey],
-                options: []
+                options: listingOptions
             )
             var nodes = [FileNode]()
             for item in contents {
                 let name = item.lastPathComponent
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
-                    if Self.excludedDirectoryNames.contains(name) { continue }
-                    let childNodes = children(of: item, depth: depth + 1, maxDepth: maxDepth)
-                    guard !childNodes.isEmpty else { continue }
+                    if Self.alwaysExcludedDirectoryNames.contains(name) { continue }
+                    let childNodes = children(
+                        of: item,
+                        depth: depth + 1,
+                        maxDepth: maxDepth,
+                        showHiddenFiles: showHiddenFiles
+                    )
+                    let isDotDirectory = name.hasPrefix(".")
+                    let includeDirectory = !childNodes.isEmpty || (showHiddenFiles && isDotDirectory)
+                    guard includeDirectory else { continue }
                     nodes.append(FileNode(name: name, url: item, isDirectory: true, children: childNodes))
                 } else if Self.supportedExtensions.contains(item.pathExtension.lowercased()) {
                     nodes.append(FileNode(name: name, url: item, isDirectory: false, children: nil))
