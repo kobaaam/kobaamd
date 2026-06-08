@@ -96,6 +96,35 @@ struct FileServiceTests {
         #expect(svc.loadNodes(at: tmpDir).isEmpty)
     }
 
+    @Test("Dot directories with supported files are visible")
+    func loadNodesIncludesScratchDirectory() throws {
+        let scratch = tmpDir.appendingPathComponent(".scratch/member-create", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        try "# PRD".write(
+            to: scratch.appendingPathComponent("PRD.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let nodes = svc.loadNodes(at: tmpDir)
+        let scratchNode = nodes.first { $0.name == ".scratch" }
+        #expect(scratchNode != nil)
+        #expect(scratchNode?.isDirectory == true)
+        let prd = scratchNode?.children?.first { $0.name == "member-create" }?
+            .children?.first { $0.name == "PRD.md" }
+        #expect(prd != nil)
+    }
+
+    @Test("Excluded dot directories are hidden")
+    func loadNodesHidesGitDirectory() throws {
+        let gitDir = tmpDir.appendingPathComponent(".git/objects", isDirectory: true)
+        try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
+        try "obj".write(to: gitDir.appendingPathComponent("dummy"), atomically: true, encoding: .utf8)
+
+        let names = svc.loadNodes(at: tmpDir).map(\.name)
+        #expect(!names.contains(".git"))
+    }
+
     // MARK: - createNewFile
 
     @Test("Missing extension gets .md added")
