@@ -105,6 +105,19 @@ enum E1TerminalTypography {
         }
         return NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
     }
+
+    /// 丸数字などの記号を潰さないよう、等幅本体 + 記号フォントのカスケードを付ける。
+    static func codeFont(size: CGFloat) -> NSFont {
+        let base = monospaceFont(size: size)
+        let cascades: [NSFontDescriptor] = [
+            NSFontDescriptor(fontAttributes: [.family: "Apple Symbols"]),
+            NSFontDescriptor(fontAttributes: [.family: "Hiragino Sans"]),
+        ]
+        let descriptor = base.fontDescriptor.addingAttributes([
+            .cascadeList: cascades,
+        ])
+        return NSFont(descriptor: descriptor, size: size) ?? base
+    }
 }
 
 enum E1TerminalPasteSupport {

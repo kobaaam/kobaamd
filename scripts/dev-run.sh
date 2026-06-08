@@ -54,6 +54,7 @@ graceful_quit_dev() {
 build_and_launch() {
   echo "[dev-run] $(date '+%H:%M:%S') building…"
   graceful_quit_dev
+  ./scripts/apply-swiftterm-patches.sh
   swift build
   ./scripts/post-build.sh debug dev
   echo "[dev-run] launching $APP (production kobaamd is untouched)"

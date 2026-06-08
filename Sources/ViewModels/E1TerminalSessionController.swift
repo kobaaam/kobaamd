@@ -75,7 +75,7 @@ final class E1TerminalSessionController {
 extension E1LocalTerminalView {
     func configureAppearance(theme: ColorTheme = AppState.shared.selectedTheme) {
         let size = CGFloat(AppState.shared.terminalFontSize)
-        font = E1TerminalTypography.monospaceFont(size: size)
+        font = E1TerminalTypography.codeFont(size: size)
         nativeForegroundColor = theme.editorText
         nativeBackgroundColor = theme.editorBackground
     }

@@ -18,7 +18,7 @@ struct NSTextViewWrapper: View {
     private var paperColor: Color { Color(appState.selectedTheme.editorBackground) }
     private var inkColor: Color   { Color(appState.selectedTheme.editorText) }
     private var editorFont: Font {
-        Font(E1TerminalTypography.monospaceFont(size: CGFloat(appState.terminalFontSize)))
+        Font(E1TerminalTypography.codeFont(size: CGFloat(appState.terminalFontSize)))
     }
     private var editorLineSpacing: CGFloat {
         CGFloat(appState.terminalFontSize) * 0.43

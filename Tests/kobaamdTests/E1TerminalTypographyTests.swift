@@ -17,4 +17,12 @@ struct E1TerminalTypographyTests {
         let name = font.fontName.lowercased()
         #expect(name.contains("sfmono") || name.contains("menlo") || name.contains("monaco"))
     }
+
+    @Test("codeFont keeps monospace body with symbol cascade")
+    func codeFontHasCascade() {
+        let font = E1TerminalTypography.codeFont(size: 14)
+        #expect(font.isFixedPitch)
+        let cascades = font.fontDescriptor.object(forKey: .cascadeList) as? [NSFontDescriptor] ?? []
+        #expect(!cascades.isEmpty)
+    }
 }
