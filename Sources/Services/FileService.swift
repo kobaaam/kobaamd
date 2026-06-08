@@ -15,6 +15,15 @@ final class FileService {
         "gitignore", "env", "conf", "ini", "log"
     ]
 
+    /// ファイルツリーに出さないディレクトリ（`.scratch` 等のドットディレクトリは対象外）
+    static let excludedDirectoryNames: Set<String> = [
+        ".git", ".svn", ".hg", ".bzr",
+        "node_modules", ".build", "DerivedData",
+        "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache",
+        ".gradle", "Pods", "Carthage", ".bundle",
+        ".Trash", ".Spotlight-V100", ".DocumentRevisions-V100", ".fseventsd",
+    ]
+
     func loadNodes(at url: URL) -> [FileNode] {
         guard isDirectory(url) else { return [] }
         return children(of: url)
@@ -49,16 +58,19 @@ final class FileService {
             let contents = try fileManager.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
+                options: []
             )
             var nodes = [FileNode]()
             for item in contents {
+                let name = item.lastPathComponent
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
-                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: true,
-                                         children: children(of: item, depth: depth + 1, maxDepth: maxDepth)))
-                } else if FileService.supportedExtensions.contains(item.pathExtension.lowercased()) {
-                    nodes.append(FileNode(name: item.lastPathComponent, url: item, isDirectory: false, children: nil))
+                    if Self.excludedDirectoryNames.contains(name) { continue }
+                    let childNodes = children(of: item, depth: depth + 1, maxDepth: maxDepth)
+                    guard !childNodes.isEmpty else { continue }
+                    nodes.append(FileNode(name: name, url: item, isDirectory: true, children: childNodes))
+                } else if Self.supportedExtensions.contains(item.pathExtension.lowercased()) {
+                    nodes.append(FileNode(name: name, url: item, isDirectory: false, children: nil))
                 }
             }
             nodes.sort { lhs, rhs in
