@@ -29,14 +29,34 @@ struct SettingsView: View {
                 }
                 LabeledContent("コードフォント") {
                     HStack(spacing: 8) {
-                        Slider(value: $appState.terminalFontSize, in: 11...22, step: 1)
+                        Button {
+                            appState.adjustCodeFontSize(by: -AppState.CodeFontSize.step)
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(appState.terminalFontSize <= AppState.CodeFontSize.min)
+
+                        Slider(
+                            value: $appState.terminalFontSize,
+                            in: AppState.CodeFontSize.min...AppState.CodeFontSize.max,
+                            step: AppState.CodeFontSize.step
+                        )
                         Text("\(Int(appState.terminalFontSize)) pt")
                             .monospacedDigit()
                             .frame(width: 40, alignment: .trailing)
+
+                        Button {
+                            appState.adjustCodeFontSize(by: AppState.CodeFontSize.step)
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(appState.terminalFontSize >= AppState.CodeFontSize.max)
                     }
                 }
                 .onChange(of: appState.terminalFontSize) { _, _ in
-                    NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
+                    AppState.postCodeFontAppearanceChanged()
                 }
                 Text("ターミナルとエディタの等幅フォントサイズです。既定は 14pt（SF Mono）。")
                     .font(.caption)

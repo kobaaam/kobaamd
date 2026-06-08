@@ -132,6 +132,23 @@ struct AppStateTests {
         #expect(state.terminalFontSize == 16)
     }
 
+    @Test("adjustCodeFontSize clamps to configured range")
+    func adjustCodeFontSizeClamps() {
+        state.terminalFontSize = AppState.CodeFontSize.max
+        state.adjustCodeFontSize(by: 1)
+        #expect(state.terminalFontSize == AppState.CodeFontSize.max)
+
+        state.terminalFontSize = AppState.CodeFontSize.min
+        state.adjustCodeFontSize(by: -1)
+        #expect(state.terminalFontSize == AppState.CodeFontSize.min)
+
+        state.terminalFontSize = 14
+        state.adjustCodeFontSize(by: 2)
+        #expect(state.terminalFontSize == 16)
+        state.resetCodeFontSize()
+        #expect(state.terminalFontSize == AppState.CodeFontSize.defaultSize)
+    }
+
     // MARK: - Color theme
 
     @Test("selectedTheme assignment persists raw value to UserDefaults")

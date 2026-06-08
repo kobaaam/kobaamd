@@ -18,6 +18,13 @@ import Observation
     private static let maxRecentFiles     = 10
     private static let selectedThemeKey   = "selectedColorTheme"
     private static let terminalFontSizeKey = "terminalFontSize"
+
+    enum CodeFontSize {
+        static let min: Double = 11
+        static let max: Double = 22
+        static let defaultSize: Double = 14
+        static let step: Double = 1
+    }
     private static let e1LocalSessionsKey = "e1LocalSessions"
     private static let e1ActiveSessionIDKey = "e1ActiveSessionID"
     private static let openTabURLsKey = "openTabURLs"
@@ -41,7 +48,24 @@ import Observation
         let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.dark.rawValue
         self.selectedTheme = ColorTheme(rawValue: raw) ?? .dark
         let storedFontSize = defaults.double(forKey: Self.terminalFontSizeKey)
-        self.terminalFontSize = storedFontSize > 0 ? storedFontSize : 14
+        self.terminalFontSize = storedFontSize > 0 ? storedFontSize : Self.CodeFontSize.defaultSize
+    }
+
+    func adjustCodeFontSize(by delta: Double) {
+        let next = min(Self.CodeFontSize.max, max(Self.CodeFontSize.min, terminalFontSize + delta))
+        guard next != terminalFontSize else { return }
+        terminalFontSize = next
+        Self.postCodeFontAppearanceChanged()
+    }
+
+    func resetCodeFontSize() {
+        guard terminalFontSize != Self.CodeFontSize.defaultSize else { return }
+        terminalFontSize = Self.CodeFontSize.defaultSize
+        Self.postCodeFontAppearanceChanged()
+    }
+
+    static func postCodeFontAppearanceChanged() {
+        NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
     }
 
     var autoFormatOnSave: Bool {

@@ -86,6 +86,20 @@ struct kobaamdApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
             }
+            CommandMenu("表示") {
+                Button("コードフォントを大きく") {
+                    AppState.shared.adjustCodeFontSize(by: AppState.CodeFontSize.step)
+                }
+                .keyboardShortcut("=", modifiers: .command)
+                Button("コードフォントを小さく") {
+                    AppState.shared.adjustCodeFontSize(by: -AppState.CodeFontSize.step)
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                Button("コードフォントを既定値に戻す") {
+                    AppState.shared.resetCodeFontSize()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+            }
             CommandMenu("E1") {
                 Button("フォーカス: ターミナル") { AppCommand.e1FocusTerminal.post() }
                     .keyboardShortcut("1", modifiers: .command)

@@ -20,6 +20,8 @@ struct E1EditorStatusBar: View {
 
             Spacer()
 
+            codeFontSizeControl
+
             if appViewModel.lineCount > 0 {
                 statLabel("Ln \(appViewModel.lineCount)")
                 statLabel("\(appViewModel.wordCount) words")
@@ -37,6 +39,38 @@ struct E1EditorStatusBar: View {
         .padding(.vertical, 5)
         .background(chrome.chromeSurface)
         .overlay(KobaHDivider(), alignment: .top)
+    }
+
+    private var codeFontSizeControl: some View {
+        let chrome = appState.selectedTheme
+        return HStack(spacing: 2) {
+            Button {
+                appState.adjustCodeFontSize(by: -AppState.CodeFontSize.step)
+            } label: {
+                Image(systemName: "textformat.size.smaller")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(chrome.chromeMute)
+            .disabled(appState.terminalFontSize <= AppState.CodeFontSize.min)
+            .help("フォントを小さく (⌘-)")
+
+            Text("\(Int(appState.terminalFontSize)) pt")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(chrome.chromeMute2)
+                .frame(minWidth: 34)
+
+            Button {
+                appState.adjustCodeFontSize(by: AppState.CodeFontSize.step)
+            } label: {
+                Image(systemName: "textformat.size.larger")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(chrome.chromeMute)
+            .disabled(appState.terminalFontSize >= AppState.CodeFontSize.max)
+            .help("フォントを大きく (⌘+)")
+        }
     }
 
     private func statLabel(_ text: String) -> some View {
