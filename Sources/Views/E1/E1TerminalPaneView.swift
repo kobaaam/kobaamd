@@ -6,30 +6,21 @@ import SwiftTerm
 
 struct E1TerminalPaneView: View {
     @Bindable var coordinator: SessionCoordinator
-    @Bindable var appState = AppState.shared
     @State private var terminalController = E1TerminalSessionController()
 
     var body: some View {
-        let chrome = appState.selectedTheme
         ZStack {
             if let active = coordinator.activeTerminalSession {
-                ForEach(coordinator.terminalSessions) { session in
-                    let isActive = session.id == active.id
-                    E1TerminalRepresentable(
-                        terminal: terminalController.terminalView(for: session),
-                        isActive: isActive
-                    ) {
-                        if isActive {
-                            terminalController.ensureProcessStarted(for: session)
-                        }
-                    }
-                    .opacity(isActive ? 1 : 0)
-                    .allowsHitTesting(isActive)
+                E1TerminalRepresentable(
+                    terminal: terminalController.terminalView(for: active),
+                    sessionID: active.id
+                ) {
+                    terminalController.ensureProcessStarted(for: active)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(chrome.chromePaper)
+        .background(AppState.shared.selectedTheme.chromePaper)
         .onChange(of: coordinator.activeSessionID) { _, _ in
             guard let session = coordinator.activeTerminalSession else { return }
             terminalController.ensureProcessStarted(for: session)
@@ -47,20 +38,28 @@ struct E1TerminalPaneView: View {
 }
 
 private struct E1TerminalRepresentable: NSViewRepresentable {
-    let terminal: LocalProcessTerminalView
-    let isActive: Bool
+    let terminal: E1LocalTerminalView
+    let sessionID: UUID
     let onActivate: () -> Void
 
-    func makeNSView(context: Context) -> LocalProcessTerminalView {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> E1LocalTerminalView {
         terminal.translatesAutoresizingMaskIntoConstraints = false
         onActivate()
+        context.coordinator.activatedSessionID = sessionID
         return terminal
     }
 
-    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
-        if isActive {
-            onActivate()
-            nsView.window?.makeFirstResponder(nsView)
-        }
+    func updateNSView(_ nsView: E1LocalTerminalView, context: Context) {
+        guard context.coordinator.activatedSessionID != sessionID else { return }
+        context.coordinator.activatedSessionID = sessionID
+        onActivate()
+    }
+
+    final class Coordinator {
+        var activatedSessionID: UUID?
     }
 }
