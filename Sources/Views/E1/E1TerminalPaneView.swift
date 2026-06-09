@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import SwiftTerm
+import GhosttyTerminal
 
 // MARK: - E1 center pane: embedded terminal (KMD-225)
 
@@ -10,29 +10,28 @@ struct E1TerminalPaneView: View {
 
     var body: some View {
         ZStack {
-            if let active = coordinator.activeTerminalSession {
-                E1TerminalRepresentable(
-                    terminal: terminalController.terminalView(for: active),
-                    sessionID: active.id
-                ) {
-                    terminalController.ensureProcessStarted(for: active)
+            ForEach(coordinator.terminalSessions) { session in
+                if terminalController.hasTerminal(for: session.id) {
+                    let isActive = session.id == coordinator.activeSessionID
+                    E1TerminalRepresentable(
+                        terminal: terminalController.terminalView(for: session)!
+                    )
+                    .opacity(isActive ? 1 : 0)
+                    .allowsHitTesting(isActive)
+                    .accessibilityHidden(!isActive)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppState.shared.selectedTheme.chromePaper)
         .onChange(of: coordinator.activeSessionID) { _, _ in
-            guard let session = coordinator.activeTerminalSession else { return }
-            terminalController.ensureProcessStarted(for: session)
+            focusActiveTerminal()
         }
         .onAppear {
-            guard let session = coordinator.activeTerminalSession else { return }
-            terminalController.ensureProcessStarted(for: session)
+            focusActiveTerminal()
         }
         .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalPane)) { _ in
-            guard let session = coordinator.activeTerminalSession else { return }
-            let view = terminalController.terminalView(for: session)
-            view.window?.makeFirstResponder(view)
+            focusActiveTerminal()
         }
         .onReceive(NotificationCenter.default.publisher(for: .e1TerminalAppearanceChanged)) { _ in
             terminalController.refreshAppearance()
@@ -41,31 +40,26 @@ struct E1TerminalPaneView: View {
             terminalController.refreshAppearance()
         }
     }
+
+    private func focusActiveTerminal() {
+        guard let session = coordinator.activeTerminalSession else { return }
+        let view = terminalController.ensureProcessStarted(for: session)
+        DispatchQueue.main.async {
+            view.window?.makeFirstResponder(view)
+            view.fitToSize()
+        }
+    }
 }
 
 private struct E1TerminalRepresentable: NSViewRepresentable {
     let terminal: E1LocalTerminalView
-    let sessionID: UUID
-    let onActivate: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
 
     func makeNSView(context: Context) -> E1LocalTerminalView {
         terminal.translatesAutoresizingMaskIntoConstraints = false
-        onActivate()
-        context.coordinator.activatedSessionID = sessionID
         return terminal
     }
 
     func updateNSView(_ nsView: E1LocalTerminalView, context: Context) {
-        guard context.coordinator.activatedSessionID != sessionID else { return }
-        context.coordinator.activatedSessionID = sessionID
-        onActivate()
-    }
-
-    final class Coordinator {
-        var activatedSessionID: UUID?
+        nsView.fitToSize()
     }
 }

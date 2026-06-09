@@ -17,6 +17,7 @@ import Observation
     private static let workspaceBookmarks = "workspaceFolderBookmarks"
     private static let maxRecentFiles     = 10
     private static let selectedThemeKey   = "selectedColorTheme"
+    private static let terminalThemeUnifiedKey = "terminalThemeUnifiedToDark_v1"
     private static let terminalFontSizeKey = "terminalFontSize"
     private static let showHiddenFilesKey = "showHiddenFiles"
 
@@ -53,8 +54,16 @@ import Observation
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.dark.rawValue
-        self.selectedTheme = ColorTheme(rawValue: raw) ?? .dark
+        let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.e1Recommended.rawValue
+        var theme = ColorTheme(rawValue: raw) ?? .e1Recommended
+        if !defaults.bool(forKey: Self.terminalThemeUnifiedKey) {
+            if theme == .solarizedDark {
+                theme = .e1Recommended
+                defaults.set(ColorTheme.e1Recommended.rawValue, forKey: Self.selectedThemeKey)
+            }
+            defaults.set(true, forKey: Self.terminalThemeUnifiedKey)
+        }
+        self.selectedTheme = theme
         let storedFontSize = defaults.double(forKey: Self.terminalFontSizeKey)
         self.terminalFontSize = storedFontSize > 0 ? storedFontSize : Self.CodeFontSize.defaultSize
         self.showHiddenFiles = defaults.bool(forKey: Self.showHiddenFilesKey)

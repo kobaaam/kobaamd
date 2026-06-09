@@ -8,8 +8,4 @@ struct E1TerminalKeyboardTests {
         #expect(E1TerminalKeyboardSupport.shiftEnter == "\u{1b}[13;2u")
     }
 
-    @Test("enableKittyDisambiguate pushes disambiguate flag")
-    func kittyEnableSequence() {
-        #expect(E1TerminalKeyboardSupport.enableKittyDisambiguate == "\u{1b}[>1u")
-    }
 }

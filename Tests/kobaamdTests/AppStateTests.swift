@@ -180,6 +180,21 @@ struct AppStateTests {
         #expect(preset.selectedTheme == .dark)
     }
 
+    @Test("solarizedDark migrates once to e1 recommended dark for terminal parity")
+    func solarizedDarkMigratesToDarkOnce() throws {
+        let suiteName = "kobaamd.test.\(UUID().uuidString)"
+        let suite = try #require(UserDefaults(suiteName: suiteName))
+        suite.set("solarizedDark", forKey: "selectedColorTheme")
+        let migrated = AppState(defaults: suite)
+        #expect(migrated.selectedTheme == .dark)
+        #expect(suite.string(forKey: "selectedColorTheme") == "dark")
+        #expect(suite.bool(forKey: "terminalThemeUnifiedToDark_v1"))
+
+        suite.set("solarizedDark", forKey: "selectedColorTheme")
+        let secondLaunch = AppState(defaults: suite)
+        #expect(secondLaunch.selectedTheme == .solarizedDark)
+    }
+
     @Test("selectedTheme assignment fires @Observable change notification")
     func selectedThemeFiresObservation() async {
         var notified = false

@@ -10,10 +10,13 @@ final class MarkdownService {
     // theme.previewCSS のみなので、theme ごとにキャッシュして再利用する。
     private static var shellHeadCache: [String: String] = [:]
     private static let shellHeadLock = NSLock()
+    /// シェル HTML の構造変更時にインクリメントしてキャッシュを無効化する。
+    private static let shellHeadRevision = 2
 
     private static func shellHead(themeKey: String, previewCSS: String) -> String {
+        let cacheKey = "\(themeKey)-r\(shellHeadRevision)"
         shellHeadLock.lock()
-        if let cached = shellHeadCache[themeKey] {
+        if let cached = shellHeadCache[cacheKey] {
             shellHeadLock.unlock()
             return cached
         }
@@ -43,6 +46,14 @@ final class MarkdownService {
                 mermaid.run({ querySelector: '.mermaid' });
               }
             });
+            document.addEventListener('click', function(e) {
+              if (e.target.closest('a')) return;
+              var el = e.target.closest('[data-source-line-start]');
+              if (!el) return;
+              var line = parseInt(el.dataset.sourceLineStart, 10);
+              if (!line || !window.webkit || !window.webkit.messageHandlers.previewLineSelected) return;
+              window.webkit.messageHandlers.previewLineSelected.postMessage({ line: line });
+            });
             </script>
             <style>
             \(previewCSS)
@@ -54,7 +65,7 @@ final class MarkdownService {
         PerfLogger.end("MarkdownService.shellHead.build(theme=\(themeKey))")
 
         shellHeadLock.lock()
-        shellHeadCache[themeKey] = head
+        shellHeadCache[cacheKey] = head
         shellHeadLock.unlock()
         return head
     }

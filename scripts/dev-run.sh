@@ -14,7 +14,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 APP=".build/kobaamd-dev.app"
-APP_NAME="kobaamd (Dev)"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+APP_NAME="kobaamd v${VERSION} (Dev)"
 EXEC_NAME="kobaamd-dev"
 WATCH=false
 DEBOUNCE_SEC=1
@@ -54,7 +55,6 @@ graceful_quit_dev() {
 build_and_launch() {
   echo "[dev-run] $(date '+%H:%M:%S') building…"
   graceful_quit_dev
-  ./scripts/apply-swiftterm-patches.sh
   swift build
   ./scripts/post-build.sh debug dev
   echo "[dev-run] launching $APP (production kobaamd is untouched)"

@@ -1,23 +1,16 @@
 import AppKit
 import Foundation
-import SwiftTerm
+import GhosttyTerminal
 
-// MARK: - E1 terminal tuned for Claude Code (keyboard, paste, selection stability)
+// MARK: - E1 terminal (Ghostty) — Claude Code keyboard & image paste
 
-final class E1LocalTerminalView: LocalProcessTerminalView {
+final class E1LocalTerminalView: TerminalView {
     var pasteImageDirectory: URL?
     private var keyMonitor: Any?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        optionAsMetaKey = true
-        enableClaudeCodeKeyboard()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        optionAsMetaKey = true
-        enableClaudeCodeKeyboard()
+        controller = E1TerminalEngine.sharedController
     }
 
     deinit {
@@ -31,22 +24,11 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         installKeyMonitorIfNeeded()
     }
 
-    /// Kitty keyboard protocol — Shift+Enter と修飾キーを Claude Code が識別できるようにする。
-    func enableClaudeCodeKeyboard() {
-        feed(text: E1TerminalKeyboardSupport.enableKittyDisambiguate)
-    }
-
-    override func paste(_ sender: Any) {
-        if handleImagePaste(insertPath: true) { return }
-        super.paste(sender)
-    }
-
     private func installKeyMonitorIfNeeded() {
         guard window != nil, keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.isReceivingKeyboardFocus else { return event }
-            if self.sendShiftEnterIfNeeded(event) { return nil }
-            if self.handleOptionVImagePaste(event) { return nil }
+            if self.handleImagePasteShortcut(event) { return nil }
             return event
         }
     }
@@ -58,26 +40,19 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         return view.isDescendant(of: self)
     }
 
-    /// Claude Code のプロンプト改行（cmux 同等）— Kitty CSI u `\e[13;2u` を常に送る。
-    @discardableResult
-    private func sendShiftEnterIfNeeded(_ event: NSEvent) -> Bool {
-        guard event.keyCode == 36 else { return false }
+    private func handleImagePasteShortcut(_ event: NSEvent) -> Bool {
+        guard event.charactersIgnoringModifiers?.lowercased() == "v" else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.contains(.shift),
-              !flags.contains(.command),
-              !flags.contains(.control),
-              !flags.contains(.option) else { return false }
-        send(txt: E1TerminalKeyboardSupport.shiftEnter)
-        return true
+        if flags.contains(.option), !flags.contains(.command) {
+            return handleImagePaste(insertPath: false)
+        }
+        if flags.contains(.command), !flags.contains(.option),
+           E1TerminalPasteSupport.imageFromPasteboard(.general) != nil {
+            return handleImagePaste(insertPath: true)
+        }
+        return false
     }
 
-    private func handleOptionVImagePaste(_ event: NSEvent) -> Bool {
-        guard event.modifierFlags.contains(.option),
-              event.charactersIgnoringModifiers?.lowercased() == "v" else { return false }
-        return handleImagePaste(insertPath: false)
-    }
-
-    /// 画像を一意ファイル名で保存し、Claude Code の Alt+V（⌥V）またはパス貼り付けで渡す。
     @discardableResult
     func handleImagePaste(insertPath: Bool) -> Bool {
         let pasteboard = NSPasteboard.general
@@ -92,18 +67,16 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         pasteboard.writeObjects([fileURL as NSURL])
 
         if insertPath {
-            insertText(savedPath, replacementRange: NSRange(location: 0, length: 0))
+            sendText(savedPath)
         } else {
-            send(txt: "\u{1b}v")
+            sendText("\u{1b}v")
         }
         return true
     }
 }
 
 enum E1TerminalKeyboardSupport {
-    /// Push kitty disambiguate mode (Shift+Enter 等を CSI u で送れるようにする).
-    static let enableKittyDisambiguate = "\u{1b}[>1u"
-    /// Shift+Enter — Claude Code / Ink が改行として扱うシーケンス。
+    /// Shift+Enter — Claude Code / Ink が改行として扱うシーケンス（Ghostty keybind と同期）。
     static let shiftEnter = "\u{1b}[13;2u"
 }
 

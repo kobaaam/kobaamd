@@ -15,19 +15,21 @@ cd "$REPO_ROOT"
 CONFIG=${1:-debug}
 PROFILE=${2:-prod}
 
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+
 case "$PROFILE" in
   dev)
     APP=".build/kobaamd-dev.app"
     EXEC_NAME="kobaamd-dev"
     BUNDLE_ID="com.kobaamd.app.dev"
-    DISPLAY_NAME="kobaamd (Dev)"
+    DISPLAY_NAME="kobaamd v${VERSION} (Dev)"
     REGISTER_LS=false
     ;;
   prod|*)
     APP=".build/kobaamd.app"
     EXEC_NAME="kobaamd"
     BUNDLE_ID="com.kobaamd.app"
-    DISPLAY_NAME="kobaamd"
+    DISPLAY_NAME="kobaamd v${VERSION}"
     REGISTER_LS=true
     ;;
 esac

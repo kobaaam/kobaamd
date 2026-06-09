@@ -67,7 +67,9 @@ struct E1MainWindowView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(appState.selectedTheme.chromePaper)
-        .navigationTitle("kobaamd (E1)")
+        .background(E1WindowTitleConfigurator())
+        .navigationTitle("kobaamd (E1) \(AppVersion.bundleMarketing)")
+        .toolbarTitleDisplayMode(.inline)
         .frame(minWidth: 720, minHeight: 400)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -138,6 +140,26 @@ struct E1MainWindowView: View {
 
     private static func saveRightFraction(_ value: CGFloat) {
         UserDefaults.standard.set(Double(value), forKey: rightFractionKey)
+    }
+}
+
+/// タイトルバー左の白丸（システムのアイコン枠）を隠す。
+private struct E1WindowTitleConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        configureWindow(for: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        configureWindow(for: nsView)
+    }
+
+    private func configureWindow(for view: NSView) {
+        DispatchQueue.main.async {
+            guard let window = view.window ?? NSApp.keyWindow else { return }
+            WindowChrome.configureE1Window(window)
+        }
     }
 }
 

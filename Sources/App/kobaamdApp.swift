@@ -174,6 +174,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowFrameKey = "windowFrame"
     private var moveObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
+    private var windowChromeObservers: [NSObjectProtocol] = []
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first,
@@ -195,8 +196,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
         subscribeToWindowNotifications()
+        subscribeToWindowChromeNotifications()
         DispatchQueue.main.async { [weak self] in
             self?.restoreWindowFrame()
+            NSApp.windows.forEach(WindowChrome.configureE1Window)
         }
     }
 
@@ -220,6 +223,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func subscribeToWindowChromeNotifications() {
+        let center = NotificationCenter.default
+        let names: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didBecomeMainNotification,
+            NSWindow.didResizeNotification,
+        ]
+        windowChromeObservers = names.map { name in
+            center.addObserver(forName: name, object: nil, queue: .main) { notification in
+                guard let window = notification.object as? NSWindow else { return }
+                WindowChrome.configureE1Window(window)
+            }
+        }
+    }
+
     private func removeWindowNotifications() {
         let center = NotificationCenter.default
         if let moveObserver {
@@ -230,6 +248,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             center.removeObserver(resizeObserver)
             self.resizeObserver = nil
         }
+        for observer in windowChromeObservers {
+            center.removeObserver(observer)
+        }
+        windowChromeObservers.removeAll()
     }
 
     private func saveWindowFrame() {

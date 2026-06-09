@@ -9,11 +9,21 @@ enum ColorTheme: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// E1 ターミナル・エディタ・シェルの推奨テーマ（Gemini E1 / VS Code 系）。
+    static let e1Recommended: ColorTheme = .dark
+
     var displayName: String {
         switch self {
         case .light:         return "Light"
         case .dark:          return "Dark"
         case .solarizedDark: return "Solarized Dark"
+        }
+    }
+
+    var settingsCaption: String? {
+        switch self {
+        case .dark: return "E1 推奨（ターミナル・エディタ統一）"
+        default: return nil
         }
     }
 
@@ -32,6 +42,78 @@ enum ColorTheme: String, CaseIterable, Identifiable {
         case .light:         return NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1) // #1a1a1a
         case .dark:          return NSColor(srgbRed: 0.831, green: 0.831, blue: 0.831, alpha: 1) // #d4d4d4
         case .solarizedDark: return NSColor(srgbRed: 0.514, green: 0.580, blue: 0.588, alpha: 1) // #839496
+        }
+    }
+
+    /// E1 ターミナルのデフォルト前景色。エディタより一段ソフトにして長時間の眩しさを抑える。
+    var terminalForeground: NSColor {
+        switch self {
+        case .light:         return NSColor(srgbRed: 0.102, green: 0.102, blue: 0.102, alpha: 1) // #1a1a1a
+        case .dark:          return NSColor(srgbRed: 0.706, green: 0.706, blue: 0.706, alpha: 1) // #b4b4b4
+        case .solarizedDark: return NSColor(srgbRed: 0.514, green: 0.580, blue: 0.588, alpha: 1) // #839496
+        }
+    }
+
+    /// E1 ターミナル用 16 色 ANSI パレット（VS Code Dark+ 系、白系のみ抑えめ）。
+    var terminalAnsiPalette: [NSColor] {
+        switch self {
+        case .light:
+            return [
+                NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1),
+                NSColor(srgbRed: 0.804, green: 0.192, blue: 0.192, alpha: 1),
+                NSColor(srgbRed: 0.051, green: 0.737, blue: 0.475, alpha: 1),
+                NSColor(srgbRed: 0.898, green: 0.898, blue: 0.063, alpha: 1),
+                NSColor(srgbRed: 0.141, green: 0.447, blue: 0.784, alpha: 1),
+                NSColor(srgbRed: 0.737, green: 0.247, blue: 0.737, alpha: 1),
+                NSColor(srgbRed: 0.067, green: 0.659, blue: 0.804, alpha: 1),
+                NSColor(srgbRed: 0.706, green: 0.706, blue: 0.706, alpha: 1),
+                NSColor(srgbRed: 0.4, green: 0.4, blue: 0.4, alpha: 1),
+                NSColor(srgbRed: 0.945, green: 0.298, blue: 0.298, alpha: 1),
+                NSColor(srgbRed: 0.137, green: 0.820, blue: 0.545, alpha: 1),
+                NSColor(srgbRed: 0.961, green: 0.961, blue: 0.263, alpha: 1),
+                NSColor(srgbRed: 0.231, green: 0.557, blue: 0.918, alpha: 1),
+                NSColor(srgbRed: 0.839, green: 0.439, blue: 0.839, alpha: 1),
+                NSColor(srgbRed: 0.161, green: 0.722, blue: 0.859, alpha: 1),
+                NSColor(srgbRed: 0.784, green: 0.784, blue: 0.784, alpha: 1),
+            ]
+        case .dark:
+            return [
+                NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1),
+                NSColor(srgbRed: 0.804, green: 0.192, blue: 0.192, alpha: 1),
+                NSColor(srgbRed: 0.051, green: 0.737, blue: 0.475, alpha: 1),
+                NSColor(srgbRed: 0.898, green: 0.898, blue: 0.063, alpha: 1),
+                NSColor(srgbRed: 0.141, green: 0.447, blue: 0.784, alpha: 1),
+                NSColor(srgbRed: 0.737, green: 0.247, blue: 0.737, alpha: 1),
+                NSColor(srgbRed: 0.067, green: 0.659, blue: 0.804, alpha: 1),
+                NSColor(srgbRed: 0.706, green: 0.706, blue: 0.706, alpha: 1), // #b4b4b4
+                NSColor(srgbRed: 0.4, green: 0.4, blue: 0.4, alpha: 1),
+                NSColor(srgbRed: 0.945, green: 0.298, blue: 0.298, alpha: 1),
+                NSColor(srgbRed: 0.137, green: 0.820, blue: 0.545, alpha: 1),
+                NSColor(srgbRed: 0.961, green: 0.961, blue: 0.263, alpha: 1),
+                NSColor(srgbRed: 0.231, green: 0.557, blue: 0.918, alpha: 1),
+                NSColor(srgbRed: 0.839, green: 0.439, blue: 0.839, alpha: 1),
+                NSColor(srgbRed: 0.161, green: 0.722, blue: 0.859, alpha: 1),
+                NSColor(srgbRed: 0.784, green: 0.784, blue: 0.784, alpha: 1), // #c8c8c8
+            ]
+        case .solarizedDark:
+            return [
+                NSColor(srgbRed: 0.027, green: 0.212, blue: 0.259, alpha: 1),
+                NSColor(srgbRed: 0.863, green: 0.196, blue: 0.184, alpha: 1),
+                NSColor(srgbRed: 0.522, green: 0.600, blue: 0.0, alpha: 1),
+                NSColor(srgbRed: 0.710, green: 0.537, blue: 0.0, alpha: 1),
+                NSColor(srgbRed: 0.149, green: 0.545, blue: 0.824, alpha: 1),
+                NSColor(srgbRed: 0.424, green: 0.443, blue: 0.769, alpha: 1),
+                NSColor(srgbRed: 0.149, green: 0.616, blue: 0.604, alpha: 1),
+                NSColor(srgbRed: 0.514, green: 0.580, blue: 0.588, alpha: 1),
+                NSColor(srgbRed: 0.345, green: 0.431, blue: 0.459, alpha: 1),
+                NSColor(srgbRed: 0.863, green: 0.196, blue: 0.184, alpha: 1),
+                NSColor(srgbRed: 0.522, green: 0.600, blue: 0.0, alpha: 1),
+                NSColor(srgbRed: 0.710, green: 0.537, blue: 0.0, alpha: 1),
+                NSColor(srgbRed: 0.149, green: 0.545, blue: 0.824, alpha: 1),
+                NSColor(srgbRed: 0.424, green: 0.443, blue: 0.769, alpha: 1),
+                NSColor(srgbRed: 0.149, green: 0.616, blue: 0.604, alpha: 1),
+                NSColor(srgbRed: 0.576, green: 0.631, blue: 0.631, alpha: 1),
+            ]
         }
     }
 
@@ -175,6 +257,9 @@ enum ColorTheme: String, CaseIterable, Identifiable {
             li p{margin:0}
             li:has(input[type=checkbox]){list-style:none;margin-left:-1.6em}
             li input[type=checkbox]{margin-right:6px;accent-color:#FF5B1F;vertical-align:middle}
+            [data-source-line-start]{cursor:pointer}
+            [data-koba-active]{background-color:rgba(255,91,31,0.08);border-radius:4px}
+            tr[data-koba-active] td,tr[data-koba-active] th{background-color:rgba(255,91,31,0.08)}
             """
 
         case .dark:
@@ -247,6 +332,9 @@ enum ColorTheme: String, CaseIterable, Identifiable {
             li p{margin:0}
             li:has(input[type=checkbox]){list-style:none;margin-left:-1.6em}
             li input[type=checkbox]{margin-right:6px;accent-color:#ff7340;vertical-align:middle}
+            [data-source-line-start]{cursor:pointer}
+            [data-koba-active]{background-color:rgba(255,115,64,0.12);border-radius:4px}
+            tr[data-koba-active] td,tr[data-koba-active] th{background-color:rgba(255,115,64,0.12)}
             """
 
         case .solarizedDark:
@@ -319,6 +407,9 @@ enum ColorTheme: String, CaseIterable, Identifiable {
             li p{margin:0}
             li:has(input[type=checkbox]){list-style:none;margin-left:-1.6em}
             li input[type=checkbox]{margin-right:6px;accent-color:#cb4b16;vertical-align:middle}
+            [data-source-line-start]{cursor:pointer}
+            [data-koba-active]{background-color:rgba(203,75,22,0.15);border-radius:4px}
+            tr[data-koba-active] td,tr[data-koba-active] th{background-color:rgba(203,75,22,0.15)}
             """
         }
     }

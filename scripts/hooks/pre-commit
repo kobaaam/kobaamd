@@ -16,8 +16,6 @@ else
     echo "🔨 Swift ファイルが変更されています。ビルドを確認します..."
     echo "$SWIFT_CHANGED" | sed 's/^/  /'
 
-    ./scripts/apply-swiftterm-patches.sh
-
     # メインビルド確認
     if ! swift build 2>&1 | tail -3; then
         echo "❌ swift build 失敗。コミットを中止します。"

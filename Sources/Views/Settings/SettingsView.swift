@@ -27,6 +27,9 @@ struct SettingsView: View {
                 .onChange(of: appState.selectedTheme) { _, _ in
                     NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
                 }
+                Text("ターミナル作業には Dark（#1e1e1e）を推奨。Gemini E1 設計と VS Code 系パレットに合わせています。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 LabeledContent("コードフォント") {
                     HStack(spacing: 8) {
                         Button {
