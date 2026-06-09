@@ -25,16 +25,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run unit tests
+      - name: Build and run stable unit tests
         run: |
           set -euo pipefail
           chmod +x ./scripts/run-unit-tests.sh
-          ./scripts/run-unit-tests.sh --xunit-output "$RUNNER_TEMP/kobaamd-xunit.xml"
-
-      - name: Upload xUnit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kobaamd-xunit
-          path: ${{ runner.temp }}/kobaamd-xunit.xml
-          if-no-files-found: ignore
+          ./scripts/run-unit-tests.sh
