@@ -114,7 +114,7 @@ struct BacklinksScannerTests {
 
     @Test("Snippet builder truncates with ellipses")
     func snippetBuilderTruncatesWithEllipses() throws {
-        let content = String(repeating: "a", count: 40) + "note" + String(repeating: "b", count: 40)
+        let content = String(repeating: "a", count: 40) + " note " + String(repeating: "b", count: 40)
         let result = BacklinksScanner.scan(
             sourceURL: sourceURL,
             sourceContent: content,

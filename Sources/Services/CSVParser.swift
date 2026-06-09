@@ -36,7 +36,12 @@ enum CSVParser {
     static func parse(_ rawText: String) -> CSVTable {
         // Excel 等が出力する CSV は先頭に UTF-8 BOM (U+FEFF) が付くことがある。
         // 先頭の 1 個だけ除去する（フィールド途中の U+FEFF は保持）。
-        let text: String = rawText.hasPrefix("\u{FEFF}") ? String(rawText.dropFirst()) : rawText
+        var text: String = rawText.hasPrefix("\u{FEFF}") ? String(rawText.dropFirst()) : rawText
+        // CRLF / CR を LF に正規化して行区切り判定を単純化する（クォート外のみ対象だが、
+        // 行区切りはクォート外にしか現れない前提で全体正規化してよい）。
+        text = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
 
         guard !text.isEmpty else {
             return CSVTable(headers: [], rows: [], isTruncated: false, columnCount: 0)
@@ -94,19 +99,6 @@ enum CSVParser {
                 case ",":
                     // フィールド区切り
                     commitField()
-                case "\r":
-                    // CR / CRLF の行区切り
-                    commitRow()
-                    if next < text.endIndex && text[next] == "\n" {
-                        // CRLF: LF をスキップ
-                        index = text.index(after: next)
-                        continue
-                    }
-                    // 行数上限チェック
-                    if allRows.count >= maxRows {
-                        isTruncated = true
-                        break
-                    }
                 case "\n":
                     // LF の行区切り
                     commitRow()
