@@ -1,0 +1,40 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.claude/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.claude/**'
+
+concurrency:
+  group: unit-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift-test:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/run-unit-tests.sh
+          ./scripts/run-unit-tests.sh --xunit-output "$RUNNER_TEMP/kobaamd-xunit.xml"
+
+      - name: Upload xUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kobaamd-xunit
+          path: ${{ runner.temp }}/kobaamd-xunit.xml
+          if-no-files-found: ignore

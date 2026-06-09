@@ -17,7 +17,12 @@ struct NSTextViewWrapper: View {
 
     private var paperColor: Color { Color(appState.selectedTheme.editorBackground) }
     private var inkColor: Color   { Color(appState.selectedTheme.editorText) }
-    private static let editorFont = Font.system(size: 14, design: .monospaced)
+    private var editorFont: Font {
+        Font(E1TerminalTypography.codeFont(size: CGFloat(appState.terminalFontSize)))
+    }
+    private var editorLineSpacing: CGFloat {
+        CGFloat(appState.terminalFontSize) * 0.43
+    }
 
     init(binding: Binding<String>, scrollRatio: Binding<Double>) {
         self._text        = binding
@@ -26,8 +31,8 @@ struct NSTextViewWrapper: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(Self.editorFont)
-            .lineSpacing(6)
+            .font(editorFont)
+            .lineSpacing(editorLineSpacing)
             .foregroundStyle(inkColor)
             .scrollContentBackground(.hidden)
             .background(
@@ -84,6 +89,7 @@ struct EditorObserver: NSViewRepresentable {
         private var toggleBoldObserver: Any?
         private var toggleItalicObserver: Any?
         private var insertLinkObserver: Any?
+        private var jumpToLineObserver: Any?
         private var eventMonitor: Any?
         private let highlightService: HighlightServiceProtocol
         weak var textViewRef: NSTextView?
@@ -91,6 +97,7 @@ struct EditorObserver: NSViewRepresentable {
         var currentTheme: ColorTheme = AppState.shared.selectedTheme
         var highlightColor: NSColor { currentTheme.editorCurrentLineHighlight }
         private var lastHighlightedRange: NSRange = NSRange(location: NSNotFound, length: 0)
+        private var attachAttempts = 0
 
         @MainActor
         init(highlightService: HighlightServiceProtocol? = nil) {
@@ -121,6 +128,14 @@ struct EditorObserver: NSViewRepresentable {
 
                 if foundScrollView && foundTextView { break }
                 current = parent
+            }
+
+            if !foundTextView, attachAttempts < 6 {
+                attachAttempts += 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self, weak view] in
+                    guard let self, let view else { return }
+                    self.attach(to: view, scrollRatio: scrollRatio)
+                }
             }
 
             NotificationCenter.default.addObserver(
@@ -168,6 +183,17 @@ struct EditorObserver: NSViewRepresentable {
             ) { [weak self] _ in
                 guard let self, let tv = self.textViewRef, tv.window?.firstResponder === tv else { return }
                 self.applyMarkdownShortcut(.link, in: tv)
+            }
+
+            jumpToLineObserver = NotificationCenter.default.addObserver(
+                forName: .jumpToLine,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let tv = self.textViewRef,
+                      let line = note.userInfo?["line"] as? Int else { return }
+                self.jumpToSourceLine(line, in: tv)
             }
         }
 
@@ -337,10 +363,12 @@ struct EditorObserver: NSViewRepresentable {
                     editedRange: editedRange,
                     changeInLength: changeInLength
                 )
+                highlightCurrentLine(in: tv)
                 return
             }
 
             highlightService.highlight(textStorage)
+            highlightCurrentLine(in: tv)
         }
 
         @MainActor
@@ -360,6 +388,42 @@ struct EditorObserver: NSViewRepresentable {
                 editedRange: editedRange,
                 changeInLength: changeInLength
             )
+            highlightCurrentLine(in: tv)
+        }
+
+        private func jumpToSourceLine(_ line: Int, in tv: NSTextView) {
+            let nsString = tv.string as NSString
+            guard nsString.length > 0 else { return }
+
+            let location: Int
+            if line <= 1 {
+                location = 0
+            } else {
+                var currentLine = 1
+                var index = 0
+                while currentLine < line, index < nsString.length {
+                    let nextNewline = nsString.range(
+                        of: "\n",
+                        options: [],
+                        range: NSRange(location: index, length: nsString.length - index)
+                    )
+                    if nextNewline.location == NSNotFound { break }
+                    index = nextNewline.location + 1
+                    currentLine += 1
+                }
+                location = min(index, nsString.length)
+            }
+
+            tv.setSelectedRange(NSRange(location: location, length: 0))
+            tv.scrollRangeToVisible(NSRange(location: location, length: 1))
+            tv.window?.makeFirstResponder(tv)
+            highlightCurrentLine(in: tv)
+        }
+
+        private func sourceLineNumber(at location: Int, in nsString: NSString) -> Int {
+            guard location > 0 else { return 1 }
+            let prefix = nsString.substring(to: min(location, nsString.length))
+            return prefix.filter { $0 == "\n" }.count + 1
         }
 
         private func highlightCurrentLine(in tv: NSTextView) {
@@ -379,16 +443,11 @@ struct EditorObserver: NSViewRepresentable {
             lm.addTemporaryAttribute(.backgroundColor, value: highlightColor, forCharacterRange: lineRange)
             lastHighlightedRange = lineRange
 
-            // プレビュー側にカーソルのブロックインデックスを通知
-            let beforeCursor = String(tv.string.prefix(insertion))
-            let blockIndex = beforeCursor
-                .components(separatedBy: "\n\n")
-                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                .count
+            let sourceLine = sourceLineNumber(at: insertion, in: nsString)
             NotificationCenter.default.post(
                 name: .cursorBlockChanged,
                 object: nil,
-                userInfo: ["blockIndex": max(0, blockIndex - 1)]
+                userInfo: ["sourceLine": sourceLine]
             )
         }
 
@@ -418,7 +477,8 @@ struct EditorObserver: NSViewRepresentable {
                 insertSnippetObserver,
                 toggleBoldObserver,
                 toggleItalicObserver,
-                insertLinkObserver
+                insertLinkObserver,
+                jumpToLineObserver
             ]
             .compactMap { $0 }
             .forEach {

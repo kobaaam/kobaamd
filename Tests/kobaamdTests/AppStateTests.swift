@@ -122,6 +122,34 @@ struct AppStateTests {
         state.showHiddenFiles = true
         #expect(defaults.bool(forKey: "showHiddenFiles") == true)
         #expect(state.showHiddenFiles == true)
+        state.showHiddenFiles = false
+        #expect(defaults.bool(forKey: "showHiddenFiles") == false)
+        #expect(state.showHiddenFiles == false)
+    }
+
+    @Test("terminalFontSize defaults to 14 and persists")
+    func terminalFontSizePersists() {
+        #expect(state.terminalFontSize == 14)
+        state.terminalFontSize = 16
+        #expect(defaults.double(forKey: "terminalFontSize") == 16)
+        #expect(state.terminalFontSize == 16)
+    }
+
+    @Test("adjustCodeFontSize clamps to configured range")
+    func adjustCodeFontSizeClamps() {
+        state.terminalFontSize = AppState.CodeFontSize.max
+        state.adjustCodeFontSize(by: 1)
+        #expect(state.terminalFontSize == AppState.CodeFontSize.max)
+
+        state.terminalFontSize = AppState.CodeFontSize.min
+        state.adjustCodeFontSize(by: -1)
+        #expect(state.terminalFontSize == AppState.CodeFontSize.min)
+
+        state.terminalFontSize = 14
+        state.adjustCodeFontSize(by: 2)
+        #expect(state.terminalFontSize == 16)
+        state.resetCodeFontSize()
+        #expect(state.terminalFontSize == AppState.CodeFontSize.defaultSize)
     }
 
     // MARK: - Color theme
@@ -150,6 +178,21 @@ struct AppStateTests {
         suite.set("not-a-real-theme", forKey: "selectedColorTheme")
         let preset = AppState(defaults: suite)
         #expect(preset.selectedTheme == .dark)
+    }
+
+    @Test("solarizedDark migrates once to e1 recommended dark for terminal parity")
+    func solarizedDarkMigratesToDarkOnce() throws {
+        let suiteName = "kobaamd.test.\(UUID().uuidString)"
+        let suite = try #require(UserDefaults(suiteName: suiteName))
+        suite.set("solarizedDark", forKey: "selectedColorTheme")
+        let migrated = AppState(defaults: suite)
+        #expect(migrated.selectedTheme == .dark)
+        #expect(suite.string(forKey: "selectedColorTheme") == "dark")
+        #expect(suite.bool(forKey: "terminalThemeUnifiedToDark_v1"))
+
+        suite.set("solarizedDark", forKey: "selectedColorTheme")
+        let secondLaunch = AppState(defaults: suite)
+        #expect(secondLaunch.selectedTheme == .solarizedDark)
     }
 
     @Test("selectedTheme assignment fires @Observable change notification")

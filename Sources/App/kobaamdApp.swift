@@ -86,6 +86,20 @@ struct kobaamdApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
             }
+            CommandMenu("表示") {
+                Button("コードフォントを大きく") {
+                    AppState.shared.adjustCodeFontSize(by: AppState.CodeFontSize.step)
+                }
+                .keyboardShortcut("=", modifiers: .command)
+                Button("コードフォントを小さく") {
+                    AppState.shared.adjustCodeFontSize(by: -AppState.CodeFontSize.step)
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                Button("コードフォントを既定値に戻す") {
+                    AppState.shared.resetCodeFontSize()
+                }
+                .keyboardShortcut("0", modifiers: .command)
+            }
             CommandMenu("E1") {
                 Button("フォーカス: ターミナル") { AppCommand.e1FocusTerminal.post() }
                     .keyboardShortcut("1", modifiers: .command)
@@ -137,6 +151,7 @@ extension Notification.Name {
     static let cursorBlockChanged     = Notification.Name("kobaamd.cursorBlockChanged")
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let previewScrollRatioChanged = Notification.Name("kobaamd.previewScrollRatioChanged")
+    static let e1TerminalAppearanceChanged = Notification.Name("kobaamd.e1TerminalAppearanceChanged")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
@@ -148,6 +163,7 @@ extension Notification.Name {
     static let e1FocusEditorRequested          = Notification.Name("kobaamd.e1FocusEditorRequested")
     static let e1FocusTerminalPane             = Notification.Name("kobaamd.e1FocusTerminalPane")
     static let e1FocusFileTree                 = Notification.Name("kobaamd.e1FocusFileTree")
+    static let e1WindowChromeRefresh           = Notification.Name("kobaamd.e1WindowChromeRefresh")
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
     static let persistEditorSessionRequested   = Notification.Name("kobaamd.persistEditorSessionRequested")
@@ -159,6 +175,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowFrameKey = "windowFrame"
     private var moveObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
+    private var windowChromeObservers: [NSObjectProtocol] = []
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first,
@@ -180,8 +197,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
         subscribeToWindowNotifications()
+        subscribeToWindowChromeNotifications()
         DispatchQueue.main.async { [weak self] in
             self?.restoreWindowFrame()
+            NSApp.windows.forEach(WindowChrome.configureE1Window)
         }
     }
 
@@ -205,6 +224,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func subscribeToWindowChromeNotifications() {
+        let center = NotificationCenter.default
+        let names: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didBecomeMainNotification,
+            NSWindow.didResizeNotification,
+            .e1WindowChromeRefresh,
+        ]
+        windowChromeObservers = names.map { name in
+            center.addObserver(forName: name, object: nil, queue: .main) { notification in
+                guard let window = notification.object as? NSWindow else { return }
+                WindowChrome.configureE1Window(window)
+            }
+        }
+    }
+
     private func removeWindowNotifications() {
         let center = NotificationCenter.default
         if let moveObserver {
@@ -215,6 +250,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             center.removeObserver(resizeObserver)
             self.resizeObserver = nil
         }
+        for observer in windowChromeObservers {
+            center.removeObserver(observer)
+        }
+        windowChromeObservers.removeAll()
     }
 
     private func saveWindowFrame() {

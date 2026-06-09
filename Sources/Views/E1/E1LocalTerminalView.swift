@@ -1,23 +1,16 @@
 import AppKit
 import Foundation
-import SwiftTerm
+import GhosttyTerminal
 
-// MARK: - E1 terminal tuned for Claude Code (keyboard, paste, selection stability)
+// MARK: - E1 terminal (Ghostty) — Claude Code keyboard & image paste
 
-final class E1LocalTerminalView: LocalProcessTerminalView {
+final class E1LocalTerminalView: TerminalView {
     var pasteImageDirectory: URL?
     private var keyMonitor: Any?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        optionAsMetaKey = true
-        enableClaudeCodeKeyboard()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        optionAsMetaKey = true
-        enableClaudeCodeKeyboard()
+        controller = E1TerminalEngine.sharedController
     }
 
     deinit {
@@ -31,40 +24,35 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         installKeyMonitorIfNeeded()
     }
 
-    /// Kitty keyboard protocol — Shift+Enter と修飾キーを Claude Code が識別できるようにする。
-    func enableClaudeCodeKeyboard() {
-        feed(text: "\u{1b}[>1u")
-    }
-
-    override func paste(_ sender: Any) {
-        if handleImagePaste(insertPath: true) { return }
-        super.paste(sender)
-    }
-
     private func installKeyMonitorIfNeeded() {
         guard window != nil, keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.window?.firstResponder === self else { return event }
-            if self.handleShiftEnter(event) { return nil }
-            if self.handleOptionVImagePaste(event) { return nil }
+            guard let self, self.isReceivingKeyboardFocus else { return event }
+            if self.handleImagePasteShortcut(event) { return nil }
             return event
         }
     }
 
-    private func handleShiftEnter(_ event: NSEvent) -> Bool {
-        guard event.keyCode == 36, event.modifierFlags.contains(.shift) else { return false }
-        guard terminal.keyboardEnhancementFlags.isEmpty else { return false }
-        send(txt: "\n")
-        return true
+    private var isReceivingKeyboardFocus: Bool {
+        guard let window, let responder = window.firstResponder else { return false }
+        if responder === self { return true }
+        guard let view = responder as? NSView else { return false }
+        return view.isDescendant(of: self)
     }
 
-    private func handleOptionVImagePaste(_ event: NSEvent) -> Bool {
-        guard event.modifierFlags.contains(.option),
-              event.charactersIgnoringModifiers?.lowercased() == "v" else { return false }
-        return handleImagePaste(insertPath: false)
+    private func handleImagePasteShortcut(_ event: NSEvent) -> Bool {
+        guard event.charactersIgnoringModifiers?.lowercased() == "v" else { return false }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags.contains(.option), !flags.contains(.command) {
+            return handleImagePaste(insertPath: false)
+        }
+        if flags.contains(.command), !flags.contains(.option),
+           E1TerminalPasteSupport.imageFromPasteboard(.general) != nil {
+            return handleImagePaste(insertPath: true)
+        }
+        return false
     }
 
-    /// 画像を一意ファイル名で保存し、Claude Code の Alt+V（⌥V）またはパス貼り付けで渡す。
     @discardableResult
     func handleImagePaste(insertPath: Bool) -> Bool {
         let pasteboard = NSPasteboard.general
@@ -79,11 +67,49 @@ final class E1LocalTerminalView: LocalProcessTerminalView {
         pasteboard.writeObjects([fileURL as NSURL])
 
         if insertPath {
-            insertText(savedPath, replacementRange: NSRange(location: 0, length: 0))
+            sendText(savedPath)
         } else {
-            send(txt: "\u{1b}v")
+            sendText("\u{1b}v")
         }
         return true
+    }
+}
+
+enum E1TerminalKeyboardSupport {
+    /// Shift+Enter — Claude Code / Ink が改行として扱うシーケンス（Ghostty keybind と同期）。
+    static let shiftEnter = "\u{1b}[13;2u"
+}
+
+enum E1TerminalTypography {
+    static let defaultSize: CGFloat = 14
+    private static let fontCandidates = [
+        "SFMono-Regular",
+        "SF Mono",
+        "Menlo-Regular",
+        "Menlo",
+        "Monaco",
+    ]
+
+    static func monospaceFont(size: CGFloat) -> NSFont {
+        for name in fontCandidates {
+            if let font = NSFont(name: name, size: size) {
+                return font
+            }
+        }
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .medium)
+    }
+
+    /// 丸数字などの記号を潰さないよう、等幅本体 + 記号フォントのカスケードを付ける。
+    static func codeFont(size: CGFloat) -> NSFont {
+        let base = monospaceFont(size: size)
+        let cascades: [NSFontDescriptor] = [
+            NSFontDescriptor(fontAttributes: [.family: "Apple Symbols"]),
+            NSFontDescriptor(fontAttributes: [.family: "Hiragino Sans"]),
+        ]
+        let descriptor = base.fontDescriptor.addingAttributes([
+            .cascadeList: cascades,
+        ])
+        return NSFont(descriptor: descriptor, size: size) ?? base
     }
 }
 

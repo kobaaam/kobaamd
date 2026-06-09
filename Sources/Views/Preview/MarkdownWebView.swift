@@ -81,6 +81,7 @@ struct MarkdownWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         PerfLogger.begin("MarkdownWebView.makeNSView")
         let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(context.coordinator, name: "previewLineSelected")
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
@@ -149,7 +150,7 @@ struct MarkdownWebView: NSViewRepresentable {
         ) { _ in }
     }
 
-    @MainActor class Coordinator: NSObject, WKNavigationDelegate {
+    @MainActor class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var isLoaded = false
         var lastShellVersion: Int = 0
         var lastBodyHTML: String = ""
@@ -266,22 +267,39 @@ struct MarkdownWebView: NSViewRepresentable {
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
 
-        private func highlightBySourceLine(_ cursorLine: Int, in wv: WKWebView) {
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "previewLineSelected" else { return }
+            let line: Int?
+            if let dict = message.body as? [String: Any] {
+                line = dict["line"] as? Int
+            } else {
+                line = nil
+            }
+            guard let line, let wv = webView else { return }
+            highlightBySourceLine(line, in: wv, scrollIfNeeded: false)
+            NotificationCenter.default.post(
+                name: .jumpToLine,
+                object: nil,
+                userInfo: ["line": line, "source": "preview"]
+            )
+        }
+
+        private func highlightBySourceLine(
+            _ cursorLine: Int,
+            in wv: WKWebView,
+            scrollIfNeeded: Bool = true
+        ) {
             let js = """
-            (function(cursorLine) {
-              // 前のハイライトを消す（tr の場合は td/th 子要素も）
+            (function(cursorLine, scrollIfNeeded) {
               document.querySelectorAll('[data-koba-active]').forEach(function(el) {
                 el.removeAttribute('data-koba-active');
-                el.style.removeProperty('background-color');
-                el.style.removeProperty('border-radius');
-                el.querySelectorAll('td, th').forEach(function(c) {
-                  c.style.removeProperty('background-color');
-                });
               });
               var blocks = document.querySelectorAll('[data-source-line-start]');
               var best = null;
               var bestStart = -1;
-              // start <= cursorLine <= end の中で最も内側（start が最大）を選ぶ
               for (var i = 0; i < blocks.length; i++) {
                 var start = parseInt(blocks[i].dataset.sourceLineStart, 10);
                 var end   = parseInt(blocks[i].dataset.sourceLineEnd,   10);
@@ -290,7 +308,6 @@ struct MarkdownWebView: NSViewRepresentable {
                   bestStart = start;
                 }
               }
-              // フォールバック: cursorLine より前の最後のブロック
               if (!best) {
                 for (var i = 0; i < blocks.length; i++) {
                   var start = parseInt(blocks[i].dataset.sourceLineStart, 10);
@@ -300,23 +317,14 @@ struct MarkdownWebView: NSViewRepresentable {
               }
               if (best) {
                 best.setAttribute('data-koba-active', '');
-                best.style.borderRadius = '4px';
-                // tr の場合は td/th に直接色を付ける（CSS specificity 対策）
-                if (best.tagName === 'TR') {
-                  best.querySelectorAll('td, th').forEach(function(c) {
-                    c.style.backgroundColor = 'rgba(255,91,31,0.08)';
-                  });
-                } else {
-                  best.style.backgroundColor = 'rgba(255,91,31,0.08)';
-                }
-                // カーソル行のブロックをプレビューに追従させる
-                // ビューポート外なら中央にスクロール、内なら動かさない
-                var rect = best.getBoundingClientRect();
-                if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                  best.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (scrollIfNeeded) {
+                  var rect = best.getBoundingClientRect();
+                  if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                    best.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
                 }
               }
-            })(\(cursorLine));
+            })(\(cursorLine), \(scrollIfNeeded ? "true" : "false"));
             """
             wv.evaluateJavaScript(js, completionHandler: nil)
         }

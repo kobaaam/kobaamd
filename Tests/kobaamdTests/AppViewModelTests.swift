@@ -107,12 +107,15 @@ struct AppViewModelTests {
     }
 
     @Test("openDroppedFile: ディレクトリURLではfileTreeViewModelにフォルダが追加されること")
-    func openDroppedFileAddsDirectoryToFileTree() async {
+    func openDroppedFileAddsDirectoryToFileTree() async throws {
         let vm = AppViewModel()
-        // /tmp は実在するディレクトリ
-        let dirURL = URL(fileURLWithPath: "/tmp")
+        let dirURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kobaamd-drop-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
         await vm.openDroppedFile(url: dirURL)
-        #expect(vm.fileTreeViewModel.folders.contains(where: { $0.url == dirURL }))
+        #expect(vm.fileTreeViewModel.folders.contains(where: {
+            $0.url.standardizedFileURL == dirURL.standardizedFileURL
+        }))
     }
 
     // MARK: - Viewer Mode Tests

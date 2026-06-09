@@ -14,7 +14,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 APP=".build/kobaamd-dev.app"
-APP_NAME="kobaamd (Dev)"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+APP_NAME="kobaamd v${VERSION} (Dev)"
 EXEC_NAME="kobaamd-dev"
 WATCH=false
 DEBOUNCE_SEC=1

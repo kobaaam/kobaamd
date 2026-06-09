@@ -30,6 +30,17 @@ struct E1ScopedFileTreeView: View {
             .padding(.top, 10)
             .padding(.bottom, 4)
 
+            Toggle("隠しファイルを表示", isOn: $appState.showHiddenFiles)
+                .toggleStyle(.checkbox)
+                .font(.system(size: 10))
+                .foregroundStyle(chrome.chromeMute)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+                .onChange(of: appState.showHiddenFiles) { _, _ in
+                    fileTreeViewModel.reload()
+                    appViewModel.refreshQuickOpenIndex()
+                }
+
             if fileTreeViewModel.folders.isEmpty {
                 Text("セッションを選択してください")
                     .font(.system(size: 11))

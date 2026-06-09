@@ -24,15 +24,44 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .frame(width: 160)
                 }
-            }
+                .onChange(of: appState.selectedTheme) { _, _ in
+                    NotificationCenter.default.post(name: .e1TerminalAppearanceChanged, object: nil)
+                }
+                Text("ターミナル作業には Dark（#1e1e1e）を推奨。Gemini E1 設計と VS Code 系パレットに合わせています。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LabeledContent("コードフォント") {
+                    HStack(spacing: 8) {
+                        Button {
+                            appState.adjustCodeFontSize(by: -AppState.CodeFontSize.step)
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(appState.terminalFontSize <= AppState.CodeFontSize.min)
 
-            Section("ファイル") {
-                Toggle("隠しファイルを表示", isOn: $appState.showHiddenFiles)
-                    .onChange(of: appState.showHiddenFiles) { _, _ in
-                        appViewModel.fileTreeViewModel.reload()
-                        appViewModel.refreshQuickOpenIndex()
+                        Slider(
+                            value: $appState.terminalFontSize,
+                            in: AppState.CodeFontSize.min...AppState.CodeFontSize.max,
+                            step: AppState.CodeFontSize.step
+                        )
+                        Text("\(Int(appState.terminalFontSize)) pt")
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
+
+                        Button {
+                            appState.adjustCodeFontSize(by: AppState.CodeFontSize.step)
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(appState.terminalFontSize >= AppState.CodeFontSize.max)
                     }
-                Text("ON にすると `.scratch` や `.git` などドット始まりのフォルダが Files に表示されます。")
+                }
+                .onChange(of: appState.terminalFontSize) { _, _ in
+                    AppState.postCodeFontAppearanceChanged()
+                }
+                Text("ターミナルとエディタの等幅フォントサイズです。既定は 14pt（SF Mono）。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

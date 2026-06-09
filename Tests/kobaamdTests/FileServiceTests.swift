@@ -2,7 +2,7 @@ import Testing
 @testable import kobaamd
 import Foundation
 
-@Suite("FileService")
+@Suite("FileService", .serialized)
 struct FileServiceTests {
     let svc = FileService()
     let tmpDir: URL
@@ -76,10 +76,13 @@ struct FileServiceTests {
 
     @Test("Directories sort before files")
     func loadNodesSortsDirectoriesFirst() throws {
-        try FileManager.default.createDirectory(
-            at: tmpDir.appendingPathComponent("zzz"), withIntermediateDirectories: false)
-        try "".write(to: tmpDir.appendingPathComponent("aaa.md"), atomically: true, encoding: .utf8)
-        let nodes = svc.loadNodes(at: tmpDir)
+        let dir = tmpDir.appendingPathComponent("sort-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let zzz = dir.appendingPathComponent("zzz", isDirectory: true)
+        try FileManager.default.createDirectory(at: zzz, withIntermediateDirectories: false)
+        try "".write(to: zzz.appendingPathComponent("inside.md"), atomically: true, encoding: .utf8)
+        try "".write(to: dir.appendingPathComponent("aaa.md"), atomically: true, encoding: .utf8)
+        let nodes = svc.loadNodes(at: dir)
         #expect(nodes.first?.isDirectory == true)
         #expect(nodes.first?.name == "zzz")
     }

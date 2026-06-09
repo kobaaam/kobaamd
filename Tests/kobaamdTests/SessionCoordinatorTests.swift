@@ -2,13 +2,19 @@ import Testing
 @testable import kobaamd
 import Foundation
 
-@Suite("SessionCoordinator")
+@Suite("SessionCoordinator", .serialized)
 struct SessionCoordinatorTests {
+    @MainActor
+    private func makeCoordinator() -> SessionCoordinator {
+        AppState.saveE1LocalSessions([], activeID: nil)
+        return SessionCoordinator()
+    }
+
     @Test("bootstrap applies file tree even when session already active")
     @MainActor
     func bootstrapScopesFileTreeOnFirstLoad() {
         let vm = AppViewModel()
-        let coordinator = SessionCoordinator()
+        let coordinator = makeCoordinator()
         let path = FileManager.default.homeDirectoryForCurrentUser
         let session = WorktreeSession.localDirectory(name: "Home", path: path)
         coordinator.sessions = [session]
@@ -25,7 +31,7 @@ struct SessionCoordinatorTests {
     @MainActor
     func selectSessionScopesWorktreeAndResetsEditor() {
         let vm = AppViewModel()
-        let coordinator = SessionCoordinator()
+        let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
 
         let mainPath = URL(fileURLWithPath: "/tmp/repo-main", isDirectory: true)
@@ -47,12 +53,14 @@ struct SessionCoordinatorTests {
 
     @Test("same directory can spawn multiple sessions")
     @MainActor
-    func sameDirectoryAllowsMultipleSessions() async {
+    func sameDirectoryAllowsMultipleSessions() async throws {
         let vm = AppViewModel()
-        let coordinator = SessionCoordinator()
+        let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
         let path = FileManager.default.temporaryDirectory
-        coordinator.sessions = [WorktreeSession.localDirectory(name: "tmp", path: path)]
+            .appendingPathComponent("kobaamd-multi-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        coordinator.sessions = [WorktreeSession.localDirectory(name: path.lastPathComponent, path: path)]
         coordinator.activeSessionID = coordinator.sessions[0].id
 
         await coordinator.handleFolderOpened(path)
@@ -60,16 +68,18 @@ struct SessionCoordinatorTests {
         #expect(coordinator.sessions.count == 2)
         #expect(Set(coordinator.sessions.map(\.worktreePath)) == [path.standardizedFileURL])
         #expect(Set(coordinator.sessions.map(\.id)).count == 2)
-        #expect(coordinator.sessions[1].name == "tmp 2")
+        #expect(coordinator.sessions[1].name == "\(path.lastPathComponent) 2")
     }
 
     @Test("duplicateSession clones active directory")
     @MainActor
-    func duplicateSessionCreatesSibling() {
+    func duplicateSessionCreatesSibling() throws {
         let vm = AppViewModel()
-        let coordinator = SessionCoordinator()
+        let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
-        let path = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kobaamd-session-dup-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
         let original = WorktreeSession.localDirectory(name: "project", path: path)
         coordinator.sessions = [original]
         coordinator.activeSessionID = original.id
@@ -79,15 +89,15 @@ struct SessionCoordinatorTests {
 
         #expect(coordinator.sessions.count == 2)
         #expect(coordinator.sessions[1].worktreePath == path.standardizedFileURL)
-        #expect(coordinator.sessions[1].name == "project 2")
+        #expect(coordinator.sessions[1].name == path.lastPathComponent)
         #expect(coordinator.activeSessionID == coordinator.sessions[1].id)
     }
 
     @Test("E2E fixture builds alpha/beta sessions and scopes Quick Open")
     @MainActor
-    func e2eFixtureScopesQuickOpen() throws {
+    func e2eFixtureScopesQuickOpen() async throws {
         let vm = AppViewModel()
-        let coordinator = SessionCoordinator()
+        let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
         coordinator.applyE2ESessionFixture()
 
@@ -102,6 +112,8 @@ struct SessionCoordinatorTests {
         }
         coordinator.selectSession(id: betaID)
         #expect(vm.fileTreeViewModel.rootURL?.lastPathComponent == "beta")
+        try await Task.sleep(for: .milliseconds(200))
+        vm.refreshQuickOpenIndex()
         vm.quickOpenViewModel.filter()
         let names = Set(vm.quickOpenViewModel.candidates.map(\.fileName))
         #expect(names.contains("beta.md"))
