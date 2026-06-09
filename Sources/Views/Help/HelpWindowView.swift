@@ -5,6 +5,7 @@ enum HelpSection: String, CaseIterable, Identifiable {
     case shortcuts = "ショートカット"
     case features = "機能ガイド"
     case integrations = "連携"
+    case acknowledgements = "オープンソース"
     case faq = "FAQ"
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum HelpSection: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .features: return "square.grid.2x2"
         case .integrations: return "link"
+        case .acknowledgements: return "doc.text"
         case .faq: return "questionmark.circle"
         }
     }

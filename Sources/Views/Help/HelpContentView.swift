@@ -93,6 +93,35 @@ struct HelpContentView: View {
                 )
             }
 
+        case .acknowledgements:
+            VStack(alignment: .leading, spacing: 16) {
+                featureBlock(
+                    title: "E1 ターミナル（Ghostty）",
+                    text: "E1 の組み込みターミナルは Ghostty の libghostty を libghostty-spm（GhosttyTerminal）経由で利用しています。いずれも MIT ライセンスです。kobaamd は Ghostty プロジェクトとは無関係であり、公式製品ではありません。"
+                )
+                featureBlock(
+                    title: "その他の主要コンポーネント",
+                    text: "swift-markdown（Apache-2.0）、Tree-sitter（MIT）、Mermaid.js（MIT）、EasyMDE（MIT）などを利用しています。"
+                )
+                sectionCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ライセンス全文")
+                            .font(.headline)
+                            .foregroundStyle(Color.kobaInk)
+                        bodyText(
+                            "リポジトリ直下の THIRD_PARTY_NOTICES.md に、Ghostty・libghostty-spm ほかの帰属表示と MIT 全文を掲載しています。"
+                        )
+                        Link("Ghostty — ghostty.org", destination: URL(string: "https://ghostty.org")!)
+                            .font(.body)
+                        Link(
+                            "libghostty-spm — GitHub",
+                            destination: URL(string: "https://github.com/Lakr233/libghostty-spm")!
+                        )
+                        .font(.body)
+                    }
+                }
+            }
+
         case .faq:
             sectionCard {
                 VStack(alignment: .leading, spacing: 10) {

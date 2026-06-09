@@ -26,7 +26,7 @@ open .build/kobaamd.app
 
 - Swift standard conventions
 - MVVM architecture — keep Views thin, logic in ViewModels/Services
-- No third-party dependencies beyond `swift-markdown` (Apple official)
+- Third-party deps are managed in `Package.swift` (e.g. swift-markdown, libghostty-spm); update `THIRD_PARTY_NOTICES.md` when adding or upgrading distributable components
 - Prefer `@Observable` over `ObservableObject`
 - All disk I/O must run on background threads (`Task.detached`)
 

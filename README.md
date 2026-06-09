@@ -90,9 +90,9 @@ macOS の Hardened Runtime では実行中バイナリの上書きができな�
 swift build && ./scripts/post-build.sh debug dev && open .build/kobaamd-dev.app
 ```
 
-**E1 shell (Re-concept):** The default UI is Session rail | Terminal | Viewer. In **Settings**, turn off **「E1 シェル」** to use the legacy Markdown 3-pane layout. Restart the app after toggling.
+**E1 shell (Re-concept):** The default UI is Session rail | Terminal | Viewer. The embedded terminal is powered by [Ghostty](https://ghostty.org) via [libghostty-spm](https://github.com/Lakr233/libghostty-spm) (MIT). In **Settings**, turn off **「E1 シェル」** to use the legacy Markdown 3-pane layout. Restart the app after toggling.
 
-**E1 シェル（Re-concept）:** デフォルトは Session rail | Terminal | Viewer です。**設定**で **「E1 シェル」** を OFF にすると従来の Markdown 3ペイン UI に戻ります。切り替え後はアプリを再起動してください。
+**E1 シェル（Re-concept）:** デフォルトは Session rail | Terminal | Viewer です。組み込みターミナルは [Ghostty](https://ghostty.org) を [libghostty-spm](https://github.com/Lakr233/libghostty-spm)（MIT）経由で利用しています。**設定**で **「E1 シェル」** を OFF にすると従来の Markdown 3ペイン UI に戻ります。切り替え後はアプリを再起動してください。
 
 If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, run the development ACL helper described in [`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md).
 ローカルの ad-hoc 再ビルド後に API キーの Keychain アクセス確認が繰り返される場合は、[`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md) の開発用 ACL ヘルパーを使用してください。
@@ -217,6 +217,26 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## Third-party software / オープンソース利用
+
+kobaamd is MIT-licensed, but it bundles and links other open-source components.
+The E1 terminal embeds Ghostty's `libghostty` library (MIT) through the
+`GhosttyTerminal` Swift package. Other dependencies include swift-markdown,
+Tree-sitter, Mermaid.js, and EasyMDE.
+
+- Full attribution and license texts: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- In-app: **Help → オープンソース** (⌘?)
+
+kobaamd is not affiliated with or endorsed by the Ghostty project.
+
+kobaamd 本体は MIT ですが、Ghostty ほか複数の OSS を組み込んでいます。
+E1 ターミナルは `libghostty-spm` 経由で Ghostty（MIT）を利用しています。
+帰属表示・全文は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) および
+アプリ内ヘルプの「オープンソース」を参照してください。
+
+---
+
 ## License / ライセンス
 
-MIT — see [LICENSE](LICENSE).
+kobaamd source code: MIT — see [LICENSE](LICENSE).
+Third-party components: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
