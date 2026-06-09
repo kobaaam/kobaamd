@@ -2,7 +2,7 @@ import Testing
 @testable import kobaamd
 import Foundation
 
-@Suite("SessionCoordinator")
+@Suite("SessionCoordinator", .serialized)
 struct SessionCoordinatorTests {
     @Test("bootstrap applies file tree even when session already active")
     @MainActor
@@ -65,11 +65,13 @@ struct SessionCoordinatorTests {
 
     @Test("duplicateSession clones active directory")
     @MainActor
-    func duplicateSessionCreatesSibling() {
+    func duplicateSessionCreatesSibling() throws {
         let vm = AppViewModel()
         let coordinator = SessionCoordinator()
         coordinator.attach(appViewModel: vm)
-        let path = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kobaamd-session-dup-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
         let original = WorktreeSession.localDirectory(name: "project", path: path)
         coordinator.sessions = [original]
         coordinator.activeSessionID = original.id

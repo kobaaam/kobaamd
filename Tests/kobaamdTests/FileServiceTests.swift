@@ -2,7 +2,7 @@ import Testing
 @testable import kobaamd
 import Foundation
 
-@Suite("FileService")
+@Suite("FileService", .serialized)
 struct FileServiceTests {
     let svc = FileService()
     let tmpDir: URL
