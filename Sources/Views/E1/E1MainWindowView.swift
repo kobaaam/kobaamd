@@ -187,6 +187,9 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
             .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
                 appViewModel.refreshQuickOpenIndex()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+                appViewModel.refreshQuickOpenIndex()
+            }
             .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalRequested)) { _ in
                 NotificationCenter.default.post(name: .e1FocusTerminalPane, object: nil)
             }
