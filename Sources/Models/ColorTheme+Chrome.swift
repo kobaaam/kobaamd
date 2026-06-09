@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - Shell chrome colors (E1 + app chrome)
@@ -79,6 +80,33 @@ extension ColorTheme {
         switch self {
         case .light:         return .kobaInk
         case .dark, .solarizedDark: return Color.white
+        }
+    }
+
+    /// タイトルバー / ツールバー用（`chromePaper` より一段明るく、版表示のコントラストを確保）。
+    var chromeTitlebar: Color {
+        switch self {
+        case .light:         return .kobaSurface
+        case .dark:          return Color(hex: "2D2D30")
+        case .solarizedDark: return Color(hex: "0A3942")
+        }
+    }
+
+    var chromeTitlebarNSColor: NSColor {
+        switch self {
+        case .light:
+            return NSColor(srgbRed: 0.98, green: 0.98, blue: 0.97, alpha: 1)
+        case .dark:
+            return NSColor(srgbRed: 0.176, green: 0.176, blue: 0.188, alpha: 1) // #2D2D30
+        case .solarizedDark:
+            return NSColor(srgbRed: 0.039, green: 0.224, blue: 0.259, alpha: 1) // #0A3942
+        }
+    }
+
+    var prefersDarkChrome: Bool {
+        switch self {
+        case .light: return false
+        case .dark, .solarizedDark: return true
         }
     }
 }

@@ -2,9 +2,22 @@ import AppKit
 
 enum WindowChrome {
     static func configureE1Window(_ window: NSWindow) {
+        guard AppState.shared.useE1Shell else { return }
+
+        let theme = AppState.shared.selectedTheme
+        let title = "kobaamd (E1) \(AppVersion.bundleMarketing)"
+
+        window.title = title
+        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = false
+        window.isOpaque = true
+        window.backgroundColor = theme.chromeTitlebarNSColor
+        window.appearance = NSAppearance(named: theme.prefersDarkChrome ? .darkAqua : .aqua)
+
         if #available(macOS 11.0, *) {
-            window.toolbarStyle = .unifiedCompact
+            window.toolbarStyle = .unified
         }
+
         restoreTrafficLightButtons(in: window)
         scheduleTitlebarIconHiding(for: window)
     }

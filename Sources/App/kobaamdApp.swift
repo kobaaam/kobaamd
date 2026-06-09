@@ -163,6 +163,7 @@ extension Notification.Name {
     static let e1FocusEditorRequested          = Notification.Name("kobaamd.e1FocusEditorRequested")
     static let e1FocusTerminalPane             = Notification.Name("kobaamd.e1FocusTerminalPane")
     static let e1FocusFileTree                 = Notification.Name("kobaamd.e1FocusFileTree")
+    static let e1WindowChromeRefresh           = Notification.Name("kobaamd.e1WindowChromeRefresh")
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
     static let persistEditorSessionRequested   = Notification.Name("kobaamd.persistEditorSessionRequested")
@@ -229,6 +230,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             NSWindow.didBecomeKeyNotification,
             NSWindow.didBecomeMainNotification,
             NSWindow.didResizeNotification,
+            .e1WindowChromeRefresh,
         ]
         windowChromeObservers = names.map { name in
             center.addObserver(forName: name, object: nil, queue: .main) { notification in

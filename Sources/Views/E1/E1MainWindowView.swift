@@ -70,8 +70,14 @@ struct E1MainWindowView: View {
         .background(E1WindowTitleConfigurator())
         .navigationTitle("kobaamd (E1) \(AppVersion.bundleMarketing)")
         .toolbarTitleDisplayMode(.inline)
+        .toolbarBackground(appState.selectedTheme.chromeTitlebar, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+        .toolbarColorScheme(appState.selectedTheme.prefersDarkChrome ? .dark : .light)
         .frame(minWidth: 720, minHeight: 400)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                E1WindowTitleLabel(theme: appState.selectedTheme)
+            }
             ToolbarItemGroup(placement: .navigation) {
                 Button {
                     NotificationCenter.default.post(name: .openFolderRequested, object: nil)
@@ -123,6 +129,9 @@ struct E1MainWindowView: View {
         .onChange(of: rightFraction) { _, newValue in
             Self.saveRightFraction(newValue)
         }
+        .onChange(of: appState.selectedTheme) { _, _ in
+            NotificationCenter.default.post(name: .e1WindowChromeRefresh, object: nil)
+        }
         .modifier(E1MainWindowCommandReceiver(
             appViewModel: appViewModel,
             sessionCoordinator: sessionCoordinator,
@@ -140,6 +149,29 @@ struct E1MainWindowView: View {
 
     private static func saveRightFraction(_ value: CGFloat) {
         UserDefaults.standard.set(Double(value), forKey: rightFractionKey)
+    }
+}
+
+private struct E1WindowTitleLabel: View {
+    let theme: ColorTheme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("kobaamd")
+                .font(.system(size: 13, weight: .semibold))
+            Text("(E1)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.chromeMute)
+            Text(AppVersion.bundleMarketing)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(theme.chromeInk)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(theme.chromeLine.opacity(theme.prefersDarkChrome ? 0.55 : 0.25), in: Capsule())
+        }
+        .foregroundStyle(theme.chromeInk)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("kobaamd E1 \(AppVersion.bundleMarketing)")
     }
 }
 
