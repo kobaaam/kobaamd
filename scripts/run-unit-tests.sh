@@ -71,7 +71,7 @@ trap cleanup EXIT
 echo "[run-unit-tests] swift test ${FILTER_ARGS[*]:-} (xunit: $XUNIT_OUTPUT)"
 
 set +e
-CMD=(swift test --enable-swift-testing --xunit-output "$XUNIT_OUTPUT")
+CMD=(swift test --enable-swift-testing --no-parallel --xunit-output "$XUNIT_OUTPUT")
 if ((${#FILTER_ARGS[@]})); then
   CMD+=("${FILTER_ARGS[@]}")
 fi

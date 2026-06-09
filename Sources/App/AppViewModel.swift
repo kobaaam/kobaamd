@@ -344,9 +344,10 @@ final class AppViewModel {
             previewMode = .viewer
         }
 
+        guard let window = NSApplication.shared.mainWindow else { return }
         let announcement = previewMode == .viewer ? "Reading mode active" : "Edit mode active"
         NSAccessibility.post(
-            element: NSApp.mainWindow ?? NSApp,
+            element: window,
             notification: .announcementRequested,
             userInfo: [
                 .announcement: announcement,
