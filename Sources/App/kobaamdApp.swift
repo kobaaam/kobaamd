@@ -152,6 +152,7 @@ extension Notification.Name {
     static let jumpToLine             = Notification.Name("kobaamd.jumpToLine")
     static let previewScrollRatioChanged = Notification.Name("kobaamd.previewScrollRatioChanged")
     static let e1TerminalAppearanceChanged = Notification.Name("kobaamd.e1TerminalAppearanceChanged")
+    static let e1TerminalMemoryPressure = Notification.Name("kobaamd.e1TerminalMemoryPressure")
     static let exportPDFRequested             = AppCommand.exportPDF.notificationName
     static let exportPDFWithURL               = Notification.Name("kobaamd.exportPDFWithURL")
     static let exportPDFCompleted             = Notification.Name("kobaamd.exportPDFCompleted")
@@ -176,6 +177,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var moveObserver: NSObjectProtocol?
     private var resizeObserver: NSObjectProtocol?
     private var windowChromeObservers: [NSObjectProtocol] = []
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first,
@@ -198,6 +200,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
         subscribeToWindowNotifications()
         subscribeToWindowChromeNotifications()
+        subscribeToMemoryPressure()
         DispatchQueue.main.async { [weak self] in
             self?.restoreWindowFrame()
             NSApp.windows.forEach(WindowChrome.configureE1Window)
@@ -208,10 +211,25 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: .persistEditorSessionRequested, object: nil)
         saveWindowFrame()
         removeWindowNotifications()
+        memoryPressureSource?.cancel()
+        memoryPressureSource = nil
     }
 
     deinit {
         removeWindowNotifications()
+        memoryPressureSource?.cancel()
+    }
+
+    private func subscribeToMemoryPressure() {
+        let source = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        source.setEventHandler {
+            NotificationCenter.default.post(name: .e1TerminalMemoryPressure, object: nil)
+        }
+        source.resume()
+        memoryPressureSource = source
     }
 
     private func subscribeToWindowNotifications() {
@@ -234,8 +252,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
         windowChromeObservers = names.map { name in
             center.addObserver(forName: name, object: nil, queue: .main) { notification in
-                guard let window = notification.object as? NSWindow else { return }
-                WindowChrome.configureE1Window(window)
+                if let window = notification.object as? NSWindow {
+                    WindowChrome.configureE1Window(window)
+                } else if name == .e1WindowChromeRefresh {
+                    NSApp.windows.forEach(WindowChrome.configureE1Window)
+                }
             }
         }
     }

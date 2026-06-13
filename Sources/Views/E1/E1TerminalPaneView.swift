@@ -6,6 +6,7 @@ import GhosttyTerminal
 
 struct E1TerminalPaneView: View {
     @Bindable var coordinator: SessionCoordinator
+    @Bindable var agentStatusMonitor: E1AgentStatusMonitor
     @State private var terminalController = E1TerminalSessionController()
 
     var body: some View {
@@ -28,7 +29,21 @@ struct E1TerminalPaneView: View {
             focusActiveTerminal()
         }
         .onAppear {
+            agentStatusMonitor.attach(
+                terminalController: terminalController,
+                sessionCoordinator: coordinator
+            )
             focusActiveTerminal()
+        }
+        .onDisappear {
+            agentStatusMonitor.detach()
+            terminalController.reclaimMemory(keeping: nil)
+        }
+        .onChange(of: coordinator.sessions.map(\.id)) { _, sessionIDs in
+            terminalController.suspendSessions(notIn: Set(sessionIDs))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .e1TerminalMemoryPressure)) { _ in
+            terminalController.reclaimMemory(keeping: coordinator.activeSessionID)
         }
         .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalPane)) { _ in
             focusActiveTerminal()

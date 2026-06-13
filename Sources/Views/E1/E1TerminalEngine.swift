@@ -4,6 +4,9 @@ import GhosttyTerminal
 
 @MainActor
 enum E1TerminalEngine {
+    /// Ghostty scrollback cap per surface (RAM). 古い行は `.kobaamd/transcript.log` へ。
+    static let scrollbackLimit = E1TerminalMemoryPolicy.scrollbackLimit
+
     private static var _sharedController: TerminalController?
 
     static var sharedController: TerminalController {
@@ -11,15 +14,24 @@ enum E1TerminalEngine {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let term = E1TerminalTermConfig.shellTermName
         let controller = TerminalController { builder in
-            builder.withBackgroundOpacity(1)
-            builder.withCustom("command", "\(shell) -l")
-            builder.withCustom("env", "TERM=\(term)")
-            builder.withCustom("keybind", "shift+enter=text:\\x1b[13;2u")
-            builder.withWindowPaddingX(0)
-            builder.withWindowPaddingY(0)
+            applyBaseConfiguration(to: &builder, shell: shell, term: term)
         }
         _sharedController = controller
         return controller
+    }
+
+    private static func applyBaseConfiguration(
+        to builder: inout TerminalConfiguration.Builder,
+        shell: String,
+        term: String
+    ) {
+        builder.withBackgroundOpacity(1)
+        builder.withCustom("scrollback-limit", scrollbackLimit)
+        builder.withCustom("command", "\(shell) -l")
+        builder.withCustom("env", "TERM=\(term)")
+        builder.withCustom("keybind", "shift+enter=text:\\x1b[13;2u")
+        builder.withWindowPaddingX(0)
+        builder.withWindowPaddingY(0)
     }
 
     static func applyAppearance(theme: ColorTheme = AppState.shared.selectedTheme) {
@@ -29,8 +41,11 @@ enum E1TerminalEngine {
             dark: appearanceConfiguration(theme: theme, fontSize: size)
         )
         _ = sharedController.setTheme(scheme)
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let term = E1TerminalTermConfig.shellTermName
         _ = sharedController.setTerminalConfiguration(
             TerminalConfiguration { builder in
+                applyBaseConfiguration(to: &builder, shell: shell, term: term)
                 builder.withFontSize(size)
             }
         )

@@ -39,6 +39,8 @@ final class FileTreeViewModel {
     /// ツリー上で NEW バッジを付けるファイル（KMD-228）
     var newFilePaths: Set<String> = []
 
+    private let fsWatcher = WorkspaceFSEventWatcher()
+
     // MARK: - Legacy compat
 
     var rootURL: URL? { folders.first?.url }
@@ -64,12 +66,14 @@ final class FileTreeViewModel {
         folders.append(folder)
         saveWorkspace()
         reloadFolder(id: folder.id)
+        updateFilesystemWatching()
         NotificationCenter.default.post(name: .workspaceRootChanged, object: url)
     }
 
     func removeFolder(id: UUID) {
         folders.removeAll { $0.id == id }
         saveWorkspace()
+        updateFilesystemWatching()
     }
 
     // MARK: - Reload
@@ -104,6 +108,7 @@ final class FileTreeViewModel {
         let urls = AppState.loadWorkspaceFolders()
         folders = urls.map { WorkspaceFolder(url: $0) }
         for folder in folders { reloadFolder(id: folder.id) }
+        updateFilesystemWatching()
         if let first = folders.first {
             NotificationCenter.default.post(name: .workspaceRootChanged, object: first.url)
         }
@@ -119,6 +124,7 @@ final class FileTreeViewModel {
         folders = [folder]
         AppState.saveLastFolder(url)
         reloadFolder(id: folder.id)
+        updateFilesystemWatching()
         NotificationCenter.default.post(name: .workspaceRootChanged, object: url)
     }
 
@@ -127,6 +133,7 @@ final class FileTreeViewModel {
         selectedNode = nil
         isLoading = false
         newFilePaths = []
+        fsWatcher.stop()
     }
 
     func markFileAsNew(_ url: URL) {
@@ -178,8 +185,22 @@ final class FileTreeViewModel {
     func openFolder() { addFolder() }
     func openFolder(url: URL) { addFolder(url: url) }
     func restoreLastFolder() { restoreWorkspace() }
+
+    // MARK: - Filesystem watching
+
+    private func updateFilesystemWatching() {
+        let urls = folders.map(\.url)
+        fsWatcher.watch(urls: urls) { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.reload()
+                NotificationCenter.default.post(name: .workspaceFilesChanged, object: nil)
+            }
+        }
+    }
 }
 
 extension Notification.Name {
     static let workspaceRootChanged = Notification.Name("workspaceRootChanged")
+    static let workspaceFilesChanged = Notification.Name("workspaceFilesChanged")
 }

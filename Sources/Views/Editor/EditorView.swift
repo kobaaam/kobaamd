@@ -14,7 +14,7 @@ struct EditorView: View {
     var body: some View {
         @Bindable var vm = appViewModel
         VStack(spacing: 0) {
-            if appViewModel.previewMode != .viewer {
+            if appViewModel.previewMode != .viewer, !AppState.shared.useE1Shell {
                 FrontmatterEditor(text: $vm.editorText)
             }
             ZStack {

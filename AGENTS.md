@@ -506,3 +506,23 @@ stdout は assistant のテキスト本文のみ。stderr には `load_all.sh` �
 
 ### 4. Goal-Driven Execution
 ゴールから逆算して行動する。
+
+---
+
+## LLM-Wiki
+
+エージェント用ナレッジベースは `docs/llm-wiki/`。スキル: `~/.claude/skills/llm-wiki/SKILL.md`。
+
+### 修正前
+
+1. `docs/llm-wiki/INDEX.md` を読む
+2. 触る領域のページを 1〜2 件読み、**Invariants & Gotchas** を計画に入れる
+
+### 修正後
+
+主要モジュール・フロー・不変条件の変更時は関連ページを更新し `log.md` に追記する。
+
+### E1 ターミナル（横断方針）
+
+- **軽量 + 利便性**: セッション切替で PTY を止めない。軽量化はポーリング間引き・RAM 予算・ディスク transcript で行う（[[e1-terminal-lightweight]]）。
+- 詳細: `docs/llm-wiki/concepts/e1-terminal-lightweight.md`
