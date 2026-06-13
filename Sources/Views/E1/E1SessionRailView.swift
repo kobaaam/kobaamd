@@ -4,6 +4,7 @@ import SwiftUI
 
 struct E1SessionRailView: View {
     @Bindable var coordinator: SessionCoordinator
+    @Bindable var agentStatusMonitor: E1AgentStatusMonitor
     @Environment(AppViewModel.self) private var appViewModel
     @Bindable private var appState = AppState.shared
 
@@ -14,7 +15,10 @@ struct E1SessionRailView: View {
         GeometryReader { geo in
             let sessionsHeight = max(80, geo.size.height * sessionsFraction)
             VStack(spacing: 0) {
-                E1SessionsListView(coordinator: coordinator)
+                E1SessionsListView(
+                    coordinator: coordinator,
+                    agentStatusMonitor: agentStatusMonitor
+                )
                     .frame(height: sessionsHeight)
 
                 KobaHDivider()

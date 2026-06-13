@@ -61,7 +61,7 @@ struct SettingsView: View {
                 .onChange(of: appState.terminalFontSize) { _, _ in
                     AppState.postCodeFontAppearanceChanged()
                 }
-                Text("ターミナルとエディタの等幅フォントサイズです。既定は 14pt（SF Mono）。")
+                Text("ターミナルとエディタの等幅フォントサイズです。既定は 12pt（SF Mono）。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -73,6 +73,10 @@ struct SettingsView: View {
             Section("E1 シェル") {
                 Toggle("E1 シェル（Session | Terminal | Viewer）", isOn: $appState.useE1Shell)
                 Text("Re-concept レイアウトです。OFF にすると従来の Markdown 3ペイン UI に戻ります。変更は再起動後に反映されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("エージェント入力待ちで通知", isOn: $appState.e1NotifyWhenAgentBlocked)
+                Text("Claude Code 等が承認待ち（Blocked）になったとき、他セッションを見ている場合に macOS 通知します。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

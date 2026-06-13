@@ -134,8 +134,38 @@ struct MarkdownServiceTests {
         let md = "| Name | Value |\n| --- | --- |\n| A | 1 |"
         let html = svc.toBodyHTML(md)
         #expect(html.contains("<table"))
+        #expect(html.contains("<th>Name</th>"))
+        #expect(html.contains("<th>Value</th>"))
         #expect(html.contains("<td>A</td>"))
-        #expect(html.contains("<td>") || html.contains("<th>"))
+    }
+
+    @Test("日本語ヘッダ行が thead/th にレンダリングされること")
+    func japaneseTableHeaderRendering() {
+        let md = """
+        | メンバー | 6月単価 | 備考 |
+        |---|---|---|
+        | A | 500,000 | シニアエンジニア想定 |
+        """
+        let html = svc.toBodyHTML(md)
+        #expect(html.contains("<thead>"))
+        #expect(html.contains("<th>メンバー</th>"))
+        #expect(html.contains("<th>6月単価</th>"))
+        #expect(html.contains("<th>備考</th>"))
+        #expect(html.contains("<td>A</td>"))
+    }
+
+    @Test("4列テーブルのヘッダが正しくレンダリングされること")
+    func fourColumnTableHeaderRendering() {
+        let md = """
+        | ym | A | B | C |
+        |---|---|---|---|
+        | 2026-02 | 80 | 100 | - |
+        """
+        let html = svc.toBodyHTML(md)
+        #expect(html.contains("<th>ym</th>"))
+        #expect(html.contains("<th>A</th>"))
+        #expect(html.contains("<th>B</th>"))
+        #expect(html.contains("<th>C</th>"))
     }
 
     // MARK: - Mermaid コードブロック

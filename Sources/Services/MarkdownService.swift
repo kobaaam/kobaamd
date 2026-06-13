@@ -168,8 +168,10 @@ final class MarkdownService {
         // Markdown テーブルは 1行/row のため、Table.Row.range が nil の場合は
         // テーブル開始行 + 行オフセットで行番号を手動計算する
         let tableStart = table.range?.lowerBound.line ?? 0
-        let headRows = table.children.compactMap { $0 as? Table.Head }
-            .flatMap { $0.children.compactMap { $0 as? Table.Row } }
+        let headerRowCount = table.children
+            .compactMap { $0 as? Table.Head }
+            .map(tableHeadRowCount(in:))
+            .reduce(0, +)
 
         var html = "<table\(srcAttr(table))>"
 
@@ -177,10 +179,10 @@ final class MarkdownService {
             if let head = child as? Table.Head {
                 html += "<thead>"
                 var offset = 0
-                for row in head.children.compactMap({ $0 as? Table.Row }) {
-                    let attr = tableRowAttr(row, tableStart: tableStart, offset: offset)
+                for rowMarkup in tableHeadRowMarkups(in: head) {
+                    let attr = tableRowAttr(rowMarkup, tableStart: tableStart, offset: offset)
                     html += "<tr\(attr)>"
-                    for cell in row.children.compactMap({ $0 as? Table.Cell }) {
+                    for cell in tableRowCells(in: rowMarkup) {
                         html += "<th>\(renderChildren(of: cell))</th>"
                     }
                     html += "</tr>"
@@ -190,7 +192,7 @@ final class MarkdownService {
             } else if let body = child as? Table.Body {
                 html += "<tbody>"
                 // ヘッダ行数 + セパレータ行(1行) 分をオフセット
-                var offset = headRows.count + 1
+                var offset = headerRowCount + 1
                 for row in body.children.compactMap({ $0 as? Table.Row }) {
                     let attr = tableRowAttr(row, tableStart: tableStart, offset: offset)
                     html += "<tr\(attr)>"
@@ -205,6 +207,30 @@ final class MarkdownService {
         }
         html += "</table>"
         return html
+    }
+
+    /// swift-markdown 0.4+ では `Table.Head` の子が `Table.Row` ではなく `Table.Cell` 直結のことがある。
+    private func tableHeadRowMarkups(in head: Table.Head) -> [Markup] {
+        let rows = head.children.compactMap { $0 as? Table.Row }
+        if !rows.isEmpty { return rows }
+        let cells = head.children.compactMap { $0 as? Table.Cell }
+        return cells.isEmpty ? [] : [head]
+    }
+
+    private func tableHeadRowCount(in head: Table.Head) -> Int {
+        let rows = head.children.compactMap { $0 as? Table.Row }
+        if !rows.isEmpty { return rows.count }
+        return head.children.contains(where: { $0 is Table.Cell }) ? 1 : 0
+    }
+
+    private func tableRowCells(in rowMarkup: Markup) -> [Table.Cell] {
+        if let row = rowMarkup as? Table.Row {
+            return row.children.compactMap { $0 as? Table.Cell }
+        }
+        if let head = rowMarkup as? Table.Head {
+            return head.children.compactMap { $0 as? Table.Cell }
+        }
+        return []
     }
 
     /// Table.Row の行番号属性を返す。range がある場合はそれを優先し、

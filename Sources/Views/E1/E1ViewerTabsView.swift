@@ -21,10 +21,8 @@ struct E1ViewerTabsView: View {
     var body: some View {
         let chrome = appState.selectedTheme
         VStack(spacing: 0) {
+            E1ViewerPathBar()
             tabBar
-            if fileKind == .markdown, appViewModel.selectedFileURL != nil {
-                E1MarkdownToolbar()
-            }
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if fileKind == .markdown, appViewModel.selectedFileURL != nil {

@@ -80,7 +80,8 @@ ensure_app_bundle
 stop_running_target
 
 if [ ! -f "$BUILD_BINARY" ]; then
-  echo "[post-build] binary not found at $BUILD_BINARY — run swift build first"
+  echo "[post-build] binary not found at $BUILD_BINARY"
+  echo "[post-build] run: ./scripts/prepare-build.sh && swift build -c $CONFIG"
   exit 1
 fi
 
