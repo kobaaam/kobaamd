@@ -177,6 +177,23 @@ struct AppViewModelTests {
         #expect(vm.tabs.first?.content == "<p>new</p>")
     }
 
+    @Test("resolvedActiveFileContent prefers disk for clean markdown tab")
+    func resolvedActiveFileContentPrefersDisk() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let file = dir.appendingPathComponent("doc.md")
+        try "# old".write(to: file, atomically: true, encoding: .utf8)
+
+        let vm = AppViewModel()
+        vm.openInTab(url: file, content: "# old")
+        try "# new".write(to: file, atomically: true, encoding: .utf8)
+
+        #expect(vm.resolvedActiveFileContent() == "# new")
+    }
+
     @Test("syncOpenTabsFromDiskIfClean skips dirty tabs")
     func syncOpenTabsFromDiskIfCleanSkipsDirtyTab() throws {
         let dir = FileManager.default.temporaryDirectory

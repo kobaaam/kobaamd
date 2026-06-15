@@ -43,18 +43,8 @@ struct HTMLPreviewView: View {
         }
     }
 
-    /// 未保存編集時はエディタバッファ、それ以外はディスクを優先（Claude Code 等の外部更新を反映）。
     private func refreshPreviewHTML() {
-        if appViewModel.isDirty {
-            previewHTML = appViewModel.editorText
-            return
-        }
-        if let url = appViewModel.selectedFileURL,
-           let disk = try? FileService().readFile(at: url) {
-            previewHTML = disk
-            return
-        }
-        previewHTML = appViewModel.editorText
+        previewHTML = appViewModel.resolvedActiveFileContent()
     }
 }
 

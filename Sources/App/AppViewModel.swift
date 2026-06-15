@@ -73,6 +73,9 @@ final class AppViewModel {
     var tabs: [EditorTab] = []
     var activeTabID: UUID? = nil
     private var isRestoringEditorSession = false
+    /// `syncTabContent` による editorText 代入中は `markEdited` を抑止する。
+    @ObservationIgnored
+    private var isApplyingDiskSync = false
 
     /// 現在アクティブなタブ。
     var activeTab: EditorTab? {
@@ -252,7 +255,9 @@ final class AppViewModel {
         tabs[idx].content = updated
         tabs[idx].isDirty = false
         if activeTabID == tabs[idx].id {
+            isApplyingDiskSync = true
             editorText = updated
+            isApplyingDiskSync = false
             savedText = updated
             isDirty = false
             outlineViewModel.update(text: updated)
@@ -262,8 +267,17 @@ final class AppViewModel {
         }
     }
 
+    /// アクティブファイルの表示用テキスト（未編集時はディスク優先）。md / html / csv / d2 等すべて共通。
+    func resolvedActiveFileContent() -> String {
+        FileContentResolver.displayContent(
+            url: selectedFileURL,
+            inMemory: editorText,
+            isDirty: isDirty
+        )
+    }
+
     /// FSEvents 等でディスクが更新されたとき、未編集（!isDirty）の開いているタブをディスク内容に追従する。
-    /// Claude Code 等の外部エージェントがファイルを書き換えた場合のプレビュー stale 対策。
+    /// md / html / csv / d2 等の拡張子を問わず、Claude Code 等の外部更新をエディタ・プレビューに反映する。
     func syncOpenTabsFromDiskIfClean() {
         flushActiveTab()
         let fileService = FileService()
@@ -387,6 +401,7 @@ final class AppViewModel {
     }
 
     func markEdited() {
+        guard !isApplyingDiskSync else { return }
         isDirty = true  // 編集時は即 true、保存時に false にする
         scheduleStatsUpdate()
     }
