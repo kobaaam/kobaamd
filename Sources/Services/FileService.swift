@@ -20,9 +20,33 @@ final class FileService {
         ".Trash", ".Spotlight-V100", ".DocumentRevisions-V100", ".fseventsd",
     ]
 
-    func loadNodes(at url: URL, showHiddenFiles: Bool = AppState.shared.showHiddenFiles) -> [FileNode] {
+    /// 依存・ビルド成果物ディレクトリ（`indexDependencyDirectories` が OFF のときスキップ）
+    static let dependencyDirectoryNames: Set<String> = [
+        "node_modules", "dist", "build", ".git", ".svn", ".hg",
+        ".pnpm", ".yarn", "coverage", ".next", ".nuxt", "vendor",
+    ]
+
+    /// ディレクトリをツリー走査・インデックスから除外するか。
+    static func shouldSkipDirectory(
+        name: String,
+        includeDependencyDirectories: Bool
+    ) -> Bool {
+        if alwaysExcludedDirectoryNames.contains(name) { return true }
+        if !includeDependencyDirectories, dependencyDirectoryNames.contains(name) { return true }
+        return false
+    }
+
+    func loadNodes(
+        at url: URL,
+        showHiddenFiles: Bool = AppState.shared.showHiddenFiles,
+        includeDependencyDirectories: Bool = AppState.shared.indexDependencyDirectories
+    ) -> [FileNode] {
         guard isDirectory(url) else { return [] }
-        return children(of: url, showHiddenFiles: showHiddenFiles)
+        return children(
+            of: url,
+            showHiddenFiles: showHiddenFiles,
+            includeDependencyDirectories: includeDependencyDirectories
+        )
     }
 
     func readFile(at url: URL) throws -> String {
@@ -52,7 +76,8 @@ final class FileService {
         of directory: URL,
         depth: Int = 0,
         maxDepth: Int = 5,
-        showHiddenFiles: Bool
+        showHiddenFiles: Bool,
+        includeDependencyDirectories: Bool
     ) -> [FileNode] {
         guard depth < maxDepth else { return [] }
         do {
@@ -68,12 +93,16 @@ final class FileService {
                 let name = item.lastPathComponent
                 guard let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else { continue }
                 if isDir {
-                    if Self.alwaysExcludedDirectoryNames.contains(name) { continue }
+                    if Self.shouldSkipDirectory(
+                        name: name,
+                        includeDependencyDirectories: includeDependencyDirectories
+                    ) { continue }
                     let childNodes = children(
                         of: item,
                         depth: depth + 1,
                         maxDepth: maxDepth,
-                        showHiddenFiles: showHiddenFiles
+                        showHiddenFiles: showHiddenFiles,
+                        includeDependencyDirectories: includeDependencyDirectories
                     )
                     let isDotDirectory = name.hasPrefix(".")
                     let includeDirectory = !childNodes.isEmpty || (showHiddenFiles && isDotDirectory)

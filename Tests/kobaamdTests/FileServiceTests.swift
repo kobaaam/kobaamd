@@ -113,7 +113,7 @@ struct FileServiceTests {
         #expect(!names.contains(".scratch"))
     }
 
-    @Test("Hidden on shows scratch and empty dot directories like .git")
+    @Test("Hidden on shows scratch and empty dot directories like .git when deps included")
     func loadNodesShowsDotDirectoriesWhenHiddenOn() throws {
         let scratch = tmpDir.appendingPathComponent(".scratch/member-create", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -126,7 +126,11 @@ struct FileServiceTests {
         try FileManager.default.createDirectory(at: gitDir, withIntermediateDirectories: true)
         try "obj".write(to: gitDir.appendingPathComponent("dummy"), atomically: true, encoding: .utf8)
 
-        let nodes = svc.loadNodes(at: tmpDir, showHiddenFiles: true)
+        let nodes = svc.loadNodes(
+            at: tmpDir,
+            showHiddenFiles: true,
+            includeDependencyDirectories: true
+        )
         let names = nodes.map(\.name)
         #expect(names.contains(".scratch"))
         #expect(names.contains(".git"))
@@ -135,6 +139,36 @@ struct FileServiceTests {
         let prd = scratchNode?.children?.first { $0.name == "member-create" }?
             .children?.first { $0.name == "PRD.md" }
         #expect(prd != nil)
+    }
+
+    @Test("Dependency directories are skipped by default")
+    func loadNodesSkipsDependencyDirectoriesByDefault() throws {
+        let nodeModules = tmpDir.appendingPathComponent("node_modules/pkg", isDirectory: true)
+        try FileManager.default.createDirectory(at: nodeModules, withIntermediateDirectories: true)
+        try "dep".write(
+            to: nodeModules.appendingPathComponent("index.js"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "# App".write(to: tmpDir.appendingPathComponent("app.md"), atomically: true, encoding: .utf8)
+
+        let names = svc.loadNodes(at: tmpDir, includeDependencyDirectories: false).map(\.name)
+        #expect(names.contains("app.md"))
+        #expect(!names.contains("node_modules"))
+    }
+
+    @Test("Dependency directories appear when opt-in enabled")
+    func loadNodesIncludesDependencyDirectoriesWhenOptIn() throws {
+        let nodeModules = tmpDir.appendingPathComponent("node_modules/pkg", isDirectory: true)
+        try FileManager.default.createDirectory(at: nodeModules, withIntermediateDirectories: true)
+        try "dep".write(
+            to: nodeModules.appendingPathComponent("index.js"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let names = svc.loadNodes(at: tmpDir, includeDependencyDirectories: true).map(\.name)
+        #expect(names.contains("node_modules"))
     }
 
     // MARK: - createNewFile

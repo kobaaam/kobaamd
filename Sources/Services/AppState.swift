@@ -20,6 +20,7 @@ import Observation
     private static let terminalThemeUnifiedKey = "terminalThemeUnifiedToDark_v1"
     private static let terminalFontSizeKey = "terminalFontSize"
     private static let showHiddenFilesKey = "showHiddenFiles"
+    static let indexDependencyDirectoriesKey = "indexDependencyDirectories"
 
     enum CodeFontSize {
         static let min: Double = 11
@@ -52,6 +53,13 @@ import Observation
         }
     }
 
+    /// `node_modules` / `dist` / `.git` 等をツリー・全文検索インデックスに含める（既定 OFF）。
+    var indexDependencyDirectories: Bool {
+        didSet {
+            defaults.set(indexDependencyDirectories, forKey: Self.indexDependencyDirectoriesKey)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.e1Recommended.rawValue
@@ -67,6 +75,7 @@ import Observation
         let storedFontSize = defaults.double(forKey: Self.terminalFontSizeKey)
         self.terminalFontSize = storedFontSize > 0 ? storedFontSize : Self.CodeFontSize.defaultSize
         self.showHiddenFiles = defaults.bool(forKey: Self.showHiddenFilesKey)
+        self.indexDependencyDirectories = defaults.bool(forKey: Self.indexDependencyDirectoriesKey)
     }
 
     func adjustCodeFontSize(by delta: Double) {

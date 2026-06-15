@@ -42,8 +42,8 @@ final class WikiIndexService {
     private let dbQueue = DispatchQueue(label: "WikiIndexService.db")
     private var buildTask: Task<Void, Never>?
 
-    func setRoot(_ url: URL?) {
-        if state == .ready, rootURL == url {
+    func setRoot(_ url: URL?, force: Bool = false) {
+        if !force, state == .ready, rootURL == url {
             return
         }
 
@@ -131,10 +131,13 @@ final class WikiIndexService {
     }
 
     private nonisolated static func indexFiles(in rootURL: URL, db: OpaquePointer?) throws {
+        let includeDependencyDirectories = UserDefaults.standard.bool(
+            forKey: AppState.indexDependencyDirectoriesKey
+        )
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else {
             throw ServiceError.invalidRoot
@@ -159,7 +162,18 @@ final class WikiIndexService {
         for case let fileURL as URL in enumerator {
             try Task.checkCancellation()
 
-            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey])
+            let values = try? fileURL.resourceValues(
+                forKeys: [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey]
+            )
+            if values?.isDirectory == true {
+                if FileService.shouldSkipDirectory(
+                    name: fileURL.lastPathComponent,
+                    includeDependencyDirectories: includeDependencyDirectories
+                ) {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
             guard values?.isRegularFile == true else { continue }
             guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
             guard let body = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }

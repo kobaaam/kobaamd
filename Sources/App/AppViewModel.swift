@@ -128,7 +128,7 @@ final class AppViewModel {
     }
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
-    func refreshQuickOpenIndex() {
+    func refreshQuickOpenIndex(forceSearchReindex: Bool = false) {
         quickOpenViewModel.indexFiles(
             from: fileTreeViewModel.folders,
             scopedTo: fileTreeViewModel.rootURL
@@ -139,7 +139,7 @@ final class AppViewModel {
         // Folder スコープの対象は「最初に開いたワークスペースフォルダ」（PRD §2）
         todoViewModel.updateFolderRoot(folderURLs.first)
         tagsViewModel.updateWorkspaceRoots(folderURLs)
-        searchIndexService.setRoot(folderURLs.first)
+        searchIndexService.setRoot(folderURLs.first, force: forceSearchReindex)
     }
 
     @MainActor

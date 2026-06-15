@@ -65,6 +65,28 @@ struct WikiIndexServiceTests {
         #expect((hits ?? []).contains { $0.snippet.contains("特定キーワード") })
     }
 
+    @Test("Skips node_modules by default")
+    func skipsNodeModulesByDefault() async throws {
+        let deps = tmpDir.appendingPathComponent("node_modules/pkg", isDirectory: true)
+        try FileManager.default.createDirectory(at: deps, withIntermediateDirectories: true)
+        try "秘密の依存キーワード".write(
+            to: deps.appendingPathComponent("hidden.js"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try write("公開キーワードはここ", name: "visible.md")
+
+        let service = WikiIndexService()
+        service.setRoot(tmpDir)
+        try await waitForReady(service)
+
+        let depHits = await service.search(query: "秘密の依存キーワード")
+        #expect(depHits?.isEmpty == true)
+
+        let visibleHits = await service.search(query: "公開キーワード")
+        #expect(visibleHits?.isEmpty == false)
+    }
+
     @Test("Index build failure moves state to failed")
     func indexingFailureSetsFailedState() async throws {
         let blockedRoot = FileManager.default.temporaryDirectory
