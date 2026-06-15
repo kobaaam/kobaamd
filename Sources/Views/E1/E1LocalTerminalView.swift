@@ -81,7 +81,7 @@ enum E1TerminalKeyboardSupport {
 }
 
 enum E1TerminalTypography {
-    static let defaultSize: CGFloat = 14
+    static let defaultSize: CGFloat = CGFloat(AppState.CodeFontSize.defaultSize)
     private static let fontCandidates = [
         "SFMono-Regular",
         "SF Mono",

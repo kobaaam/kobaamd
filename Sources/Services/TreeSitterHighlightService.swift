@@ -10,13 +10,13 @@ import TreeSitterMarkdown
     private let language: Language?
 
     private var theme: ColorTheme { AppState.shared.selectedTheme }
-
-    private let editorFont  = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-    private let boldFont    = NSFont.monospacedSystemFont(ofSize: 14, weight: .bold)
-    private let h1Font      = NSFont.monospacedSystemFont(ofSize: 20, weight: .bold)
-    private let h2Font      = NSFont.monospacedSystemFont(ofSize: 17, weight: .bold)
-    private let h3Font      = NSFont.monospacedSystemFont(ofSize: 15, weight: .semibold)
-    private let codeFont    = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    private var baseSize: CGFloat { CGFloat(AppState.shared.terminalFontSize) }
+    private var editorFont: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize, weight: .regular) }
+    private var boldFont: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize, weight: .bold) }
+    private var h1Font: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize * 20 / 14, weight: .bold) }
+    private var h2Font: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize * 17 / 14, weight: .bold) }
+    private var h3Font: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize * 15 / 14, weight: .semibold) }
+    private var codeFont: NSFont { NSFont.monospacedSystemFont(ofSize: baseSize * 13 / 14, weight: .regular) }
 
     init() {
         let parser = Parser()

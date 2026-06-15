@@ -1,37 +1,42 @@
 import AppKit
 
 enum WindowChrome {
+    /// E1 のネイティブタイトルバーは常に macOS 標準のライト chrome にする。
+    private static let e1TitlebarAppearance = NSAppearance(named: .aqua)
+    private static let e1TitlebarBackground = ColorTheme.light.chromeTitlebarNSColor
+
     static func configureE1Window(_ window: NSWindow) {
         guard AppState.shared.useE1Shell else { return }
 
-        let theme = AppState.shared.selectedTheme
-        let title = "kobaamd (E1) \(AppVersion.bundleMarketing)"
+        let title = "kobaamd (E1) \(AppVersion.display)"
 
         window.title = title
         window.titleVisibility = .visible
         window.titlebarAppearsTransparent = false
+        window.styleMask.remove(.fullSizeContentView)
+        window.isMovableByWindowBackground = false
         window.isOpaque = true
-        window.backgroundColor = theme.chromeTitlebarNSColor
-        window.appearance = NSAppearance(named: theme.prefersDarkChrome ? .darkAqua : .aqua)
+        window.backgroundColor = e1TitlebarBackground
+        window.appearance = e1TitlebarAppearance
 
         if #available(macOS 11.0, *) {
-            window.toolbarStyle = .unified
+            window.toolbarStyle = .automatic
         }
 
         restoreTrafficLightButtons(in: window)
-        scheduleTitlebarIconHiding(for: window)
+        scheduleTrafficLightRestore(for: window)
     }
 
-    static func scheduleTitlebarIconHiding(for window: NSWindow) {
-        for delay in [0.0, 0.1, 0.3] {
+    private static func scheduleTrafficLightRestore(for window: NSWindow) {
+        for delay in [0.05, 0.15, 0.35] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard window === NSApp.keyWindow || NSApp.windows.contains(window) else { return }
                 restoreTrafficLightButtons(in: window)
-                hideTitlebarDocumentIcon(in: window)
             }
         }
     }
 
-    /// 過去の広すぎる非表示処理で隠れた 3 色ボタンを必ず復元する。
+    /// 3 色ボタンとその祖先を必ず表示する（カスタム chrome 後の復旧用）。
     static func restoreTrafficLightButtons(in window: NSWindow) {
         let buttons = [
             window.standardWindowButton(.closeButton),
@@ -49,48 +54,5 @@ enum WindowChrome {
                 ancestor = view.superview
             }
         }
-    }
-
-    static func hideTitlebarDocumentIcon(in window: NSWindow) {
-        guard let close = window.standardWindowButton(.closeButton),
-              let zoom = window.standardWindowButton(.zoomButton),
-              let trafficContainer = close.superview,
-              let titlebar = trafficContainer.superview ?? zoom.superview else { return }
-
-        let trafficMaxX = trafficContainer.frame.maxX
-
-        for subview in titlebar.subviews {
-            guard !containsStandardWindowButton(subview) else { continue }
-
-            let name = String(describing: type(of: subview))
-            if name.contains("Title") || name.contains("Text") || name.contains("Toolbar") {
-                continue
-            }
-
-            let isDocumentIconSlot = subview.frame.minX >= trafficMaxX - 4
-                && subview.frame.width <= 28
-                && subview.frame.height <= 28
-                && name.contains("Icon")
-
-            if isDocumentIconSlot {
-                subview.isHidden = true
-            }
-        }
-    }
-
-    private static func containsStandardWindowButton(_ view: NSView) -> Bool {
-        var current: NSView? = view
-        while let node = current {
-            if node is NSButton, node.window?.standardWindowButton(.closeButton) === node
-                || node.window?.standardWindowButton(.miniaturizeButton) === node
-                || node.window?.standardWindowButton(.zoomButton) === node {
-                return true
-            }
-            current = node.superview
-        }
-        for child in view.subviews where containsStandardWindowButton(child) {
-            return true
-        }
-        return false
     }
 }

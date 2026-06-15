@@ -106,6 +106,15 @@ struct AppStateTests {
 
     // MARK: - E1 shell flag
 
+    @Test("e1NotifyWhenAgentBlocked defaults to true and persists")
+    func e1NotifyWhenAgentBlockedPersists() {
+        #expect(state.e1NotifyWhenAgentBlocked == true)
+        state.e1NotifyWhenAgentBlocked = false
+        #expect(defaults.bool(forKey: "e1NotifyWhenAgentBlocked") == false)
+        state.e1NotifyWhenAgentBlocked = true
+        #expect(state.e1NotifyWhenAgentBlocked == true)
+    }
+
     @Test("useE1Shell defaults to true and persists")
     func useE1ShellPersists() {
         #expect(state.useE1Shell == true)
@@ -127,9 +136,9 @@ struct AppStateTests {
         #expect(state.showHiddenFiles == false)
     }
 
-    @Test("terminalFontSize defaults to 14 and persists")
+    @Test("terminalFontSize defaults to 12 and persists")
     func terminalFontSizePersists() {
-        #expect(state.terminalFontSize == 14)
+        #expect(state.terminalFontSize == 12)
         state.terminalFontSize = 16
         #expect(defaults.double(forKey: "terminalFontSize") == 16)
         #expect(state.terminalFontSize == 16)

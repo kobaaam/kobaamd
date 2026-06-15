@@ -55,6 +55,7 @@ graceful_quit_dev() {
 build_and_launch() {
   echo "[dev-run] $(date '+%H:%M:%S') building…"
   graceful_quit_dev
+  bash "$REPO_ROOT/scripts/prepare-build.sh"
   swift build
   ./scripts/post-build.sh debug dev
   echo "[dev-run] launching $APP (production kobaamd is untouched)"
@@ -78,6 +79,7 @@ watch_paths=(
   "$REPO_ROOT/Sources"
   "$REPO_ROOT/Package.swift"
   "$REPO_ROOT/Info.plist"
+  "$REPO_ROOT/ThirdParty/libghostty-spm-patches"
 )
 
 fswatch -r -l "$DEBOUNCE_SEC" "${watch_paths[@]}" | while read -r _; do

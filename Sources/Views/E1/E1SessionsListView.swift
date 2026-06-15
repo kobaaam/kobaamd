@@ -4,6 +4,7 @@ import SwiftUI
 
 struct E1SessionsListView: View {
     @Bindable var coordinator: SessionCoordinator
+    @Bindable var agentStatusMonitor: E1AgentStatusMonitor
     @Bindable private var appState = AppState.shared
 
     var body: some View {
@@ -44,6 +45,7 @@ struct E1SessionsListView: View {
                     ForEach(coordinator.sessions) { session in
                         E1SessionRow(
                             session: session,
+                            agentStatus: agentStatusMonitor.status(for: session.id),
                             isSelected: coordinator.activeSessionID == session.id,
                             canRemove: coordinator.canRemoveSessions
                         ) {
@@ -66,6 +68,7 @@ struct E1SessionsListView: View {
 private struct E1SessionRow: View {
     @Bindable private var appState = AppState.shared
     let session: WorktreeSession
+    let agentStatus: E1AgentStatus
     let isSelected: Bool
     let canRemove: Bool
     let onSelect: () -> Void
@@ -77,6 +80,7 @@ private struct E1SessionRow: View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
+                    agentStatusDot
                     Circle()
                         .fill(isSelected ? Color.kobaAccent : chrome.chromeMute2)
                         .frame(width: 7, height: 7)
@@ -125,6 +129,25 @@ private struct E1SessionRow: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    @ViewBuilder
+    private var agentStatusDot: some View {
+        if agentStatus.showsIndicator {
+            let rgb = agentStatus.indicatorColor
+            Circle()
+                .fill(Color(red: rgb.red, green: rgb.green, blue: rgb.blue))
+                .frame(width: 8, height: 8)
+                .overlay {
+                    if agentStatus == .blocked {
+                        Circle()
+                            .stroke(Color.red.opacity(0.45), lineWidth: 2)
+                            .frame(width: 12, height: 12)
+                    }
+                }
+                .help(agentStatus.displayName)
+                .accessibilityLabel("Agent \(agentStatus.displayName)")
+        }
+    }
+
     private var subtitle: String {
         if session.isLocalSession {
             return session.displayPath
@@ -137,6 +160,7 @@ private struct E1SessionRow: View {
 
     private var accessibilitySummary: String {
         var parts = [session.name, subtitle]
+        if agentStatus.showsIndicator { parts.append("agent \(agentStatus.displayName)") }
         if session.isMainWorktree { parts.append("main worktree") }
         return parts.joined(separator: ", ")
     }

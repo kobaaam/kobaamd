@@ -6,8 +6,8 @@ import Foundation
 //   1.0 = Phase 3 complete, OSS release
 
 enum AppVersion {
-    static let semantic = "0.4.0"
-    static let build    = 40
+    static let semantic = "0.4.4"
+    static let build    = 44
     static var display: String { "v\(semantic) (b\(build))" }
 
     /// Info.plist のマーケティング版（インストール名と揃える）。

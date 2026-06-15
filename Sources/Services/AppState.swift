@@ -24,7 +24,7 @@ import Observation
     enum CodeFontSize {
         static let min: Double = 11
         static let max: Double = 22
-        static let defaultSize: Double = 14
+        static let defaultSize: Double = 12
         static let step: Double = 1
     }
     private static let e1LocalSessionsKey = "e1LocalSessions"
@@ -38,7 +38,7 @@ import Observation
         }
     }
 
-    /// ターミナルとエディタの等幅フォントサイズ（pt）。既定 14pt。
+    /// ターミナルとエディタの等幅フォントサイズ（pt）。既定 12pt。
     var terminalFontSize: Double {
         didSet {
             defaults.set(terminalFontSize, forKey: Self.terminalFontSizeKey)
@@ -98,6 +98,17 @@ import Observation
             return defaults.bool(forKey: "autoOpenNewArtifacts")
         }
         set { defaults.set(newValue, forKey: "autoOpenNewArtifacts") }
+    }
+
+    /// Blocked 検知時に macOS 通知を送る（アクティブでないセッションのみ）。
+    var e1NotifyWhenAgentBlocked: Bool {
+        get {
+            if defaults.object(forKey: "e1NotifyWhenAgentBlocked") == nil {
+                return true
+            }
+            return defaults.bool(forKey: "e1NotifyWhenAgentBlocked")
+        }
+        set { defaults.set(newValue, forKey: "e1NotifyWhenAgentBlocked") }
     }
 
     /// E1 terminal + session shell (KMD-231). 未設定時は ON（Re-concept を正とする）。
@@ -194,6 +205,11 @@ import Observation
     static var useE1Shell: Bool {
         get { shared.useE1Shell }
         set { shared.useE1Shell = newValue }
+    }
+
+    static var e1NotifyWhenAgentBlocked: Bool {
+        get { shared.e1NotifyWhenAgentBlocked }
+        set { shared.e1NotifyWhenAgentBlocked = newValue }
     }
 
     // MARK: - E1 local sessions

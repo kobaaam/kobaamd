@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Ghostty 移行後も安定して通るスイートのみ（全 310 件は別途ローカルで）。
-DEFAULT_FILTER='E1Terminal|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|AppState'
+DEFAULT_FILTER='E1Terminal|E1AgentStatus|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|AppState'
 
 FILTER="$DEFAULT_FILTER"
 PASSTHROUGH=()
@@ -42,6 +42,9 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+echo "[run-unit-tests] prepare build (resolve + libghostty patch)"
+bash "$REPO_ROOT/scripts/prepare-build.sh"
 
 echo "[run-unit-tests] swift build"
 swift build

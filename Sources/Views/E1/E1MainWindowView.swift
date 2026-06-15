@@ -7,6 +7,7 @@ struct E1MainWindowView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Bindable private var appState = AppState.shared
     @State private var sessionCoordinator = SessionCoordinator()
+    @State private var agentStatusMonitor = E1AgentStatusMonitor()
     @State private var isQuickOpenPresented = false
 
     @State private var leftWidth: CGFloat = E1ViewerLayoutPolicy.defaultLeftWidth
@@ -30,7 +31,10 @@ struct E1MainWindowView: View {
             let centerWidth = max(centerMinWidth, remainder - rightWidth)
 
             HStack(spacing: 0) {
-                E1SessionRailView(coordinator: sessionCoordinator)
+                E1SessionRailView(
+                    coordinator: sessionCoordinator,
+                    agentStatusMonitor: agentStatusMonitor
+                )
                     .frame(width: min(leftWidth, maxLeft))
 
                 E1WidthDivider(
@@ -41,7 +45,10 @@ struct E1MainWindowView: View {
                     dragAxis: .growOnDragRight
                 )
 
-                E1TerminalPaneView(coordinator: sessionCoordinator)
+                E1TerminalPaneView(
+                    coordinator: sessionCoordinator,
+                    agentStatusMonitor: agentStatusMonitor
+                )
                     .frame(width: centerWidth)
                     .frame(maxHeight: .infinity)
                     .clipped()
@@ -67,37 +74,14 @@ struct E1MainWindowView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(appState.selectedTheme.chromePaper)
-        .background(E1WindowTitleConfigurator())
-        .navigationTitle("kobaamd (E1) \(AppVersion.bundleMarketing)")
+        .background(E1WindowConfigurator())
+        .navigationTitle("kobaamd (E1) \(AppVersion.display)")
         .toolbarTitleDisplayMode(.inline)
-        .toolbarBackground(appState.selectedTheme.chromeTitlebar, for: .windowToolbar)
+        .toolbarBackground(ColorTheme.light.chromeTitlebar, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
-        .toolbarColorScheme(appState.selectedTheme.prefersDarkChrome ? .dark : .light)
+        .toolbarColorScheme(.light)
+        .toolbar(.hidden, for: .windowToolbar)
         .frame(minWidth: 720, minHeight: 400)
-        .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button {
-                    NotificationCenter.default.post(name: .openFolderRequested, object: nil)
-                } label: {
-                    Image(systemName: "plus.folder")
-                }
-                .help("セッションを追加 (⌘O)")
-            }
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    NotificationCenter.default.post(name: .newFileRequested, object: nil)
-                } label: {
-                    Image(systemName: "doc.badge.plus")
-                }
-                .help("New File (⌘N)")
-                Button {
-                    NotificationCenter.default.post(name: .saveRequested, object: nil)
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
-                }
-                .help("Save (⌘S)")
-            }
-        }
         .onAppear {
             sessionCoordinator.attach(appViewModel: appViewModel)
             sessionCoordinator.bootstrapIfNeeded()
@@ -118,7 +102,7 @@ struct E1MainWindowView: View {
                         },
                         onDismiss: { isQuickOpenPresented = false }
                     )
-                    .padding(.top, 44)
+                    .padding(.top, 52)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
@@ -149,26 +133,6 @@ struct E1MainWindowView: View {
     }
 }
 
-/// タイトルバー左の白丸（システムのアイコン枠）を隠す。
-private struct E1WindowTitleConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        configureWindow(for: view)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        configureWindow(for: nsView)
-    }
-
-    private func configureWindow(for view: NSView) {
-        DispatchQueue.main.async {
-            guard let window = view.window ?? NSApp.keyWindow else { return }
-            WindowChrome.configureE1Window(window)
-        }
-    }
-}
-
 // MARK: - E1 command receiver (minimal: folder / save / pending open)
 
 private struct E1MainWindowCommandReceiver: ViewModifier {
@@ -185,6 +149,9 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                 isQuickOpenPresented = true
             }
             .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
+                appViewModel.refreshQuickOpenIndex()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
                 appViewModel.refreshQuickOpenIndex()
             }
             .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalRequested)) { _ in
