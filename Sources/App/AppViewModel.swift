@@ -256,6 +256,23 @@ final class AppViewModel {
             savedText = updated
             isDirty = false
             outlineViewModel.update(text: updated)
+            scheduleStatsUpdate()
+            todoViewModel.update(text: updated)
+            tagsViewModel.updateFile(url, text: updated)
+        }
+    }
+
+    /// FSEvents 等でディスクが更新されたとき、未編集（!isDirty）の開いているタブをディスク内容に追従する。
+    /// Claude Code 等の外部エージェントがファイルを書き換えた場合のプレビュー stale 対策。
+    func syncOpenTabsFromDiskIfClean() {
+        flushActiveTab()
+        let fileService = FileService()
+        for tab in tabs {
+            guard let url = tab.url, !tab.isDirty else { continue }
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            guard let diskContent = try? fileService.readFile(at: url) else { continue }
+            guard tab.content != diskContent else { continue }
+            syncTabContent(url: url, updated: diskContent)
         }
     }
 

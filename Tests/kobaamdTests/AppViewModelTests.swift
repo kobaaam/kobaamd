@@ -156,4 +156,46 @@ struct AppViewModelTests {
         #expect(PreviewMode(rawValue: "UnknownMode") == nil)
     }
 
+    @Test("syncOpenTabsFromDiskIfClean reloads clean tabs from disk")
+    func syncOpenTabsFromDiskIfCleanUpdatesCleanTab() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let file = dir.appendingPathComponent("page.html")
+        try "<p>old</p>".write(to: file, atomically: true, encoding: .utf8)
+
+        let vm = AppViewModel()
+        vm.openInTab(url: file, content: "<p>old</p>")
+        try "<p>new</p>".write(to: file, atomically: true, encoding: .utf8)
+
+        vm.syncOpenTabsFromDiskIfClean()
+
+        #expect(vm.editorText == "<p>new</p>")
+        #expect(vm.isDirty == false)
+        #expect(vm.tabs.first?.content == "<p>new</p>")
+    }
+
+    @Test("syncOpenTabsFromDiskIfClean skips dirty tabs")
+    func syncOpenTabsFromDiskIfCleanSkipsDirtyTab() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let file = dir.appendingPathComponent("page.html")
+        try "<p>disk</p>".write(to: file, atomically: true, encoding: .utf8)
+
+        let vm = AppViewModel()
+        vm.openInTab(url: file, content: "<p>disk</p>")
+        vm.updateEditorText("<p>editing</p>")
+        try "<p>external</p>".write(to: file, atomically: true, encoding: .utf8)
+
+        vm.syncOpenTabsFromDiskIfClean()
+
+        #expect(vm.editorText == "<p>editing</p>")
+        #expect(vm.isDirty == true)
+    }
+
 }

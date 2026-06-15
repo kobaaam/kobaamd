@@ -7,11 +7,12 @@ struct HTMLPreviewView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @Bindable private var appState = AppState.shared
     @State private var reloadGeneration = 0
+    @State private var previewHTML = ""
 
     var body: some View {
         let chrome = appState.selectedTheme
         Group {
-            if appViewModel.editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if previewHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 VStack(spacing: 8) {
                     Text("HTML が空です")
                         .font(.callout)
@@ -20,7 +21,7 @@ struct HTMLPreviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HTMLFileWebView(
-                    html: appViewModel.editorText,
+                    html: previewHTML,
                     fileURL: appViewModel.selectedFileURL,
                     reloadGeneration: reloadGeneration
                 )
@@ -28,9 +29,32 @@ struct HTMLPreviewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(chrome.chromePaper)
-        .onReceive(NotificationCenter.default.publisher(for: .htmlPreviewForceReload)) { _ in
+        .onAppear { refreshPreviewHTML() }
+        .onChange(of: appViewModel.selectedFileURL) { _, _ in refreshPreviewHTML() }
+        .onChange(of: appViewModel.editorText) { _, _ in refreshPreviewHTML() }
+        .onChange(of: appViewModel.isDirty) { _, _ in refreshPreviewHTML() }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+            refreshPreviewHTML()
             reloadGeneration += 1
         }
+        .onReceive(NotificationCenter.default.publisher(for: .htmlPreviewForceReload)) { _ in
+            refreshPreviewHTML()
+            reloadGeneration += 1
+        }
+    }
+
+    /// 未保存編集時はエディタバッファ、それ以外はディスクを優先（Claude Code 等の外部更新を反映）。
+    private func refreshPreviewHTML() {
+        if appViewModel.isDirty {
+            previewHTML = appViewModel.editorText
+            return
+        }
+        if let url = appViewModel.selectedFileURL,
+           let disk = try? FileService().readFile(at: url) {
+            previewHTML = disk
+            return
+        }
+        previewHTML = appViewModel.editorText
     }
 }
 
@@ -45,6 +69,7 @@ private struct HTMLFileWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
@@ -81,6 +106,7 @@ private struct HTMLFileWebView: NSViewRepresentable {
 
         func reloadIgnoringCache(html: String, baseURL: URL?) {
             guard let webView else { return }
+            URLCache.shared.removeAllCachedResponses()
             let dataStore = webView.configuration.websiteDataStore
             let types = WKWebsiteDataStore.allWebsiteDataTypes()
             dataStore.removeData(ofTypes: types, modifiedSince: .distantPast) { [weak self] in
