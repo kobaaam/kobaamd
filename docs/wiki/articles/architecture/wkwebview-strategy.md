@@ -4,7 +4,7 @@ category: architecture
 tags: [wkwebview, mermaid, d2, markdown-preview, memory, performance]
 sources: [docs/adr/0004-mermaid-wkwebview.md, docs/adr/0011-d2-diagram-preview.md]
 created: 2026-04-30
-updated: 2026-04-30
+updated: 2026-06-19
 ---
 
 # WKWebView 共存戦略とメモリ管理
@@ -25,6 +25,18 @@ kobaamd は最大4つの WKWebView インスタンス（Markdown Preview / Merma
 | **WYSIWYGEditorView** | `Sources/Views/Editor/WYSIWYGEditorView.swift` | EasyMDE ベースの WYSIWYG エディタ | WYSIWYG モード切替時 |
 
 実際に同時に存在する WebView は最大2つ（エディタ + プレビュー）。D2 プレビューと Markdown プレビューは排他的に切り替わり、WYSIWYG モードは通常のエディタと排他である。
+
+### HTML Rendered タブ: 外部 Chromium（v0.4.5）
+
+HTML の **Rendered** プレビューは WKWebView ではなく、**外部 Chromium 系ブラウザ**（Google Chrome 等）を `--app=` モードで起動する。CEF 埋め込みはメモリ・配布コストのため不採用。
+
+| 要素 | 役割 |
+|------|------|
+| `WorkspacePreviewHTTPServer` | `NWListener` で `http://127.0.0.1:<port>/` にワークスペースを配信 |
+| `ChromiumPreviewController` | ブラウザ起動・ウィンドウ位置合わせ・reload |
+| `HTMLPreviewView` | Rendered タブ UI。Chromium 未検出時は WebKit にフォールバック |
+
+相対パス CSS/JS は loopback HTTP 経由で Chrome と同じセマンティクスで解決される。プレビュー用 `.kobaamd-preview.html` はファイルツリーから除外。
 
 ### JS ライブラリのバンドル戦略
 
@@ -111,9 +123,11 @@ WKWebView は1インスタンスあたり約 30-50MB のメモリを消費する
 
 1. **遅延生成（Lazy Instantiation）**: `PreviewView` は `isReady` フラグで WebView の生成を遅延。コンテンツが空の状態では WebView を生成せず、約 50MB の節約になる
 2. **排他的表示**: D2 プレビューと Markdown プレビューは `isD2File` で排他切替。同時に2つのプレビュー WebView は存在しない
-3. **差分更新**: MarkdownWebView はページナビゲーションなしで `body.innerHTML` だけを更新。WebView の再生成を避けることでメモリのチャーンを抑制
-4. **デバウンス**: `PreviewViewModel` は 300ms のデバウンスで連続入力時の不要な再レンダリングを抑制
-5. **バックグラウンドレンダリング**: Markdown の HTML 変換は `Task.detached` でバックグラウンドスレッドに逃がし、メインスレッドの応答性を維持
+3. **HTML は外部 Chromium**: Rendered タブは WKWebView を使わず外部ブラウザに逃がす（v0.4.5）
+4. **差分更新**: MarkdownWebView はページナビゲーションなしで `body.innerHTML` だけを更新。WebView の再生成を避けることでメモリのチャーンを抑制
+5. **デバウンス**: `PreviewViewModel` は 300ms のデバウンスで連続入力時の不要な再レンダリングを抑制
+6. **FSEvents debounce (v0.4.6)**: ファイルツリー reload と QuickOpen/Wiki/tags インデックス更新を 400ms debounce。`.kobaamd/` を走査除外して transcript 連鎖を遮断
+7. **バックグラウンドレンダリング**: Markdown の HTML 変換は `Task.detached` でバックグラウンドスレッドに逃がし、メインスレッドの応答性を維持
 
 ### パフォーマンス上の考慮事項
 

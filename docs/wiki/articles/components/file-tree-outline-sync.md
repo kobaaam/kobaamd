@@ -4,7 +4,7 @@ category: components
 tags: [file-tree, outline, sidebar, navigation, scroll-sync]
 sources: []
 created: 2026-04-30
-updated: 2026-05-06
+updated: 2026-06-19
 ---
 
 # ファイルツリーとアウトラインの同期
@@ -27,6 +27,12 @@ updated: 2026-05-06
 - **ソート順**: ディレクトリが先、ファイルが後（アルファベット順）
 
 走査は `Task.detached(priority: .userInitiated)` でバックグラウンド実行され、結果を `MainActor.run` で UI に反映する。アプリがフォアグラウンドに戻ったときは `NSApplication.didBecomeActiveNotification` を受けて 1 秒のデバウンス後に自動リロードする。
+
+**v0.4.6 の除外・debounce 追加**:
+
+- **`.kobaamd/` 常時除外**: `FileService.workspaceInternalDirectoryNames` により、E1 transcript や index DB を含む内部ディレクトリをツリー走査から除外（FSEvents ノイズ源の遮断）
+- **FSEvents debounce 400ms**: `WorkspaceFSEventWatcher` のコールバック後、`scheduleFilesystemReload()` で 400ms 待ってから `reload()` と `workspaceFilesChanged` 通知を発火。バースト的な transcript 追記で連鎖再構築しない
+- **`nodesGeneration`**: `WorkspaceFolder` の `Equatable` は `nodes` ツリー全体ではなく世代カウンタで比較し、SwiftUI の深い diff コストを回避
 
 ワークスペース状態（フォルダ URL のリスト）は `AppState.saveWorkspaceFolders` / `loadWorkspaceFolders` で永続化され、起動時に `restoreWorkspace()` で復元される。
 

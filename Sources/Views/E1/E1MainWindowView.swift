@@ -149,11 +149,10 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                 isQuickOpenPresented = true
             }
             .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
-                appViewModel.refreshQuickOpenIndex()
+                appViewModel.scheduleDebouncedWorkspaceRefresh()
             }
             .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
-                appViewModel.syncOpenTabsFromDiskIfClean()
-                appViewModel.refreshQuickOpenIndex()
+                appViewModel.handleWorkspaceFilesChanged()
             }
             .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalRequested)) { _ in
                 NotificationCenter.default.post(name: .e1FocusTerminalPane, object: nil)

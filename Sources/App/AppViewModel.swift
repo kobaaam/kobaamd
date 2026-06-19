@@ -76,6 +76,8 @@ final class AppViewModel {
     /// `syncTabContent` による editorText 代入中は `markEdited` を抑止する。
     @ObservationIgnored
     private var isApplyingDiskSync = false
+    @ObservationIgnored
+    private var workspaceRefreshTask: Task<Void, Never>?
 
     /// 現在アクティブなタブ。
     var activeTab: EditorTab? {
@@ -127,6 +129,21 @@ final class AppViewModel {
         if let activeURL,
            let tab = tabs.first(where: { $0.url == activeURL }) {
             switchToTab(id: tab.id)
+        }
+    }
+
+    /// FSEvents 連鎖を debounce してディスク同期とインデックス更新をまとめる。
+    func handleWorkspaceFilesChanged() {
+        syncOpenTabsFromDiskIfClean()
+        scheduleDebouncedWorkspaceRefresh()
+    }
+
+    func scheduleDebouncedWorkspaceRefresh(forceSearchReindex: Bool = false) {
+        workspaceRefreshTask?.cancel()
+        workspaceRefreshTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            refreshQuickOpenIndex(forceSearchReindex: forceSearchReindex)
         }
     }
 

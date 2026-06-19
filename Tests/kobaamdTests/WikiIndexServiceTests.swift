@@ -87,6 +87,40 @@ struct WikiIndexServiceTests {
         #expect(visibleHits?.isEmpty == false)
     }
 
+    @Test("Skips .kobaamd internal directory during indexing")
+    func skipsKobaamdInternalDirectory() async throws {
+        let internalDir = tmpDir.appendingPathComponent(".kobaamd", isDirectory: true)
+        try FileManager.default.createDirectory(at: internalDir, withIntermediateDirectories: true)
+        try "内部ログキーワード".write(
+            to: internalDir.appendingPathComponent("transcript.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try write("外部キーワード", name: "visible.md")
+
+        let service = WikiIndexService()
+        service.setRoot(tmpDir)
+        try await waitForReady(service)
+
+        let internalHits = await service.search(query: "内部ログキーワード")
+        #expect(internalHits?.isEmpty == true)
+
+        let externalHits = await service.search(query: "外部キーワード")
+        #expect(externalHits?.isEmpty == false)
+    }
+
+    @Test("Repeated setRoot while building does not restart")
+    func setRootIgnoresDuplicateWhileBuilding() async throws {
+        try write("検索対象ワード", name: "note.md")
+
+        let service = WikiIndexService()
+        service.setRoot(tmpDir)
+        #expect(service.state == .building)
+        service.setRoot(tmpDir)
+        #expect(service.state == .building)
+        try await waitForReady(service)
+    }
+
     @Test("Index build failure moves state to failed")
     func indexingFailureSetsFailedState() async throws {
         let blockedRoot = FileManager.default.temporaryDirectory

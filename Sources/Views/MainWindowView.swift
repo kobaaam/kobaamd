@@ -293,11 +293,10 @@ extension MainWindowView {
                     }
                 }
                 .onChange(of: appViewModel.fileTreeViewModel.folders) { _, _ in
-                    appViewModel.refreshQuickOpenIndex()
+                    appViewModel.scheduleDebouncedWorkspaceRefresh()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
-                    appViewModel.syncOpenTabsFromDiskIfClean()
-                    appViewModel.refreshQuickOpenIndex()
+                    appViewModel.handleWorkspaceFilesChanged()
                 }
                 .onChange(of: AppState.shared.pendingOpenFileURL) { _, fileURL in
                     guard let url = fileURL else { return }
