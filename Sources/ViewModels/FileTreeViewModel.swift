@@ -83,8 +83,13 @@ final class FileTreeViewModel {
         let url = folders[idx].url
         isLoading = true
         let showHiddenFiles = AppState.shared.showHiddenFiles
+        let includeDependencyDirectories = AppState.shared.indexDependencyDirectories
         Task.detached(priority: .userInitiated) { [weak self] in
-            let newNodes = FileService().loadNodes(at: url, showHiddenFiles: showHiddenFiles)
+            let newNodes = FileService().loadNodes(
+                at: url,
+                showHiddenFiles: showHiddenFiles,
+                includeDependencyDirectories: includeDependencyDirectories
+            )
             await MainActor.run {
                 guard let self,
                       let i = self.folders.firstIndex(where: { $0.id == id }) else { return }

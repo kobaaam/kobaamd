@@ -47,25 +47,33 @@ struct PreviewView: View {
         .onChange(of: appViewModel.editorText) { oldValue, newValue in
             PerfLogger.event("PreviewView.editorTextChanged", "old=\(oldValue.count) new=\(newValue.count) isReady=\(isReady) hasFirst=\(hasReceivedFirstRender)")
             guard !isD2File && !isCSVFile else { return }
-            if !isReady && !newValue.isEmpty { isReady = true }
-            previewViewModel.update(text: newValue, viewerMode: appViewModel.previewMode == .viewer)
+            let text = appViewModel.resolvedActiveFileContent()
+            if !isReady && !text.isEmpty { isReady = true }
+            previewViewModel.update(text: text, viewerMode: appViewModel.previewMode == .viewer)
         }
         .onChange(of: appViewModel.selectedFileURL) { _, newURL in
             // ファイル切替直後は debounce を飛ばして即時 render（preview の stale 表示回避）
             PerfLogger.event("PreviewView.selectedFileURLChanged", "url=\(newURL?.lastPathComponent ?? "nil")")
             guard !isD2File && !isCSVFile else { return }
-            if !appViewModel.editorText.isEmpty {
+            let text = appViewModel.resolvedActiveFileContent()
+            if !text.isEmpty {
                 isReady = true
-                previewViewModel.updateImmediate(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+                previewViewModel.updateImmediate(text: text, viewerMode: appViewModel.previewMode == .viewer)
             }
         }
         .onChange(of: appViewModel.previewMode) { _, _ in
             guard !isD2File && !isCSVFile else { return }
-            previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+            previewViewModel.update(
+                text: appViewModel.resolvedActiveFileContent(),
+                viewerMode: appViewModel.previewMode == .viewer
+            )
         }
         .onChange(of: appState.selectedTheme) { _, _ in
             guard !isD2File && !isCSVFile else { return }
-            previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+            previewViewModel.update(
+                text: appViewModel.resolvedActiveFileContent(),
+                viewerMode: appViewModel.previewMode == .viewer
+            )
         }
         .onChange(of: previewViewModel.bodyHTML) { _, newValue in
             PerfLogger.event("PreviewView.bodyHTMLChanged", "newLen=\(newValue.count) hasFirst=\(hasReceivedFirstRender)")
@@ -76,10 +84,18 @@ struct PreviewView: View {
         .onAppear {
             PerfLogger.event("PreviewView.onAppear", "isD2=\(isD2File) isCSV=\(isCSVFile) hasFirst=\(hasReceivedFirstRender) textLen=\(appViewModel.editorText.count)")
             guard !isD2File && !isCSVFile else { return }
-            if !appViewModel.editorText.isEmpty {
+            let text = appViewModel.resolvedActiveFileContent()
+            if !text.isEmpty {
                 isReady = true
-                previewViewModel.update(text: appViewModel.editorText, viewerMode: appViewModel.previewMode == .viewer)
+                previewViewModel.update(text: text, viewerMode: appViewModel.previewMode == .viewer)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+            guard !isD2File && !isCSVFile else { return }
+            let text = appViewModel.resolvedActiveFileContent()
+            guard !text.isEmpty else { return }
+            isReady = true
+            previewViewModel.updateImmediate(text: text, viewerMode: appViewModel.previewMode == .viewer)
         }
     }
 
@@ -123,11 +139,14 @@ struct D2PreviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: appViewModel.editorText) { _, newValue in
-            d2VM.update(text: newValue)
+        .onChange(of: appViewModel.editorText) { _, _ in
+            d2VM.update(text: appViewModel.resolvedActiveFileContent())
         }
         .onAppear {
-            d2VM.update(text: appViewModel.editorText)
+            d2VM.update(text: appViewModel.resolvedActiveFileContent())
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+            d2VM.updateImmediate(text: appViewModel.resolvedActiveFileContent())
         }
     }
 }

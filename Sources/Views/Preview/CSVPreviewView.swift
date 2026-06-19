@@ -23,14 +23,17 @@ struct CSVPreviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: appViewModel.editorText) { _, newValue in
-            csvVM.update(text: newValue)
+        .onChange(of: appViewModel.editorText) { _, _ in
+            csvVM.update(text: appViewModel.resolvedActiveFileContent())
         }
         .onChange(of: appViewModel.selectedFileURL) { _, _ in
-            csvVM.updateImmediate(text: appViewModel.editorText)
+            csvVM.updateImmediate(text: appViewModel.resolvedActiveFileContent())
         }
         .onAppear {
-            csvVM.updateImmediate(text: appViewModel.editorText)
+            csvVM.updateImmediate(text: appViewModel.resolvedActiveFileContent())
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+            csvVM.updateImmediate(text: appViewModel.resolvedActiveFileContent())
         }
     }
 }

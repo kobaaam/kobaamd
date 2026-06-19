@@ -168,6 +168,7 @@ extension Notification.Name {
     static let newFileFromTemplateRequested     = AppCommand.newFileFromTemplate.notificationName
     static let insertSnippetAtCursor           = Notification.Name("kobaamd.insertSnippetAtCursor")
     static let persistEditorSessionRequested   = Notification.Name("kobaamd.persistEditorSessionRequested")
+    static let htmlPreviewForceReload          = Notification.Name("kobaamd.htmlPreviewForceReload")
 }
 
 // MARK: - App Delegate (window frame save/restore)

@@ -125,6 +125,16 @@ struct AppStateTests {
         #expect(state.useE1Shell == false)
     }
 
+    @Test("indexDependencyDirectories defaults to false and persists")
+    func indexDependencyDirectoriesPersists() {
+        #expect(state.indexDependencyDirectories == false)
+        state.indexDependencyDirectories = true
+        #expect(defaults.bool(forKey: AppState.indexDependencyDirectoriesKey) == true)
+        #expect(state.indexDependencyDirectories == true)
+        state.indexDependencyDirectories = false
+        #expect(state.indexDependencyDirectories == false)
+    }
+
     @Test("showHiddenFiles defaults to false and persists")
     func showHiddenFilesPersists() {
         #expect(state.showHiddenFiles == false)

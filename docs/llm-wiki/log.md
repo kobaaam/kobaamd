@@ -20,3 +20,6 @@
 
 ## [2026-06-13] create | e1-transcript-recorder-hang
 - transcript 実装のハング原因と対策
+
+## [2026-06-18] update | html-preview-chromium
+- HTML プレビューを Chromium（Google Chrome 等）連携に切り替え。localhost プレビューサーバ経由で Chrome と同じレンダリングを実現。

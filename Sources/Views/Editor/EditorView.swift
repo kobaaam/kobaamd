@@ -72,6 +72,9 @@ struct EditorView: View {
         }
         .onChange(of: vm.editorText) { _, newValue in
             appViewModel.outlineViewModel.update(text: newValue)
+            if !appViewModel.isDirty, newValue == appViewModel.savedText {
+                return
+            }
             appViewModel.markEdited()
             scheduleAutoSave()
         }

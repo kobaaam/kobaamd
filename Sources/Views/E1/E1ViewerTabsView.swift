@@ -72,6 +72,17 @@ struct E1ViewerTabsView: View {
                 }
             }
             Spacer()
+            if fileKind == .html, selectedTab == .rendered {
+                Button {
+                    NotificationCenter.default.post(name: .htmlPreviewForceReload, object: nil)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(chrome.chromeMute2)
+                .help("キャッシュをクリアして再読み込み")
+            }
             if fileKind == .markdown {
                 Button("Diff") {
                     selectedTab = .diff

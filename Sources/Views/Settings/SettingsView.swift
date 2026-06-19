@@ -66,6 +66,32 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("プレビュー") {
+                LabeledContent("HTML プレビュー") {
+                    Picker("", selection: $appState.htmlPreviewEngine) {
+                        ForEach(AppState.HTMLPreviewEngine.allCases) { engine in
+                            Text(engine.displayName).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 220)
+                }
+                Text("Chromium は Google Chrome / Chromium / Brave 等を使い、Chrome と同じレンダリングで表示します。WebKit はアプリ内に埋め込み表示します。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("ワークスペース") {
+                Toggle("依存ディレクトリをインデックスに含める", isOn: $appState.indexDependencyDirectories)
+                    .onChange(of: appState.indexDependencyDirectories) { _, _ in
+                        appViewModel.fileTreeViewModel.reload()
+                        appViewModel.refreshQuickOpenIndex(forceSearchReindex: true)
+                    }
+                Text("OFF（既定）では node_modules・dist・.git などをファイルツリーと全文検索から除外します。メモリ使用量の削減に有効です。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Formatting") {
                 Toggle("保存時に自動整形", isOn: $appState.autoFormatOnSave)
             }
@@ -134,7 +160,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 480)
+        .frame(width: 520, height: 540)
         .navigationTitle("設定")
     }
 }

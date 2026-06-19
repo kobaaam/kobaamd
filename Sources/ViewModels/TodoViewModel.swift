@@ -192,11 +192,15 @@ final class TodoViewModel {
         let rootDepth = root.pathComponents.count
         guard let enumerator = fm.enumerator(
             at: root,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
             return []
         }
+
+        let includeDependencyDirectories = UserDefaults.standard.bool(
+            forKey: AppState.indexDependencyDirectoriesKey
+        )
 
         for case let url as URL in enumerator {
             processedCount += 1
@@ -207,6 +211,16 @@ final class TodoViewModel {
             let depth = url.pathComponents.count - rootDepth
             if depth > maxDepth {
                 enumerator.skipDescendants()
+                continue
+            }
+
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                if FileService.shouldSkipDirectory(
+                    name: url.lastPathComponent,
+                    includeDependencyDirectories: includeDependencyDirectories
+                ) {
+                    enumerator.skipDescendants()
+                }
                 continue
             }
 

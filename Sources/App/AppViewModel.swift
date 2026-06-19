@@ -73,6 +73,9 @@ final class AppViewModel {
     var tabs: [EditorTab] = []
     var activeTabID: UUID? = nil
     private var isRestoringEditorSession = false
+    /// `syncTabContent` による editorText 代入中は `markEdited` を抑止する。
+    @ObservationIgnored
+    private var isApplyingDiskSync = false
 
     /// 現在アクティブなタブ。
     var activeTab: EditorTab? {
@@ -128,7 +131,7 @@ final class AppViewModel {
     }
 
     /// ワークスペース変更時（フォルダ追加・削除）に QuickOpen のインデックスを再構築する。
-    func refreshQuickOpenIndex() {
+    func refreshQuickOpenIndex(forceSearchReindex: Bool = false) {
         quickOpenViewModel.indexFiles(
             from: fileTreeViewModel.folders,
             scopedTo: fileTreeViewModel.rootURL
@@ -139,7 +142,7 @@ final class AppViewModel {
         // Folder スコープの対象は「最初に開いたワークスペースフォルダ」（PRD §2）
         todoViewModel.updateFolderRoot(folderURLs.first)
         tagsViewModel.updateWorkspaceRoots(folderURLs)
-        searchIndexService.setRoot(folderURLs.first)
+        searchIndexService.setRoot(folderURLs.first, force: forceSearchReindex)
     }
 
     @MainActor
@@ -252,10 +255,38 @@ final class AppViewModel {
         tabs[idx].content = updated
         tabs[idx].isDirty = false
         if activeTabID == tabs[idx].id {
+            isApplyingDiskSync = true
             editorText = updated
+            isApplyingDiskSync = false
             savedText = updated
             isDirty = false
             outlineViewModel.update(text: updated)
+            scheduleStatsUpdate()
+            todoViewModel.update(text: updated)
+            tagsViewModel.updateFile(url, text: updated)
+        }
+    }
+
+    /// アクティブファイルの表示用テキスト（未編集時はディスク優先）。md / html / csv / d2 等すべて共通。
+    func resolvedActiveFileContent() -> String {
+        FileContentResolver.displayContent(
+            url: selectedFileURL,
+            inMemory: editorText,
+            isDirty: isDirty
+        )
+    }
+
+    /// FSEvents 等でディスクが更新されたとき、未編集（!isDirty）の開いているタブをディスク内容に追従する。
+    /// md / html / csv / d2 等の拡張子を問わず、Claude Code 等の外部更新をエディタ・プレビューに反映する。
+    func syncOpenTabsFromDiskIfClean() {
+        flushActiveTab()
+        let fileService = FileService()
+        for tab in tabs {
+            guard let url = tab.url, !tab.isDirty else { continue }
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            guard let diskContent = try? fileService.readFile(at: url) else { continue }
+            guard tab.content != diskContent else { continue }
+            syncTabContent(url: url, updated: diskContent)
         }
     }
 
@@ -370,6 +401,7 @@ final class AppViewModel {
     }
 
     func markEdited() {
+        guard !isApplyingDiskSync else { return }
         isDirty = true  // 編集時は即 true、保存時に false にする
         scheduleStatsUpdate()
     }

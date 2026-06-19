@@ -152,6 +152,7 @@ private struct E1MainWindowCommandReceiver: ViewModifier {
                 appViewModel.refreshQuickOpenIndex()
             }
             .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
+                appViewModel.syncOpenTabsFromDiskIfClean()
                 appViewModel.refreshQuickOpenIndex()
             }
             .onReceive(NotificationCenter.default.publisher(for: .e1FocusTerminalRequested)) { _ in
