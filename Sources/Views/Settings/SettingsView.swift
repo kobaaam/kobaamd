@@ -66,6 +66,21 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("プレビュー") {
+                LabeledContent("HTML プレビュー") {
+                    Picker("", selection: $appState.htmlPreviewEngine) {
+                        ForEach(AppState.HTMLPreviewEngine.allCases) { engine in
+                            Text(engine.displayName).tag(engine)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 220)
+                }
+                Text("Chromium は Google Chrome / Chromium / Brave 等を使い、Chrome と同じレンダリングで表示します。WebKit はアプリ内に埋め込み表示します。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("ワークスペース") {
                 Toggle("依存ディレクトリをインデックスに含める", isOn: $appState.indexDependencyDirectories)
                     .onChange(of: appState.indexDependencyDirectories) { _, _ in

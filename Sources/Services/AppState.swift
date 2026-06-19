@@ -21,6 +21,21 @@ import Observation
     private static let terminalFontSizeKey = "terminalFontSize"
     private static let showHiddenFilesKey = "showHiddenFiles"
     static let indexDependencyDirectoriesKey = "indexDependencyDirectories"
+    static let htmlPreviewEngineKey = "htmlPreviewEngine"
+
+    enum HTMLPreviewEngine: String, CaseIterable, Identifiable {
+        case chromium
+        case webKit
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .chromium: return "Chromium（Google Chrome 等）"
+            case .webKit: return "WebKit（アプリ内）"
+            }
+        }
+    }
 
     enum CodeFontSize {
         static let min: Double = 11
@@ -60,6 +75,13 @@ import Observation
         }
     }
 
+    /// HTML プレビューに使うブラウザエンジン（既定: Chromium）。
+    var htmlPreviewEngine: HTMLPreviewEngine {
+        didSet {
+            defaults.set(htmlPreviewEngine.rawValue, forKey: Self.htmlPreviewEngineKey)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let raw = defaults.string(forKey: Self.selectedThemeKey) ?? ColorTheme.e1Recommended.rawValue
@@ -76,6 +98,8 @@ import Observation
         self.terminalFontSize = storedFontSize > 0 ? storedFontSize : Self.CodeFontSize.defaultSize
         self.showHiddenFiles = defaults.bool(forKey: Self.showHiddenFilesKey)
         self.indexDependencyDirectories = defaults.bool(forKey: Self.indexDependencyDirectoriesKey)
+        let engineRaw = defaults.string(forKey: Self.htmlPreviewEngineKey) ?? HTMLPreviewEngine.chromium.rawValue
+        self.htmlPreviewEngine = HTMLPreviewEngine(rawValue: engineRaw) ?? .chromium
     }
 
     func adjustCodeFontSize(by delta: Double) {
