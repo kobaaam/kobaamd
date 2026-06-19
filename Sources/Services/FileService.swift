@@ -20,6 +20,16 @@ final class FileService {
         ".Trash", ".Spotlight-V100", ".DocumentRevisions-V100", ".fseventsd",
     ]
 
+    /// kobaamd がワークスペース内に作る内部ディレクトリ（常に除外）
+    static let workspaceInternalDirectoryNames: Set<String> = [
+        ".kobaamd",
+    ]
+
+    /// プレビュー用の一時ファイル（常に除外）
+    static let workspaceInternalFileNames: Set<String> = [
+        ".kobaamd-preview.html",
+    ]
+
     /// 依存・ビルド成果物ディレクトリ（`indexDependencyDirectories` が OFF のときスキップ）
     static let dependencyDirectoryNames: Set<String> = [
         "node_modules", "dist", "build", ".git", ".svn", ".hg",
@@ -32,6 +42,7 @@ final class FileService {
         includeDependencyDirectories: Bool
     ) -> Bool {
         if alwaysExcludedDirectoryNames.contains(name) { return true }
+        if workspaceInternalDirectoryNames.contains(name) { return true }
         if !includeDependencyDirectories, dependencyDirectoryNames.contains(name) { return true }
         return false
     }
@@ -108,7 +119,8 @@ final class FileService {
                     let includeDirectory = !childNodes.isEmpty || (showHiddenFiles && isDotDirectory)
                     guard includeDirectory else { continue }
                     nodes.append(FileNode(name: name, url: item, isDirectory: true, children: childNodes))
-                } else if Self.supportedExtensions.contains(item.pathExtension.lowercased()) {
+                } else if !Self.workspaceInternalFileNames.contains(name),
+                          Self.supportedExtensions.contains(item.pathExtension.lowercased()) {
                     nodes.append(FileNode(name: name, url: item, isDirectory: false, children: nil))
                 }
             }

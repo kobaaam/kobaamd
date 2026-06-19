@@ -43,8 +43,13 @@ final class WikiIndexService {
     private var buildTask: Task<Void, Never>?
 
     func setRoot(_ url: URL?, force: Bool = false) {
-        if !force, state == .ready, rootURL == url {
-            return
+        if !force, rootURL == url {
+            switch state {
+            case .ready, .building:
+                return
+            case .unavailable, .failed:
+                break
+            }
         }
 
         buildTask?.cancel()

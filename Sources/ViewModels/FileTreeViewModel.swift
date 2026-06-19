@@ -8,12 +8,15 @@ struct WorkspaceFolder: Identifiable {
     var url: URL
     var nodes: [FileNode]
     var isExpanded: Bool
+    /// `nodes` の更新世代。SwiftUI の深い `FileNode` 比較を避ける。
+    var nodesGeneration: Int
 
-    init(url: URL, nodes: [FileNode] = [], isExpanded: Bool = true) {
+    init(url: URL, nodes: [FileNode] = [], isExpanded: Bool = true, nodesGeneration: Int = 0) {
         self.id = UUID()
         self.url = url
         self.nodes = nodes
         self.isExpanded = isExpanded
+        self.nodesGeneration = nodesGeneration
     }
 
     var displayName: String { url.lastPathComponent }
@@ -23,7 +26,7 @@ extension WorkspaceFolder: Equatable {
     static func == (lhs: WorkspaceFolder, rhs: WorkspaceFolder) -> Bool {
         lhs.id == rhs.id &&
         lhs.url == rhs.url &&
-        lhs.nodes == rhs.nodes &&
+        lhs.nodesGeneration == rhs.nodesGeneration &&
         lhs.isExpanded == rhs.isExpanded
     }
 }
@@ -40,6 +43,7 @@ final class FileTreeViewModel {
     var newFilePaths: Set<String> = []
 
     private let fsWatcher = WorkspaceFSEventWatcher()
+    private var fsReloadTask: Task<Void, Never>?
 
     // MARK: - Legacy compat
 
@@ -94,6 +98,7 @@ final class FileTreeViewModel {
                 guard let self,
                       let i = self.folders.firstIndex(where: { $0.id == id }) else { return }
                 self.folders[i].nodes = newNodes
+                self.folders[i].nodesGeneration += 1
                 self.isLoading = false
             }
         }
@@ -197,10 +202,18 @@ final class FileTreeViewModel {
         let urls = folders.map(\.url)
         fsWatcher.watch(urls: urls) { [weak self] in
             Task { @MainActor in
-                guard let self else { return }
-                self.reload()
-                NotificationCenter.default.post(name: .workspaceFilesChanged, object: nil)
+                self?.scheduleFilesystemReload()
             }
+        }
+    }
+
+    private func scheduleFilesystemReload() {
+        fsReloadTask?.cancel()
+        fsReloadTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            reload()
+            NotificationCenter.default.post(name: .workspaceFilesChanged, object: nil)
         }
     }
 }

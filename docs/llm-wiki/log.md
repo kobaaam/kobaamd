@@ -23,3 +23,9 @@
 
 ## [2026-06-18] update | html-preview-chromium
 - HTML プレビューを Chromium（Google Chrome 等）連携に切り替え。localhost プレビューサーバ経由で Chrome と同じレンダリングを実現。
+
+## [2026-06-19] create | html-preview-chromium
+- v0.4.5 の Chromium + localhost HTTP プレビュー方式を modules に文書化
+
+## [2026-06-19] create | workspace-fsevents-memory-storm
+- 39GB メモリ incident の因果と v0.4.6 debounce / .kobaamd 除外対策を gotchas に記録

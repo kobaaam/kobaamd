@@ -157,6 +157,18 @@ struct FileServiceTests {
         #expect(!names.contains("node_modules"))
     }
 
+    @Test("Workspace internal .kobaamd directory is always skipped")
+    func loadNodesSkipsKobaamdInternalDirectory() throws {
+        let internalDir = tmpDir.appendingPathComponent(".kobaamd", isDirectory: true)
+        try FileManager.default.createDirectory(at: internalDir, withIntermediateDirectories: true)
+        try "noise".write(to: internalDir.appendingPathComponent("transcript.log"), atomically: true, encoding: .utf8)
+        try "# App".write(to: tmpDir.appendingPathComponent("app.md"), atomically: true, encoding: .utf8)
+
+        let names = svc.loadNodes(at: tmpDir, includeDependencyDirectories: true).map(\.name)
+        #expect(names.contains("app.md"))
+        #expect(!names.contains(".kobaamd"))
+    }
+
     @Test("Dependency directories appear when opt-in enabled")
     func loadNodesIncludesDependencyDirectoriesWhenOptIn() throws {
         let nodeModules = tmpDir.appendingPathComponent("node_modules/pkg", isDirectory: true)
