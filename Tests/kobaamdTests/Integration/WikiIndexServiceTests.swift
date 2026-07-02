@@ -123,9 +123,7 @@ struct WikiIndexServiceTests {
 
     @Test("Index build failure moves state to failed")
     func indexingFailureSetsFailedState() async throws {
-        let blockedRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: blockedRoot, withIntermediateDirectories: true)
+        let blockedRoot = try workspace.makeDir("blocked-\(UUID().uuidString)")
         let blocker = blockedRoot.appendingPathComponent(".kobaamd")
         try "block".write(to: blocker, atomically: true, encoding: .utf8)
 

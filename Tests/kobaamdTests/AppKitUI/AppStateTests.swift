@@ -9,11 +9,13 @@ import Observation
 struct AppStateTests {
     let state: AppState
     let defaults: UserDefaults
+    let workspace: TempWorkspace
 
     init() throws {
         let suiteName = "kobaamd.test.\(UUID().uuidString)"
         defaults = try #require(UserDefaults(suiteName: suiteName))
         state = AppState(defaults: defaults)
+        workspace = try TempWorkspace()
     }
 
     // MARK: - Last folder
@@ -233,15 +235,9 @@ struct AppStateTests {
 
     @Test("Editor session round-trips tab URLs and active tab")
     func editorSessionRoundTrip() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let a = dir.appendingPathComponent("a.md")
-        let b = dir.appendingPathComponent("b.md")
-        try "# A".write(to: a, atomically: true, encoding: .utf8)
-        try "# B".write(to: b, atomically: true, encoding: .utf8)
+        let caseID = UUID().uuidString
+        let a = try workspace.write("# A", to: "\(caseID)/a.md")
+        let b = try workspace.write("# B", to: "\(caseID)/b.md")
 
         state.saveEditorSession(tabURLs: [a, b], activeURL: b)
         let loaded = state.loadEditorSession()
@@ -251,14 +247,9 @@ struct AppStateTests {
 
     @Test("loadEditorSession drops missing tab files")
     func loadEditorSessionSkipsMissing() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let live = dir.appendingPathComponent("live.md")
-        try "# live".write(to: live, atomically: true, encoding: .utf8)
-        let gone = dir.appendingPathComponent("gone.md")
+        let caseID = UUID().uuidString
+        let live = try workspace.write("# live", to: "\(caseID)/live.md")
+        let gone = workspace.url("\(caseID)/gone.md")
 
         state.saveEditorSession(tabURLs: [live, gone], activeURL: live)
         let loaded = state.loadEditorSession()
@@ -268,14 +259,9 @@ struct AppStateTests {
 
     @Test("loadRecentFiles skips missing files")
     func loadRecentFilesSkipsMissingFiles() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let existing = dir.appendingPathComponent("note.md")
-        try "# live".write(to: existing, atomically: true, encoding: .utf8)
-        let missing = dir.appendingPathComponent("gone.md")   // file never created
+        let caseID = UUID().uuidString
+        let existing = try workspace.write("# live", to: "\(caseID)/note.md")
+        let missing = workspace.url("\(caseID)/gone.md")
 
         state.saveLastFile(existing)
         state.saveLastFile(missing)

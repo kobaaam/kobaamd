@@ -4,11 +4,15 @@ import Foundation
 
 @Suite("BacklinkContextCache")
 struct BacklinkContextCacheTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
+
     @Test("Put and get round trip")
     func putAndGetRoundTrip() {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("json")
+        let fileURL = workspace.url("cache-\(UUID().uuidString).json")
         let cache = BacklinkContextCache(fileURL: fileURL)
 
         cache.put(sourceHash: "hash-a", targetBasename: "note", matchOffset: 12, verdict: .yes)
@@ -18,9 +22,7 @@ struct BacklinkContextCacheTests {
 
     @Test("Mismatched hash returns nil")
     func mismatchedHashReturnsNil() {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("json")
+        let fileURL = workspace.url("cache-\(UUID().uuidString).json")
         let cache = BacklinkContextCache(fileURL: fileURL)
 
         cache.put(sourceHash: "hash-a", targetBasename: "note", matchOffset: 12, verdict: .no)
@@ -30,9 +32,7 @@ struct BacklinkContextCacheTests {
 
     @Test("Save and reload preserves data")
     func saveAndReloadPreservesData() {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("json")
+        let fileURL = workspace.url("cache-\(UUID().uuidString).json")
         let cache = BacklinkContextCache(fileURL: fileURL)
 
         cache.put(sourceHash: "hash-a", targetBasename: "note", matchOffset: 8, verdict: .yes)
@@ -44,9 +44,7 @@ struct BacklinkContextCacheTests {
 
     @Test("Malformed file behaves as empty")
     func malformedFileBehavesAsEmpty() throws {
-        let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("json")
+        let fileURL = workspace.url("cache-\(UUID().uuidString).json")
         try Data("not-json".utf8).write(to: fileURL)
 
         let cache = BacklinkContextCache(fileURL: fileURL)

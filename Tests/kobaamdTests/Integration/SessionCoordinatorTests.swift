@@ -4,6 +4,12 @@ import Foundation
 
 @Suite("SessionCoordinator", .serialized)
 struct SessionCoordinatorTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
+
     @MainActor
     private func makeCoordinator() -> SessionCoordinator {
         AppState.saveE1LocalSessions([], activeID: nil)
@@ -57,9 +63,7 @@ struct SessionCoordinatorTests {
         let vm = AppViewModel()
         let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-multi-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        let path = try workspace.makeDir("multi-\(UUID().uuidString)")
         coordinator.sessions = [WorktreeSession.localDirectory(name: path.lastPathComponent, path: path)]
         coordinator.activeSessionID = coordinator.sessions[0].id
 
@@ -77,9 +81,7 @@ struct SessionCoordinatorTests {
         let vm = AppViewModel()
         let coordinator = makeCoordinator()
         coordinator.attach(appViewModel: vm)
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-session-dup-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        let path = try workspace.makeDir("session-dup-\(UUID().uuidString)")
         let original = WorktreeSession.localDirectory(name: "project", path: path)
         coordinator.sessions = [original]
         coordinator.activeSessionID = original.id

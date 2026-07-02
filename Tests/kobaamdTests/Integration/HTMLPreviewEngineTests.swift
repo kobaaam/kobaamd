@@ -4,6 +4,12 @@ import Testing
 
 @Suite("HTML preview engine")
 struct HTMLPreviewEngineTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
+
     @Test("HTML preview engine defaults to chromium")
     func defaultEngineIsChromium() throws {
         let suiteName = "kobaamd.test.\(UUID().uuidString)"
@@ -24,11 +30,7 @@ struct HTMLPreviewEngineTests {
 
     @Test("Materializer writes dirty preview beside source file")
     func materializeDirtyPreview() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = root.appendingPathComponent("page.html")
-        try "<html><body>old</body></html>".write(to: source, atomically: true, encoding: .utf8)
+        let source = try workspace.write("<html><body>old</body></html>", to: "page.html")
 
         let result = try HTMLPreviewMaterializer.materialize(
             fileURL: source,
@@ -38,18 +40,14 @@ struct HTMLPreviewEngineTests {
 
         #expect(result.serveRoot == source.deletingLastPathComponent().standardizedFileURL)
         #expect(result.relativePath == HTMLPreviewMaterializer.swapFileName)
-        let swap = root.appendingPathComponent(HTMLPreviewMaterializer.swapFileName)
+        let swap = workspace.url(HTMLPreviewMaterializer.swapFileName)
         #expect(FileManager.default.fileExists(atPath: swap.path))
         #expect(try String(contentsOf: swap, encoding: .utf8).contains("new"))
     }
 
     @Test("Materializer serves clean file directly")
     func materializeCleanPreview() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let source = root.appendingPathComponent("page.html")
-        try "<html><body>clean</body></html>".write(to: source, atomically: true, encoding: .utf8)
+        let source = try workspace.write("<html><body>clean</body></html>", to: "page.html")
 
         let result = try HTMLPreviewMaterializer.materialize(
             fileURL: source,

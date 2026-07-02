@@ -382,16 +382,12 @@ struct PreviewSecurityTests {
 
     @Test("symlink 解決後に serve root 外を指すパスは prefix チェックで弾かれること")
     func symlinkResolvingRejectsOutsidePath() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let outside = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let rootWS = try TempWorkspace()
+        let outsideWS = try TempWorkspace()
+        let root = rootWS.root
+        let outside = outsideWS.root
 
-        let secret = outside.appendingPathComponent("secret.txt")
-        try "secret content".write(to: secret, atomically: true, encoding: .utf8)
-
+        let secret = try outsideWS.write("secret content", to: "secret.txt")
         let link = root.appendingPathComponent("link.txt")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: secret)
 
@@ -402,9 +398,6 @@ struct PreviewSecurityTests {
         let isAllowed = resolvedLink.path.hasPrefix(resolvedRoot.path + "/")
             || resolvedLink.path == resolvedRoot.path
         #expect(!isAllowed, "symlink 越えは弾かれるべき")
-
-        try? FileManager.default.removeItem(at: root)
-        try? FileManager.default.removeItem(at: outside)
     }
 
     // MARK: - KMD-242 followup: nonce フォールバック・タブ区切りタグ
@@ -443,19 +436,13 @@ struct PreviewSecurityTests {
 
     @Test("serve root 内の正規ファイルは prefix チェックを通過すること")
     func normalFilePassesPrefixCheck() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-
-        let file = root.appendingPathComponent("readme.md")
-        try "content".write(to: file, atomically: true, encoding: .utf8)
+        let ws = try TempWorkspace()
+        let file = try ws.write("content", to: "readme.md")
 
         let resolvedFile = file.resolvingSymlinksInPath()
-        let resolvedRoot = root.resolvingSymlinksInPath()
+        let resolvedRoot = ws.root.resolvingSymlinksInPath()
         let isAllowed = resolvedFile.path.hasPrefix(resolvedRoot.path + "/")
             || resolvedFile.path == resolvedRoot.path
         #expect(isAllowed, "root 内の通常ファイルは通過するべき")
-
-        try? FileManager.default.removeItem(at: root)
     }
 }

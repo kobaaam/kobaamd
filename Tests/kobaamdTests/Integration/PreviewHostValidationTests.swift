@@ -13,6 +13,11 @@ import Testing
 /// - 有効 Host + 実ファイル + serveRoot 設定済み → 200 OK
 @Suite("Preview HTTP server Host validation")
 struct PreviewHostValidationTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
 
     // MARK: - isAllowedHost 純関数テスト
 
@@ -101,13 +106,8 @@ struct PreviewHostValidationTests {
 
     @Test("正規ファイルは 200 を返す（有効 Host + 実ファイル + serveRoot 設定）")
     func validRequestReturns200() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        let file = root.appendingPathComponent("test.html")
-        try "<html><body>hello</body></html>".write(to: file, atomically: true, encoding: .utf8)
+        let root = workspace.root
+        _ = try workspace.write("<html><body>hello</body></html>", to: "test.html")
 
         let server = WorkspacePreviewHTTPServer()
         let port = try server.ensureStarted()

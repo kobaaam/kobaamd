@@ -14,7 +14,7 @@ Tests/kobaamdTests/
 ├── ViewModel/            @Observable / @MainActor の ViewModel テスト
 ├── AppKitUI/             AppKit import または @MainActor 必須のテスト
 ├── Benchmarks/           ハイライト性能スモークテスト（通常実行は除外）
-└── TempWorkspaceTests.swift  TestSupport 自体のユニットテスト
+└── Unit/TempWorkspaceTests.swift  TestSupport 自体のユニットテスト
 ```
 
 ## TestSupport の使い方
@@ -53,17 +53,33 @@ await eventually(timeout: .seconds(2)) { !vm.isSearching }
 RUN_BENCHMARKS=1 swift test --filter HighlightBenchmarks
 ```
 
-## CI フィルタとの関係
+CI では `main` への push 時のみ、別 job で上記と同等の実行を行います（`swift-test` job 成功後）。
 
-`.github/workflows/unit-tests.yml` → `scripts/run-unit-tests.sh` は以下の suite 名正規表現でフィルタしています。
+## テスト実行
+
+### CI（デフォルト: 全件）
+
+`.github/workflows/unit-tests.yml` → `scripts/run-unit-tests.sh` は **フィルタなしで全テスト** を実行します。
+
+```sh
+./scripts/run-unit-tests.sh
+```
+
+### ローカル高速確認（安定サブセット）
+
+開発中の素早い確認には `--stable-only` を使います。以下の suite 名正規表現にマッチするテストのみ実行します（約 88 件）。
 
 ```
 E1Terminal|E1AgentStatus|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|AppState
 ```
 
-このフィルタにマッチする suite の **型名・@Suite 表示名は変更しないこと**。追加フィルタは `scripts/run-unit-tests.sh` を修正して別 PR で対応してください。
+```sh
+./scripts/run-unit-tests.sh --stable-only
+```
 
-## テストの全件実行
+このフィルタにマッチする suite の **型名・@Suite 表示名は変更しないこと**。フィルタ内容の変更は `scripts/run-unit-tests.sh` の `STABLE_FILTER` を修正して別 PR で対応してください。
+
+### 全件実行（直接）
 
 ```sh
 bash scripts/prepare-build.sh && swift test --enable-swift-testing --no-parallel

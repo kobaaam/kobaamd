@@ -6,6 +6,11 @@ import Testing
 @Suite("AppViewModel")
 @MainActor
 struct AppViewModelTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
 
     @Test("openInTab でタブ数が増えること")
     func openInTabIncreasesTabCount() {
@@ -109,9 +114,7 @@ struct AppViewModelTests {
     @Test("openDroppedFile: ディレクトリURLではfileTreeViewModelにフォルダが追加されること")
     func openDroppedFileAddsDirectoryToFileTree() async throws {
         let vm = AppViewModel()
-        let dirURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-drop-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dirURL, withIntermediateDirectories: true)
+        let dirURL = try workspace.makeDir("drop-\(UUID().uuidString)")
         await vm.openDroppedFile(url: dirURL)
         #expect(vm.fileTreeViewModel.folders.contains(where: {
             $0.url.standardizedFileURL == dirURL.standardizedFileURL
@@ -158,13 +161,7 @@ struct AppViewModelTests {
 
     @Test("syncOpenTabsFromDiskIfClean reloads clean tabs from disk")
     func syncOpenTabsFromDiskIfCleanUpdatesCleanTab() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let file = dir.appendingPathComponent("page.html")
-        try "<p>old</p>".write(to: file, atomically: true, encoding: .utf8)
+        let file = try workspace.write("<p>old</p>", to: "\(UUID().uuidString)/page.html")
 
         let vm = AppViewModel()
         vm.openInTab(url: file, content: "<p>old</p>")
@@ -179,13 +176,7 @@ struct AppViewModelTests {
 
     @Test("resolvedActiveFileContent prefers disk for clean markdown tab")
     func resolvedActiveFileContentPrefersDisk() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let file = dir.appendingPathComponent("doc.md")
-        try "# old".write(to: file, atomically: true, encoding: .utf8)
+        let file = try workspace.write("# old", to: "\(UUID().uuidString)/doc.md")
 
         let vm = AppViewModel()
         vm.openInTab(url: file, content: "# old")
@@ -196,13 +187,7 @@ struct AppViewModelTests {
 
     @Test("syncOpenTabsFromDiskIfClean skips dirty tabs")
     func syncOpenTabsFromDiskIfCleanSkipsDirtyTab() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let file = dir.appendingPathComponent("page.html")
-        try "<p>disk</p>".write(to: file, atomically: true, encoding: .utf8)
+        let file = try workspace.write("<p>disk</p>", to: "\(UUID().uuidString)/page.html")
 
         let vm = AppViewModel()
         vm.openInTab(url: file, content: "<p>disk</p>")

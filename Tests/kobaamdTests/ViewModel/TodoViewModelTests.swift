@@ -13,16 +13,6 @@ struct TodoViewModelTests {
 
     var tmpDir: URL { workspace.root }
 
-    private func write(_ content: String, name: String, in dir: URL? = nil) throws -> URL {
-        let target = (dir ?? tmpDir).appendingPathComponent(name)
-        try FileManager.default.createDirectory(
-            at: target.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try content.write(to: target, atomically: true, encoding: .utf8)
-        return target
-    }
-
     private func waitForItems(_ vm: TodoViewModel) async {
         await eventually(timeout: .seconds(2)) { !vm.items.isEmpty && !vm.isScanning }
     }
@@ -47,9 +37,9 @@ struct TodoViewModelTests {
 
     @Test("scanDirectory collects TODOs from .md files in directory")
     func scanDirectoryCollectsMd() async throws {
-        _ = try write("TODO: alpha\n", name: "a.md")
-        _ = try write("FIXME: beta\n", name: "sub/b.md")
-        _ = try write("TODO: ignored\n", name: "c.txt")
+        _ = try workspace.write("TODO: alpha\n", to: "a.md")
+        _ = try workspace.write("FIXME: beta\n", to: "sub/b.md")
+        _ = try workspace.write("TODO: ignored\n", to: "c.txt")
         let items = await TodoViewModel.scanDirectory(at: tmpDir)
         #expect(items.contains { $0.text == "alpha" })
         #expect(items.contains { $0.text == "beta" })
@@ -59,12 +49,10 @@ struct TodoViewModelTests {
 
     @Test("scanWorkspace collects TODOs from multiple roots")
     func scanWorkspaceMerges() async throws {
-        let dirA = tmpDir.appendingPathComponent("A")
-        let dirB = tmpDir.appendingPathComponent("B")
-        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: dirB, withIntermediateDirectories: true)
-        _ = try write("TODO: from-a\n", name: "x.md", in: dirA)
-        _ = try write("FIXME: from-b\n", name: "y.md", in: dirB)
+        let dirA = try workspace.makeDir("A")
+        let dirB = try workspace.makeDir("B")
+        _ = try workspace.write("TODO: from-a\n", to: "A/x.md")
+        _ = try workspace.write("FIXME: from-b\n", to: "B/y.md")
         let items = await TodoViewModel.scanWorkspace(folders: [dirA, dirB])
         #expect(items.contains { $0.text == "from-a" })
         #expect(items.contains { $0.text == "from-b" })
@@ -77,7 +65,7 @@ struct TodoViewModelTests {
         try await Task.sleep(for: .milliseconds(400))
         #expect(vm.items.contains { $0.text == "file-only" })
 
-        _ = try write("TODO: folder-found\n", name: "x.md")
+        _ = try workspace.write("TODO: folder-found\n", to: "x.md")
         vm.updateFolderRoot(tmpDir)
         vm.setScope(.folder)
         await waitForItems(vm)
@@ -91,19 +79,8 @@ struct TodoViewModelTests {
 
     @Test("maxDepth=5 limits descent")
     func maxDepthLimits() async throws {
-        let deepDir = tmpDir
-            .appendingPathComponent("d1/d2/d3/d4/d5/d6", isDirectory: true)
-        try FileManager.default.createDirectory(at: deepDir, withIntermediateDirectories: true)
-        try "TODO: too-deep\n".write(
-            to: deepDir.appendingPathComponent("x.md"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try "TODO: shallow\n".write(
-            to: tmpDir.appendingPathComponent("d1/y.md"),
-            atomically: true,
-            encoding: .utf8
-        )
+        _ = try workspace.write("TODO: too-deep\n", to: "d1/d2/d3/d4/d5/d6/x.md")
+        _ = try workspace.write("TODO: shallow\n", to: "d1/y.md")
         let items = await TodoViewModel.scanDirectory(at: tmpDir, maxDepth: 5)
         #expect(items.contains { $0.text == "shallow" })
         #expect(!items.contains { $0.text == "too-deep" })
@@ -111,12 +88,10 @@ struct TodoViewModelTests {
 
     @Test("Folder scope root is decoupled from active file")
     func folderScopeDecoupledFromActiveFile() async throws {
-        let dirA = tmpDir.appendingPathComponent("A", isDirectory: true)
-        let dirB = tmpDir.appendingPathComponent("B", isDirectory: true)
-        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: dirB, withIntermediateDirectories: true)
-        _ = try write("TODO: A1", name: "a.md", in: dirA)
-        _ = try write("TODO: B1", name: "b.md", in: dirB)
+        let dirA = try workspace.makeDir("A")
+        let dirB = try workspace.makeDir("B")
+        _ = try workspace.write("TODO: A1", to: "A/a.md")
+        _ = try workspace.write("TODO: B1", to: "B/b.md")
 
         let vm = TodoViewModel()
         vm.setScope(.folder)
@@ -131,12 +106,10 @@ struct TodoViewModelTests {
 
     @Test("Folder root follows the head of workspace folders")
     func folderRootFollowsWorkspaceHead() async throws {
-        let dirA = tmpDir.appendingPathComponent("A", isDirectory: true)
-        let dirC = tmpDir.appendingPathComponent("C", isDirectory: true)
-        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: dirC, withIntermediateDirectories: true)
-        _ = try write("TODO: A1", name: "a.md", in: dirA)
-        _ = try write("TODO: C1", name: "c.md", in: dirC)
+        let dirA = try workspace.makeDir("A")
+        let dirC = try workspace.makeDir("C")
+        _ = try workspace.write("TODO: A1", to: "A/a.md")
+        _ = try workspace.write("TODO: C1", to: "C/c.md")
 
         let vm = TodoViewModel()
         vm.setScope(.folder)

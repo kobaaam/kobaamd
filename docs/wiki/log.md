@@ -184,3 +184,9 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - skipped sources（理由付き）:
   - テスト再構築 PR: 2026-07-02 時点でオープン PR なし。Tests/kobaamdTests/README.md も存在しないため新規記事へのリファレンスのみ記載
 - lint: --no-llm で確認（実行後コミット）
+
+## [2026-07-03] build-and-test-pipeline 更新（KMD-245 followup）
+
+- updated articles:
+  - articles/practices/build-and-test-pipeline.md（CI デフォルトを全件実行に更新、--stable-only をローカル高速確認用として明記、ベースライン 474 tests green）
+- ソース: Tests/kobaamdTests/README.md、scripts/run-unit-tests.sh、.github/workflows/unit-tests.yml

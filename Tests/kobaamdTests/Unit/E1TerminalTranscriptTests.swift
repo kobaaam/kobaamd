@@ -4,6 +4,12 @@ import Testing
 
 @Suite("E1 terminal transcript")
 struct E1TerminalTranscriptTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
+
     @Test("disk transcript cap is 100 MB")
     func diskCapIs100MB() {
         #expect(E1TerminalMemoryPolicy.diskTranscriptMaxBytes == 100 * 1024 * 1024)
@@ -52,11 +58,7 @@ struct E1TerminalTranscriptTests {
 
     @Test("trim keeps tail within max bytes")
     func trimKeepsTail() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-transcript-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
+        let directory = try workspace.makeDir("transcript-\(UUID().uuidString)")
         let url = directory.appendingPathComponent("transcript.log")
         let payload = String(repeating: "x", count: 1200)
         try payload.data(using: .utf8)!.write(to: url)
@@ -70,10 +72,7 @@ struct E1TerminalTranscriptTests {
 
     @Test("appendDelta writes under worktree .kobaamd")
     func appendWritesTranscriptFile() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-transcript-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let directory = try workspace.makeDir("transcript-\(UUID().uuidString)")
 
         _ = try E1TerminalTranscriptStore.appendDelta(
             previousSnapshot: nil,

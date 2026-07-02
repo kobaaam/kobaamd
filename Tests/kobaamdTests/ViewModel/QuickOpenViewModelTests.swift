@@ -5,19 +5,16 @@ import Testing
 @Suite("QuickOpenViewModel")
 @MainActor
 struct QuickOpenViewModelTests {
+    let workspace: TempWorkspace
 
-    private func makeVM(withFileNames fileNames: [String]) throws -> QuickOpenViewModel {
-        let tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-quick-open-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: tmpDir,
-            withIntermediateDirectories: true,
-            attributes: nil
-        )
-        defer { try? FileManager.default.removeItem(at: tmpDir) }
+    init() throws {
+        workspace = try TempWorkspace()
+    }
 
+    private func makeVM(withFileNames fileNames: [String], subdir: String? = nil) throws -> QuickOpenViewModel {
+        let base = try workspace.makeDir(subdir ?? UUID().uuidString)
         for fileName in fileNames {
-            let fileURL = tmpDir.appendingPathComponent(fileName)
+            let fileURL = base.appendingPathComponent(fileName)
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true,
@@ -26,7 +23,7 @@ struct QuickOpenViewModelTests {
             try Data().write(to: fileURL)
         }
 
-        let folder = WorkspaceFolder(url: tmpDir, nodes: FileService().loadNodes(at: tmpDir))
+        let folder = WorkspaceFolder(url: base, nodes: FileService().loadNodes(at: base))
         let vm = QuickOpenViewModel()
         vm.indexFiles(from: [folder])
         return vm
@@ -57,13 +54,9 @@ struct QuickOpenViewModelTests {
 
     @Test("scopedTo は指定ルート配下のファイルのみインデックスする")
     func scopedIndexFiltersOutsideRoot() throws {
-        let parent = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kobaamd-qo-scope-\(UUID().uuidString)", isDirectory: true)
-        let session = parent.appendingPathComponent("session", isDirectory: true)
-        let other = parent.appendingPathComponent("other", isDirectory: true)
-        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: parent) }
+        let scopeRoot = "scoped-\(UUID().uuidString)"
+        let session = try workspace.makeDir("\(scopeRoot)/session")
+        let other = try workspace.makeDir("\(scopeRoot)/other")
 
         try Data().write(to: session.appendingPathComponent("in-scope.md"))
         try Data().write(to: other.appendingPathComponent("out-scope.md"))

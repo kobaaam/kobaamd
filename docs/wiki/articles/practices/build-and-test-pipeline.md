@@ -7,7 +7,7 @@ sources:
   - scripts/run-unit-tests.sh
   - Package.swift
 created: 2026-07-02
-updated: 2026-07-02
+updated: 2026-07-03
 ---
 
 # ビルド・テストパイプライン手順と既知の罠
@@ -59,13 +59,23 @@ Fork に含まれる kobaamd 追加 API（`E1AgentStatusMonitor` が必要とす
 
 ## テスト実行
 
-### CI 用安定サブセット（推奨）
+### CI（デフォルト: 全件）
 
 ```bash
 ./scripts/run-unit-tests.sh
 ```
 
-このスクリプトは `swift package resolve` → `swift build` → `swift test` を一括実行する。テスト対象は以下の正規表現でフィルタされた安定サブセット:
+このスクリプトは `scripts/prepare-build.sh` → `swift build` → `swift test --enable-swift-testing --no-parallel` を一括実行する。**CI はフィルタなしで全テストを実行する**（KMD-245、2026-07-03）。
+
+`main` への push 時は、全件テスト成功後に `RUN_BENCHMARKS=1` + `--filter HighlightBenchmarks` のベンチマーク job も別途走る。
+
+### ローカル高速確認（安定サブセット）
+
+```bash
+./scripts/run-unit-tests.sh --stable-only
+```
+
+開発中の素早い確認用。以下の正規表現でフィルタされた安定サブセット（約 88 件）のみ実行する:
 
 ```
 E1Terminal|E1AgentStatus|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|AppState
@@ -77,13 +87,13 @@ E1Terminal|E1AgentStatus|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|Ap
 ./scripts/run-unit-tests.sh --filter CSVParser
 ```
 
-### 全件実行
+### 全件実行（直接）
 
 ```bash
 swift test --enable-swift-testing --no-parallel
 ```
 
-**2026-07-02 時点のベースライン**: 344 tests / 既存失敗 4 件（`WikiIndexService` ×2、`TodoViewModel` ×2）。この 4 件は既知の失敗であり、回帰ではない。
+**2026-07-03 時点のベースライン**: 474 tests / 全件 green。
 
 ### 結果行の確認を必須とする運用
 

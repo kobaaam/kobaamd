@@ -4,15 +4,15 @@ import Testing
 
 @Suite("FileContentResolver")
 struct FileContentResolverTests {
+    let workspace: TempWorkspace
+
+    init() throws {
+        workspace = try TempWorkspace()
+    }
+
     @Test("Prefers disk when clean")
     func prefersDiskWhenClean() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let file = dir.appendingPathComponent("note.md")
-        try "# disk".write(to: file, atomically: true, encoding: .utf8)
+        let file = try workspace.write("# disk", to: "note.md")
 
         let resolved = FileContentResolver.displayContent(
             url: file,
@@ -24,13 +24,7 @@ struct FileContentResolverTests {
 
     @Test("Uses memory when dirty")
     func usesMemoryWhenDirty() throws {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
-        let file = dir.appendingPathComponent("note.md")
-        try "# disk".write(to: file, atomically: true, encoding: .utf8)
+        let file = try workspace.write("# disk", to: "note.md")
 
         let resolved = FileContentResolver.displayContent(
             url: file,
