@@ -22,11 +22,27 @@ struct HTMLPreviewNavigationPolicyTests {
         #expect(result == .allow)
     }
 
-    @Test("other ナビゲーション（JS起点）は allow されること")
+    @Test("other ナビゲーション（JS起点）で同一 origin は allow されること")
     func otherNavigationTypeIsAllowed() {
         let url = URL(string: "http://127.0.0.1:9123/subpage.html")!
         let result = Policy.navigationPolicy(for: url, navigationType: .other, previewURL: previewURL)
         #expect(result == .allow)
+    }
+
+    @Test("other ナビゲーション（JS起点: window.location=）で外部 https は cancel されること")
+    func otherNavigationTypeExternalHttpsCancelled() {
+        // window.location = 'https://evil.com' 等の JS 起点遷移は .other で届く。
+        // 同一 origin 外なら cancel して DNS rebinding / open redirect を防ぐ。
+        let url = URL(string: "https://evil.com")!
+        let result = Policy.navigationPolicy(for: url, navigationType: .other, previewURL: previewURL)
+        #expect(result == .cancel)
+    }
+
+    @Test("other ナビゲーション（JS起点）で別ドメインの http は cancel されること")
+    func otherNavigationTypeExternalHttpCancelled() {
+        let url = URL(string: "http://attacker.example.com/steal")!
+        let result = Policy.navigationPolicy(for: url, navigationType: .other, previewURL: previewURL)
+        #expect(result == .cancel)
     }
 
     @Test("reload ナビゲーションは allow されること")
