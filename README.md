@@ -16,24 +16,45 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 ## Features / 機能
 
 - **Instant preview / リアルタイムプレビュー** — Split view or WYSIWYG mode / スプリットビューまたは WYSIWYG モード
-- **Folder workspace / フォルダワークスペース** — File tree, outline, and TODO panel in a VS Code-style sidebar / VS Code 風サイドバーにファイルツリー・アウトライン・TODO を常時表示
+- **Folder workspace / フォルダワークスペース** — File tree, outline, tags, and TODO panel in a VS Code-style sidebar / VS Code 風サイドバーにファイルツリー・アウトライン・タグ・TODO を常時表示
 - **Mermaid diagrams / Mermaid ダイアグラム** — Flowcharts, sequence diagrams, Gantt charts rendered inline / フローチャート・シーケンス図・ガントチャートをインラインで描画
 - **D2 diagrams / D2 ダイアグラム** — D2 diagram preview rendered in the preview pane / D2 図をプレビューペインでレンダリング
 - **Tabbed editing / タブ編集** — Multiple files open simultaneously (⌘T) / 複数ファイルを同時に開く（⌘T）
-- **Syntax highlighting / シンタックスハイライト** — Markdown syntax highlighted in the editor / エディタ内の Markdown 構文をハイライト
+- **TreeSitter syntax highlighting / TreeSitter シンタックスハイライト** — Full language support in code blocks using Tree-sitter / Tree-sitter によるコードブロック内の完全な言語サポート
 - **Full-text search / 全文検索** — Search across all files in your workspace / ワークスペース全ファイルを横断検索
+- **Quick Open / クイックオープン** — Fuzzy file picker (⌘P) / ファジーファイルピッカー（⌘P）
 - **Outline panel / アウトラインパネル** — Navigate headings (H1–H6) with editor + preview sync / 見出し一覧からエディタ・プレビューを同期ジャンプ
-- **AI assist / AI アシスト** — Send selected text to OpenAI / Anthropic / Gemini / 選択テキストを AI API に送信
-- **AI chat sidebar / AI チャットサイドバー** — Multi-turn conversation with persistent context in a dedicated sidebar (⌘E) / 専用サイドバーで履歴を保ちながら AI とマルチターン会話（⌘E）
-- **File templates / ファイルテンプレート** — AI-oriented presets for README, diary, meeting notes, and tech specs (⌘N picker) / AI フレンドリーな骨格を即挿入（⌘N ピッカー）
-- **Color themes / カラーテーマ** — Built-in light, dark, solarized, and monokai themes for editor and preview / エディタ・プレビュー用ライト・ダーク・Solarized・Monokai テーマを内蔵
+- **Tags sidebar / タグサイドバー** — Browse and filter notes by frontmatter tags / frontmatter タグでノートを一覧・フィルタリング
+- **CSV table preview / CSV テーブルプレビュー** — View CSV files as formatted tables in the preview pane / CSVファイルをプレビューペインで整形テーブル表示
+- **File templates / ファイルテンプレート** — Presets for README, diary, meeting notes, and tech specs (⌘⇧N) / README・日記・議事録・技術仕様の骨格を即挿入（⌘⇧N ピッカー）
 - **Rendered Markdown diff viewer / レンダリング済み Markdown 差分ビューア** — View AI-generated diffs as formatted Markdown with green/red highlights, not raw syntax (⌘⇧D to toggle) / AI 生成差分をレンダリング済み Markdown で緑・赤ハイライト表示（⌘⇧D でトグル）
+- **PDF export / PDF エクスポート** — Export the current file to PDF (⌘⇧P) / 現在のファイルを PDF に書き出し（⌘⇧P）
+- **Chromium browser preview / Chromium ブラウザプレビュー** — Preview pages in a local Chromium instance for full browser fidelity / ローカル Chromium インスタンスでフルブラウザ相当のプレビュー
+- **Wiki search index / Wiki 検索インデックス** — Workspace-wide full-text index with tag awareness / タグ対応のワークスペース横断全文インデックス
 - **In-app help / アプリ内ヘルプ** — Built-in help window with shortcuts, features, and troubleshooting (⌘?) / ショートカット・機能説明・トラブルシューティングをアプリ内で参照（⌘?）
 - **Autosave / オートセーブ** — Changes saved automatically; manual save with ⌘S / 自動保存対応、⌘S で手動保存も可
-- **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
-- **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
 - **Frontmatter editor / Frontmatter エディタ** — Structured YAML/TOML frontmatter recognized and editable via a dedicated inline panel / YAML/TOML の frontmatter を認識し、専用インラインパネルで編集可能
 - **Backlinks pane / Backlinks ペイン** — See which files link to or mention the current file; convert unlinked mentions to wikilinks / 現在のファイルを参照しているファイルを一覧表示し、unlinked mention を wikilink に変換可能
+- **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
+- **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
+
+### E1 shell (Ghostty terminal integration)
+### E1 シェル（Ghostty ターミナル統合）
+
+kobaamd ships a second UI mode called **E1**: Session rail | Terminal | Viewer. The embedded terminal is powered by [Ghostty](https://ghostty.org) via [libghostty-spm](https://github.com/Lakr233/libghostty-spm) (MIT).
+
+kobaamd には **E1** という第二の UI モードが搭載されています。Session rail | Terminal | Viewer レイアウトで、組み込みターミナルは [Ghostty](https://ghostty.org) を [libghostty-spm](https://github.com/Lakr233/libghostty-spm)（MIT）経由で利用しています。
+
+In **Settings**, turn off **「E1 シェル」** to use the classic Markdown 3-pane layout. Restart the app after toggling.
+**設定**で **「E1 シェル」** を OFF にすると従来の Markdown 3ペイン UI に戻ります。切り替え後はアプリを再起動してください。
+
+### MCP server
+
+kobaamd ships a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server (`Sources/CLI/`) that exposes your vault to any MCP-compatible AI client (e.g. Claude Desktop).
+
+kobaamd には、Vault を任意の MCP 対応 AI クライアント（Claude Desktop 等）に公開する組み込み MCP サーバー（`Sources/CLI/`）が搭載されています。
+
+Available tools: `GetBacklinks`, `GetHeadings`, `GetTags`, `ListNotes`, `ReadNote`, `SearchNotes`
 
 ---
 
@@ -90,10 +111,6 @@ macOS の Hardened Runtime では実行中バイナリの上書きができな�
 swift build && ./scripts/post-build.sh debug dev && open .build/kobaamd-dev.app
 ```
 
-**E1 shell (Re-concept):** The default UI is Session rail | Terminal | Viewer. The embedded terminal is powered by [Ghostty](https://ghostty.org) via [libghostty-spm](https://github.com/Lakr233/libghostty-spm) (MIT). In **Settings**, turn off **「E1 シェル」** to use the legacy Markdown 3-pane layout. Restart the app after toggling.
-
-**E1 シェル（Re-concept）:** デフォルトは Session rail | Terminal | Viewer です。組み込みターミナルは [Ghostty](https://ghostty.org) を [libghostty-spm](https://github.com/Lakr233/libghostty-spm)（MIT）経由で利用しています。**設定**で **「E1 シェル」** を OFF にすると従来の Markdown 3ペイン UI に戻ります。切り替え後はアプリを再起動してください。
-
 If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, run the development ACL helper described in [`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md).
 ローカルの ad-hoc 再ビルド後に API キーの Keychain アクセス確認が繰り返される場合は、[`docs/dev-keychain-acl.md`](docs/dev-keychain-acl.md) の開発用 ACL ヘルパーを使用してください。
 
@@ -120,19 +137,32 @@ kobaamd/
 ├── Sources/
 │   ├── App/                    # Entry point, AppViewModel, commands
 │   │                           # エントリポイント・グローバル状態・コマンド
+│   ├── CLI/                    # MCP server entry point and 6 tool implementations
+│   │   └── Tools/              # GetBacklinks, GetHeadings, GetTags, ListNotes, ReadNote, SearchNotes
+│   │                           # MCP サーバーエントリポイントと 6 ツール実装
+│   ├── Diagnostics/            # Performance logging (PerfLogger)
+│   │                           # パフォーマンスログ
 │   ├── Models/                 # FileNode, EditorTab, DocumentTemplate, ColorTheme, Frontmatter, Backlink
 │   ├── Views/
 │   │   ├── MainWindowView.swift   # 3-pane layout (sidebar / editor / preview)
-│   │   ├── E1/                    # E1 shell placeholders (feature flag useE1Shell)
-│   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView, BacklinksView
-│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView, FrontmatterEditor
+│   │   ├── E1/                    # E1 shell: Session rail, terminal pane, viewer tabs (Ghostty integration)
+│   │   │                          # E1 シェル: セッションレール・ターミナルペイン・ビューアタブ
+│   │   ├── Sidebar/               # FileTreeView, SearchView, OutlineView, BacklinksView, TagsView, TodoView
+│   │   ├── Editor/                # NSTextView wrapper, TabBarView, FindReplaceBar, TemplatePickerView,
+│   │   │                          #   FrontmatterEditor, QuickInsertView, WYSIWYGEditorView
 │   │   ├── Diff/                  # DiffView, rendered Markdown diff (WKWebView-based)
 │   │   ├── Help/                  # HelpWindowView, HelpContentView (in-app help)
-│   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer
-│   │   └── AI/                    # AI assist panel, AIChatView (multi-turn chat)
-│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, AIChatViewModel, DiffViewModel, FrontmatterViewModel, BacklinksViewModel
-│   ├── Services/               # FileService, MarkdownService, AIService, GitService, BacklinksScanner, BacklinkContextChecker, BacklinkContextCache
-│   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/ (AI presets)
+│   │   ├── Preview/               # WKWebView-based Markdown + Mermaid + D2 renderer, CSVPreviewView
+│   │   ├── QuickOpen/             # QuickOpenView (⌘P fuzzy file picker)
+│   │   └── Settings/              # SettingsView
+│   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, DiffViewModel,
+│   │                           #   FrontmatterViewModel, BacklinksViewModel, TagsViewModel,
+│   │                           #   QuickOpenViewModel, CSVPreviewViewModel, D2PreviewViewModel
+│   ├── Services/               # FileService, MarkdownService, GitService, BacklinksScanner,
+│   │   │                       #   BacklinkContextChecker, WikiIndexService, TreeSitterHighlightService,
+│   │   │                       #   MarkdownFormatterService, WorktreeService
+│   │   └── Preview/            # ChromiumPreviewController, WorkspacePreviewHTTPServer
+│   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/
 ├── scripts/
 │   ├── post-build.sh           # Bundles binary + resources → .app
 │   └── keychain/               # Local development Keychain ACL helpers
@@ -140,24 +170,61 @@ kobaamd/
 └── Package.swift
 ```
 
-**Stack:** SwiftUI + AppKit · MVVM (`@Observable`) · `swift-markdown` (Apple) · WKWebView · Mermaid.js · D2
+**Stack:** SwiftUI + AppKit · MVVM (`@Observable`) · `swift-markdown` (Apple) · WKWebView · Mermaid.js · D2 · Tree-sitter · Ghostty (libghostty-spm)
 
 ---
 
 ## Keyboard Shortcuts / キーボードショートカット
 
+### File / ファイル
+
 | Shortcut | Action / アクション |
 |----------|---------------------|
 | ⌘O | Open folder / フォルダを開く |
 | ⌘N | New file / 新規ファイル |
+| ⌘⇧N | New file from template / テンプレートから新規ファイル |
 | ⌘T | New tab / 新しいタブ |
 | ⌘W | Close tab / タブを閉じる |
 | ⌘S | Save / 保存 |
+| ⌘⇧P | Export to PDF / PDF に書き出し |
+
+### Edit / 編集
+
+| Shortcut | Action / アクション |
+|----------|---------------------|
 | ⌘F | Find & Replace / 検索・置換 |
-| ⌘B | Toggle sidebar / サイドバー表示切替 |
-| ⌘E | AI assist / AI アシスト |
+| ⌘P | Quick Open / クイックオープン |
+| ⌘⌥K | Quick insert / クイックインサート |
+
+### Format / フォーマット
+
+| Shortcut | Action / アクション |
+|----------|---------------------|
+| ⌘B | Bold / 太字 |
+| ⌘I | Italic / イタリック |
+| ⌘K | Insert link / リンク挿入 |
+| ⌘⇧F | Format document / ドキュメント整形 |
+
+### View / 表示
+
+| Shortcut | Action / アクション |
+|----------|---------------------|
+| ⌘⌥S | Toggle sidebar / サイドバー表示切替 |
+| ⌘⇧R | Reading mode / 読書モード |
+| ⌘= | Increase code font size / コードフォントを大きく |
+| ⌘- | Decrease code font size / コードフォントを小さく |
+| ⌘0 | Reset code font size / コードフォントを既定値に戻す |
 | ⌘, | Settings / 設定 |
 | ⌘? | Help / ヘルプ |
+
+### E1 shell / E1 シェル
+
+| Shortcut | Action / アクション |
+|----------|---------------------|
+| ⌘1 | Focus: terminal / フォーカス: ターミナル |
+| ⌘2 | Focus: viewer / フォーカス: ビューア |
+| ⌘3 | Focus: file tree / フォーカス: ファイルツリー |
+| ⌘\ | Toggle Markdown split / Markdown スプリット切替 |
 
 ---
 
@@ -201,12 +268,10 @@ For implementation rationale and the multi-layer defense design, see `docs/wiki/
 ## Roadmap / ロードマップ
 
 - [x] **Rendered Markdown diff viewer** — See diffs as formatted Markdown, not raw syntax / レンダリング済み Markdown の差分ビューア
-
-- [ ] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
-
-- [ ] **Export** — PDF, HTML export / PDF・HTML エクスポート
-
-- [x] **Custom themes** — Light/dark/custom color schemes / カスタムカラーテーマ
+- [x] **TreeSitter syntax highlighting** — Full language support in code blocks / コードブロックの完全な言語サポート
+- [x] **PDF export** — Export to PDF / PDF エクスポート
+- [x] **E1 shell** — Ghostty terminal integration / Ghostty ターミナル統合
+- [x] **MCP server** — Expose vault to AI clients via Model Context Protocol / MCP 経由で Vault を AI クライアントに公開
 
 ---
 
@@ -214,6 +279,9 @@ For implementation rationale and the multi-layer defense design, see `docs/wiki/
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 貢献を歓迎します。[CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
+
+Vulnerability reports: see [SECURITY.md](SECURITY.md).
+脆弱性報告: [SECURITY.md](SECURITY.md) をご覧ください。
 
 ---
 
