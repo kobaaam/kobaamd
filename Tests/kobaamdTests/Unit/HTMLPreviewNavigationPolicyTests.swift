@@ -73,11 +73,11 @@ struct HTMLPreviewNavigationPolicyTests {
         #expect(result == .cancel)
     }
 
-    @Test("previewURL が nil のとき外部 URL は cancel されること")
-    func nilPreviewURLCancelsExternalLink() {
+    @Test("previewURL が nil のときは初期ロード安全弁として allow されること")
+    func nilPreviewURLAllowsInitialNavigation() {
         let url = URL(string: "https://example.com")!
         let result = Policy.navigationPolicy(for: url, navigationType: .linkActivated, previewURL: nil)
-        #expect(result == .cancel)
+        #expect(result == .allow)
     }
 
     @Test("blob: スキームは cancel されること")

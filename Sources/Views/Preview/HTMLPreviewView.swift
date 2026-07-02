@@ -224,14 +224,23 @@ final class ChromiumHTMLPreviewHostView: NSView {
 /// ## 設計判断（脅威モデル）
 ///
 /// HTML プレビューは JS 有効が必須（CSS アニメーション・React 等の対応のため）。
-/// 一方でプレビュー内のリンクが WebView 内で外部 URL へ遷移すると、
+/// 一方でプレビュー内のリンクやスクリプトが WebView 内で外部 URL へ遷移すると、
 /// 意図せず外部コンテンツが読み込まれる。
 ///
-/// 対策:
-/// - `linkActivated` で外部 URL → `NSWorkspace` でシステムブラウザに委譲して cancel
-/// - 同一 origin（127.0.0.1:<port>）内は allow（相対パスのアセット読み込み・ハッシュ遷移）
-/// - `file:` スキームは cancel（ローカルファイルシステムへのアクセスを遮断）
-/// - JS 起点 / リロードは allow（インタラクティブな HTML が壊れないように）
+/// ## ナビゲーションタイプ別の方針
+///
+/// - `about:` / 空スキーム: 常に allow（about:blank 等の初期フレーム）
+/// - 同一 origin（scheme + host + port が一致）: 常に allow
+///   （相対パスアセット・ハッシュ遷移・SPA 内ルーティング等）
+/// - `previewURL == nil`（初期ロード前の安全弁）: allow
+/// - 上記以外の外部 URL: navType に関わらず cancel
+///   - `linkActivated`: 呼び出し側で `NSWorkspace` に委譲してからキャンセル
+///   - `.other`（JS 起点: `window.location=` 等）: サイレントキャンセル
+///   - `.reload` で外部 URL: cancel（正常な reload は同一 origin に留まる）
+///   - `file:` / `blob:` 等の危険スキーム: cancel
+///
+/// 正当なインタラクティブ HTML（SPA・React・Vue 等）は同一 origin 内に留まるため
+/// `.other` を外部 URL に対して cancel しても壊れない。
 enum LocalhostHTMLWebViewCoordinatorPolicy {
     static func navigationPolicy(
         for url: URL,
@@ -240,25 +249,27 @@ enum LocalhostHTMLWebViewCoordinatorPolicy {
     ) -> WKNavigationActionPolicy {
         let scheme = url.scheme?.lowercased() ?? ""
 
-        // about:blank / 空スキームは通す
+        // about:blank / 空スキームは常に通す（初期フレーム等）
         if scheme == "about" || scheme == "" {
             return .allow
         }
 
-        // JS 起点やリロードは通す（インタラクティブ HTML 対応）
-        if navigationType == .other || navigationType == .reload {
+        // previewURL 未設定の初期ロード安全弁 — サーバー起動前などに備える
+        guard let previewURL else {
             return .allow
         }
 
-        // 同一 origin（スキーム + ホスト + ポートが一致）内の遷移は allow
-        if let previewURL,
-           url.scheme == previewURL.scheme,
+        // 同一 origin（スキーム + ホスト + ポートが一致）内は常に allow
+        // SPA のルーティング・ハッシュ遷移・相対アセット読み込みを壊さないため
+        if url.scheme == previewURL.scheme,
            url.host == previewURL.host,
            url.port == previewURL.port {
             return .allow
         }
 
-        // linkActivated 含むその他はキャンセル（呼び出し側で外部ブラウザを開く）
+        // 同一 origin 外はナビゲーションタイプに関わらずキャンセル。
+        // JS 起点（.other: window.location= 等）も外部 URL なら cancel する。
+        // 正当な SPA は同一 origin に留まるため、この制限で壊れることはない。
         return .cancel
     }
 }

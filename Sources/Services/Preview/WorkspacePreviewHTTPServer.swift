@@ -140,7 +140,11 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
     /// ブラウザが DNS rebinding で attacker.example.com を 127.0.0.1 に
     /// 解決した場合、Host ヘッダには "attacker.example.com" が入る。
     /// この検証でそのリクエストを弾くことで経路を完全に塞ぐ。
-    static func isAllowedHost(_ host: String, port: UInt16) -> Bool {
+    ///
+    /// ポート一致は検証しない: サーバーは 127.0.0.1 のランダムポートに
+    /// バインドするため、ポートを知っているクライアントは正規のアクセスと見なせる。
+    /// ホスト名の正規化だけで DNS rebinding 対策として十分。
+    static func isAllowedHost(_ host: String) -> Bool {
         // ポート部分を除去する。
         // IPv4 / hostname: "127.0.0.1:9000" → lastIndex(":") でポートを切り離す。
         // IPv6: "[::1]:9000" → "]" の直後の ":PORT" を切り離す。
@@ -189,10 +193,7 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         let hostValue = hostHeader
             .dropFirst("host:".count)
             .trimmingCharacters(in: .whitespaces)
-        lock.lock()
-        let currentPort = port
-        lock.unlock()
-        guard Self.isAllowedHost(hostValue, port: currentPort) else {
+        guard Self.isAllowedHost(hostValue) else {
             return httpResponse(status: 403, body: "Forbidden: invalid Host")
         }
 

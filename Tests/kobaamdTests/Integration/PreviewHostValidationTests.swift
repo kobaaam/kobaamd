@@ -18,42 +18,42 @@ struct PreviewHostValidationTests {
 
     @Test("127.0.0.1 は許可されること")
     func localhost127IsAllowed() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1"))
     }
 
     @Test("localhost は許可されること")
     func localhostNameIsAllowed() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("localhost", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("localhost"))
     }
 
     @Test("127.0.0.1:PORT 形式は許可されること")
     func localhostWithPortIsAllowed() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1:9000", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1:9000"))
     }
 
     @Test("localhost:PORT 形式は許可されること")
     func localhostNameWithPortIsAllowed() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("localhost:9000", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("localhost:9000"))
     }
 
     @Test("[::1] は許可されること")
     func ipv6LoopbackIsAllowed() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("[::1]", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("[::1]"))
     }
 
     @Test("外部ホスト名は拒否されること")
     func externalHostIsRejected() {
-        #expect(!WorkspacePreviewHTTPServer.isAllowedHost("evil.example.com", port: 9000))
+        #expect(!WorkspacePreviewHTTPServer.isAllowedHost("evil.example.com"))
     }
 
     @Test("DNS rebinding 風ホスト名は拒否されること")
     func dnsRebindingHostIsRejected() {
-        #expect(!WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1.evil.example.com", port: 9000))
+        #expect(!WorkspacePreviewHTTPServer.isAllowedHost("127.0.0.1.evil.example.com"))
     }
 
     @Test("大文字 LOCALHOST は許可されること（大文字小文字非依存）")
     func localhostCaseInsensitive() {
-        #expect(WorkspacePreviewHTTPServer.isAllowedHost("LOCALHOST", port: 9000))
+        #expect(WorkspacePreviewHTTPServer.isAllowedHost("LOCALHOST"))
     }
 
     // MARK: - 実サーバーテスト（NWConnection 使用）
