@@ -73,18 +73,18 @@ bash scripts/prepare-build.sh
 swift test --enable-swift-testing --no-parallel
 ```
 
-**2026-07-02 時点のベースライン**: 344 tests / 既存失敗 4 件（`WikiIndexService` ×2、`TodoViewModel` ×2）。この 4 件は既知の失敗であり、回帰ではない。
+**2026-07-02 時点のベースライン**: 344 tests / 既存失敗 4 件（`WikiIndexService` ×2、`TodoViewModel` ×2）。この 4 件は既知の失敗であり、回帰ではない。なお `scripts/run-unit-tests.sh` 内コメントに「全 310 件」と記載があるが、これは過去時点の値であり陳腐化している。344 は 2026-07-02 の実測値。
 
 ### 結果行の確認を必須とする運用
 
 `docs/ai-handoff.md` には「`swift test` が結果行なしで exit 0 する no-op 罠」が記録されている。2026-07-02 の実測ではこの挙動は再現せず、結果行（`Test Suite 'All tests' passed...` 等）が出力された。ただし環境依存の可能性があるため、**テスト実行後は結果行の出力を必ず目視確認すること**（結果行なしの exit 0 は no-op として疑う）。
 
 ## テストディレクトリ構造
-<!-- llm-context: kobaamd のテストは Tests/kobaamdTests/ 直下にフラットに配置されている（2026-07-02 時点。サブディレクトリ型への再構築は別 PR で検討中）。 -->
+<!-- llm-context: kobaamd のテストは PR #169 で層別ディレクトリに再編中（TestSupport/Unit/Integration/ViewModel/AppKitUI/Benchmarks）。2026-07-02 時点ではフラット配置のまま。 -->
 
-2026-07-02 時点では `Tests/kobaamdTests/` 直下にすべてのテストファイルがフラットに配置されている。テストスイートの再構築（`TestSupport` / `Unit` / `Integration` / `ViewModel` / `AppKitUI` / `Benchmarks` のサブディレクトリ分割）は設計検討中だが、該当 PR はまだ作成されていない。
+PR #169（test: restructure test suite into layered directories with shared TestSupport）で `Tests/kobaamdTests/` を `TestSupport` / `Unit` / `Integration` / `ViewModel` / `AppKitUI` / `Benchmarks` の層別ディレクトリに再編中。2026-07-02 時点では PR がオープンであり、マージ前はフラット配置のままである。
 
-共通ユーティリティとして `TempWorkspace`（`final class` + `deinit` でテスト後のワークスペース自動クリーンアップ）と `eventually()`（非同期アサーション待機ヘルパー）が複数テストで使われている。
+共通ユーティリティとして `TempWorkspace`（`final class` + `deinit` でテスト後のワークスペース自動クリーンアップ）と `eventually()`（非同期アサーション待機ヘルパー）が複数テストで使われている。詳細は PR #169 内の `Tests/kobaamdTests/README.md` を参照。
 
 ## Related
 
