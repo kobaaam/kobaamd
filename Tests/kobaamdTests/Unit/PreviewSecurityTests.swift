@@ -5,6 +5,235 @@ import Testing
 @Suite("Preview security hardening")
 struct PreviewSecurityTests {
 
+    // MARK: - HTMLSanitizer: 攻撃系（除去確認）
+
+    @Test("<script> タグが除去されること")
+    func sanitizerRemovesScriptTag() {
+        let result = HTMLSanitizer.sanitize("<script>alert(1)</script>")
+        #expect(!result.contains("<script"))
+        #expect(!result.contains("alert(1)"))
+    }
+
+    @Test("img の onerror 属性が除去され img タグ自体は保持されること")
+    func sanitizerRemovesOnerrorKeepsImg() {
+        let result = HTMLSanitizer.sanitize("<img src=\"x.png\" onerror=\"alert(1)\">")
+        #expect(!result.contains("onerror"))
+        #expect(result.contains("<img"))
+    }
+
+    @Test("<iframe> タグが除去されること")
+    func sanitizerRemovesIframe() {
+        let result = HTMLSanitizer.sanitize("<iframe src=\"evil.html\"></iframe>")
+        #expect(!result.contains("<iframe"))
+        #expect(!result.contains("evil.html"))
+    }
+
+    @Test("<object> タグが除去されること")
+    func sanitizerRemovesObject() {
+        let result = HTMLSanitizer.sanitize("<object data=\"payload\"></object>")
+        #expect(!result.contains("<object"))
+    }
+
+    @Test("<form> タグが除去されること")
+    func sanitizerRemovesForm() {
+        let result = HTMLSanitizer.sanitize("<form action=\"/steal\"><input name=\"x\"></form>")
+        #expect(!result.contains("<form"))
+        #expect(!result.contains("/steal"))
+    }
+
+    @Test("style 属性が除去されること")
+    func sanitizerRemovesStyleAttr() {
+        let result = HTMLSanitizer.sanitize("<div style=\"background:url(javascript:)\">text</div>")
+        #expect(!result.contains("style="))
+        #expect(result.contains("text"))
+    }
+
+    @Test("大文字 <SCRIPT> も除去されること")
+    func sanitizerRemovesScriptTagUppercase() {
+        let result = HTMLSanitizer.sanitize("<SCRIPT>alert(1)</SCRIPT>")
+        #expect(!result.lowercased().contains("<script"))
+    }
+
+    @Test("onclick 属性が除去されること")
+    func sanitizerRemovesOnclick() {
+        let result = HTMLSanitizer.sanitize("<a href=\"#\" onclick=\"alert(1)\">link</a>")
+        #expect(!result.contains("onclick"))
+        #expect(result.contains("<a"))
+        #expect(result.contains("link"))
+    }
+
+    @Test("onmouseover 属性が除去されること")
+    func sanitizerRemovesOnmouseover() {
+        let result = HTMLSanitizer.sanitize("<span onmouseover=\"steal()\">hover</span>")
+        #expect(!result.contains("onmouseover"))
+        #expect(result.contains("hover"))
+    }
+
+    @Test("img の javascript: src が無害化されること")
+    func sanitizerSanitizesJavascriptImgSrc() {
+        let result = HTMLSanitizer.sanitize("<img src=\"javascript:alert(1)\">")
+        #expect(!result.contains("javascript:"))
+    }
+
+    // MARK: - HTMLSanitizer: 正当系（保持確認）
+
+    @Test("<details><summary> が保持されること")
+    func sanitizerKeepsDetailsSummary() {
+        let result = HTMLSanitizer.sanitize("<details><summary>見出し</summary><p>内容</p></details>")
+        #expect(result.contains("<details>"))
+        #expect(result.contains("<summary>"))
+        #expect(result.contains("内容"))
+    }
+
+    @Test("HTML テーブルが保持されること")
+    func sanitizerKeepsTable() {
+        let html = "<table><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Alice</td></tr></tbody></table>"
+        let result = HTMLSanitizer.sanitize(html)
+        #expect(result.contains("<table>"))
+        #expect(result.contains("<th>"))
+        #expect(result.contains("Alice"))
+    }
+
+    @Test("<br> が保持されること")
+    func sanitizerKeepsBr() {
+        let result = HTMLSanitizer.sanitize("line1<br>line2")
+        #expect(result.contains("line1"))
+        #expect(result.contains("line2"))
+        // <br /> (self-closing) として保持される
+        #expect(result.contains("br"))
+    }
+
+    @Test("<code><pre> が保持されること")
+    func sanitizerKeepsCodePre() {
+        let result = HTMLSanitizer.sanitize("<pre><code>let x = 1</code></pre>")
+        #expect(result.contains("<pre>"))
+        #expect(result.contains("<code>"))
+        #expect(result.contains("let x = 1"))
+    }
+
+    @Test("class 属性が保持されること")
+    func sanitizerKeepsClassAttr() {
+        let result = HTMLSanitizer.sanitize("<span class=\"highlight\">text</span>")
+        #expect(result.contains("class=\"highlight\""))
+    }
+
+    @Test("a href が保持されること")
+    func sanitizerKeepsAHref() {
+        let result = HTMLSanitizer.sanitize("<a href=\"https://example.com\">link</a>")
+        #expect(result.contains("https://example.com"))
+        #expect(result.contains("link"))
+    }
+
+    // MARK: - HTMLSanitizer: MarkdownService 統合（rawHTML パス）
+
+    @Test("Markdown InlineHTML の <script> が除去されること")
+    func markdownInlineHTMLScriptRemoved() {
+        let svc = MarkdownService()
+        let html = svc.toBodyHTML("Hello <script>alert(1)</script> world")
+        #expect(!html.contains("<script"))
+        #expect(!html.contains("alert(1)"))
+    }
+
+    @Test("Markdown HTMLBlock の <iframe> が除去されること")
+    func markdownHTMLBlockIframeRemoved() {
+        let svc = MarkdownService()
+        let md = "before\n\n<iframe src=\"evil\"></iframe>\n\nafter"
+        let html = svc.toBodyHTML(md)
+        #expect(!html.contains("<iframe"))
+        #expect(!html.contains("evil"))
+    }
+
+    @Test("Markdown の details/summary が保持されること")
+    func markdownHTMLBlockDetailsSummaryKept() {
+        let svc = MarkdownService()
+        let md = "<details><summary>折りたたみ</summary><p>内容</p></details>"
+        let html = svc.toBodyHTML(md)
+        #expect(html.contains("<details>"))
+        #expect(html.contains("折りたたみ"))
+        #expect(html.contains("内容"))
+    }
+
+    @Test("Markdown の onerror 付き img が onerror なしで保持されること")
+    func markdownInlineHTMLImgOnerrorRemoved() {
+        let svc = MarkdownService()
+        let html = svc.toBodyHTML("before <img src=\"ok.png\" onerror=\"alert(1)\"> after")
+        #expect(!html.contains("onerror"))
+        #expect(html.contains("<img"))
+    }
+
+    // MARK: - CSP nonce（KMD-242）
+
+    @Test("CSP の script-src に 'unsafe-inline' が含まれないこと")
+    func cspScriptSrcNoUnsafeInline() {
+        let svc = MarkdownService()
+        let html = svc.toHTML("hello")
+        // CSP の meta content 文字列だけを取り出してチェック。
+        // Mermaid.js バンドル内部に 'unsafe-inline' という文字列が含まれる可能性があるため
+        // html 全体ではなく Content-Security-Policy content 属性値のみを対象にする。
+        guard let cspStart = html.range(of: "Content-Security-Policy\" content=\""),
+              let cspEnd = html.range(of: "\"", range: cspStart.upperBound..<html.endIndex)
+        else {
+            Issue.record("CSP meta タグが見つからない")
+            return
+        }
+        let cspValue = String(html[cspStart.upperBound..<cspEnd.lowerBound])
+        // script-src ディレクティブに 'unsafe-inline' が含まれないことを確認。
+        // style-src 'unsafe-inline' は意図的に残す（CSS のインラインスタイル許可のため）。
+        guard let scriptSrcRange = cspValue.range(of: "script-src ") else {
+            Issue.record("CSP に script-src が見つからない: \(cspValue)")
+            return
+        }
+        // script-src ディレクティブの値部分（次の ; まで）を抽出
+        let afterScriptSrc = String(cspValue[scriptSrcRange.upperBound...])
+        let scriptSrcValue = afterScriptSrc.components(separatedBy: ";").first ?? afterScriptSrc
+        #expect(!scriptSrcValue.contains("'unsafe-inline'"),
+                "script-src に 'unsafe-inline' が残っている: \(scriptSrcValue)")
+    }
+
+    @Test("CSP に nonce- が含まれること")
+    func cspContainsNonce() {
+        let svc = MarkdownService()
+        let html = svc.toHTML("hello")
+        #expect(html.contains("'nonce-"))
+    }
+
+    @Test("script タグに nonce 属性が付くこと")
+    func scriptTagsHaveNonceAttr() {
+        let svc = MarkdownService()
+        let html = svc.toHTML("hello")
+        // script タグが存在し nonce 属性を持つこと
+        #expect(html.contains("<script nonce="))
+    }
+
+    @Test("CSP の nonce と script タグの nonce が一致すること")
+    func cspNonceMatchesScriptNonce() {
+        let svc = MarkdownService()
+        let html = svc.toHTML("hello")
+
+        // CSP から nonce 値を抽出: 'nonce-<value>'
+        guard let cspRange = html.range(of: "Content-Security-Policy\" content=\""),
+              let nonceStart = html.range(of: "'nonce-", range: cspRange.upperBound..<html.endIndex),
+              let nonceEnd = html.range(of: "'", range: nonceStart.upperBound..<html.endIndex)
+        else {
+            Issue.record("CSP nonce が見つからない")
+            return
+        }
+        let cspNonce = String(html[nonceStart.upperBound..<nonceEnd.lowerBound])
+        #expect(!cspNonce.isEmpty)
+
+        // script タグの nonce 属性値が CSP の nonce と一致すること
+        let scriptNoncePattern = "nonce=\"\(cspNonce)\""
+        #expect(html.contains(scriptNoncePattern), "script の nonce が CSP の nonce と不一致")
+    }
+
+    @Test("ロードごとに nonce が異なること")
+    func nonceChangesPerLoad() {
+        // nonce はロードごとに生成されるため、連続2回の呼び出しで異なる値になることを確認
+        let n1 = MarkdownService.generateNonce()
+        let n2 = MarkdownService.generateNonce()
+        #expect(n1 != n2, "nonce が毎回同じ値になっている")
+    }
+
     // MARK: - URL スキーム許可リスト（リンク）
 
     @Test("https リンクは許可されること")
