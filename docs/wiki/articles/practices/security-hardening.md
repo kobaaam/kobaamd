@@ -58,7 +58,7 @@ OSS ユーザー / 新規参加開発者向けに、現在有効な配布物側�
 | 配布スクリプトの非対称防御解消 | `generate-appcast.sh` の PLACEHOLDER/TODO/空文字拒否 + XML エスケープ | KMD-27 | 有効 |
 | Sparkle.framework のバンドル | `.app/Contents/Frameworks/` への自動コピーと LC_RPATH 確保 | KMD-35 | 有効 |
 | 一時ファイル / unsafeFlags / hooks の軽微修正 | `mkstemp` ベースへの移行など軽微なハードニング | KMD-29 | 有効 |
-| WKWebView XSS 対策（KMD-28） | 生 HTML パススルー + CSP 不在 + javascript: リンク + Mermaid loose モードの連鎖で悪用可能と 2026-07-02 監査で判明。CSP メタタグ・URL スキーム許可リスト・decidePolicyFor・Mermaid securityLevel strict・127.0.0.1 固定で対応中（PR #167、クロスレビュー通過・マージ待ち）。残課題: 生 HTML の許可リストサニタイズはバックログ | KMD-28 | 対応中（PR #167 マージ待ち） |
+| WKWebView XSS 対策（KMD-28） | 生 HTML パススルー + CSP 不在 + javascript: リンク + Mermaid loose モードの連鎖で悪用可能と 2026-07-02 監査で判明。CSP メタタグ・URL スキーム許可リスト・decidePolicyFor・Mermaid securityLevel strict・127.0.0.1 固定で対応（PR #167、2026-07-02 マージ）。残課題: 生 HTML の許可リストサニタイズと script-src nonce 化はバックログ | KMD-28 | 対応済み（PR #167 マージ。残課題: 生 HTML 許可リストサニタイズと script-src nonce 化はバックログ） |
 | `Process()` 排除 | D2 を WASM 化、Diff を Pure Swift 化して外部バイナリ呼び出しを段階的に削減 | KMD-30 / KMD-31 | 検討中 |
 
 利用者側の検証手順（`codesign --display --verbose=4` / `codesign --verify --deep --strict`）は `README.md` の「Security / 配布物の検証」を参照。リリース担当者向けの鍵生成・appcast 生成手順は [[sparkle-release]] を参照。
@@ -75,18 +75,18 @@ OSS ユーザー / 新規参加開発者向けに、現在有効な配布物側�
 
 全 7 領域の監査を実施し、下記の対応を進めている。
 
-**対応中（PR #166: scripts・API キー・launchd、クロスレビュー通過・マージ待ち）**:
+**対応済み（PR #166: scripts・API キー・launchd、2026-07-02 マージ）**:
 - `scripts/` 内の一時ファイル生成を `mktemp` ベースに統一（競合状態・予測可能パス攻撃の排除）
 - Gemini API キーをリクエストボディから HTTP ヘッダー（`x-goog-api-key`）に移動（URL ログへの漏洩防止）
 - launchd `.plist` 内の環境変数展開を `printf %q` で統一（特殊文字によるインジェクション防止）
 
-**対応中（PR #167: プレビュー硬化、クロスレビュー通過・マージ待ち）**:
-- `WorkspacePreviewHTTPServer` のバインドアドレスを `127.0.0.1` に固定する予定（外部 NIC への意図しない公開を防止）
-- `WorkspacePreviewHTTPServer` にシンボリックリンク解決 + パストラバーサル検証を追加予定
-- Markdown リンクの URL スキームを許可リスト（`http`, `https`, `file`, `mailto`）で制限予定
-- `MarkdownWebView` のシェル HTML に CSP メタタグを追加予定
-- Mermaid の `securityLevel` を `loose` から `strict` に変更予定（スクリプト注入防止）
-- `MarkdownWebView` の `decidePolicyFor` に外部ナビゲーションブロックを追加予定
+**対応済み（PR #167: プレビュー硬化、2026-07-02 マージ）**:
+- `WorkspacePreviewHTTPServer` のバインドアドレスを `127.0.0.1` に固定（外部 NIC への意図しない公開を防止）
+- `WorkspacePreviewHTTPServer` にシンボリックリンク解決 + パストラバーサル検証を追加
+- Markdown リンクの URL スキームを許可リスト（`http`, `https`, `file`, `mailto`）で制限
+- `MarkdownWebView` のシェル HTML に CSP メタタグを追加
+- Mermaid の `securityLevel` を `loose` から `strict` に変更（スクリプト注入防止）
+- `MarkdownWebView` の `decidePolicyFor` に外部ナビゲーションブロックを追加
 
 **安全確認済み項目（追加対応不要）**:
 - MCP サーバー（VaultPath の symlink 解決 + prefix 検証）: 既存実装で適切に保護されていることを確認

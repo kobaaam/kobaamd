@@ -80,11 +80,11 @@ swift test --enable-swift-testing --no-parallel
 `docs/ai-handoff.md` には「`swift test` が結果行なしで exit 0 する no-op 罠」が記録されている。2026-07-02 の実測ではこの挙動は再現せず、結果行（`Test Suite 'All tests' passed...` 等）が出力された。ただし環境依存の可能性があるため、**テスト実行後は結果行の出力を必ず目視確認すること**（結果行なしの exit 0 は no-op として疑う）。
 
 ## テストディレクトリ構造
-<!-- llm-context: kobaamd のテストは PR #169 で層別ディレクトリに再編中（TestSupport/Unit/Integration/ViewModel/AppKitUI/Benchmarks）。2026-07-02 時点ではフラット配置のまま。 -->
+<!-- llm-context: kobaamd のテストは PR #169 で層別ディレクトリに再編済み（2026-07-02 マージ）。TestSupport/Unit/Integration/ViewModel 等に分割。 -->
 
-PR #169（test: restructure test suite into layered directories with shared TestSupport）で `Tests/kobaamdTests/` を `TestSupport` / `Unit` / `Integration` / `ViewModel` / `AppKitUI` / `Benchmarks` の層別ディレクトリに再編中。2026-07-02 時点では PR がオープンであり、マージ前はフラット配置のままである。
+PR #169（test: restructure test suite into layered directories with shared TestSupport）で `Tests/kobaamdTests/` を `TestSupport` / `Unit` / `Integration` / `ViewModel` / `AppKitUI` / `Benchmarks` の層別ディレクトリに再編済み（2026-07-02 マージ）。
 
-共通ユーティリティとして `TempWorkspace`（`final class` + `deinit` でテスト後のワークスペース自動クリーンアップ）と `eventually()`（非同期アサーション待機ヘルパー）が複数テストで使われている。詳細は PR #169 内の `Tests/kobaamdTests/README.md` を参照。
+共通ユーティリティとして `TempWorkspace`（`final class` + `deinit` でテスト後のワークスペース自動クリーンアップ）と `eventually()`（非同期アサーション待機ヘルパー）が複数テストで使われている。詳細は `Tests/kobaamdTests/README.md` を参照。
 
 ## Related
 

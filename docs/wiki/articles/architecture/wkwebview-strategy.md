@@ -139,18 +139,18 @@ WKWebView は1インスタンスあたり約 30-50MB のメモリを消費する
 | Mermaid 再変換 | 差分更新のたびに DOM を走査して `pre>code.language-mermaid` を `div.mermaid` に変換 | 大量のダイアグラムがある文書では遅延の可能性 |
 | `PerfLogger` | シェルロードの開始/終了を計測 | 差分更新のパフォーマンスは未計測 |
 
-### プレビュー硬化（KMD-28 対応、PR #167 マージ待ち）
-<!-- llm-context: KMD-28 プレビュー硬化（PR #167 マージ待ち）の設計判断。MarkdownWebView / WorkspacePreviewHTTPServer が対象。 -->
+### プレビュー硬化（KMD-28 対応、PR #167 2026-07-02 マージ）
+<!-- llm-context: KMD-28 プレビュー硬化（PR #167、2026-07-02 マージ済み）の設計判断。MarkdownWebView / WorkspacePreviewHTTPServer が対象。 -->
 
-2026-07-02 のセキュリティ監査（KMD-28）で、生 HTML パススルー・CSP 不在・`javascript:` リンク許可・Mermaid `loose` モードの連鎖が XSS の悪用経路になり得ると判明した。以下の多層防御を PR #167 で実施予定（クロスレビュー通過・マージ待ち）。対象コンポーネントは `MarkdownWebView` / `WorkspacePreviewHTTPServer` / `ChromiumPreviewController`。
+2026-07-02 のセキュリティ監査（KMD-28）で、生 HTML パススルー・CSP 不在・`javascript:` リンク許可・Mermaid `loose` モードの連鎖が XSS の悪用経路になり得ると判明した。以下の多層防御を PR #167 で実施（2026-07-02 マージ）。対象コンポーネントは `MarkdownWebView` / `WorkspacePreviewHTTPServer` / `ChromiumPreviewController`。
 
-**MarkdownWebView の変更（予定）**:
+**MarkdownWebView の変更**:
 - シェル HTML の `<head>` に CSP メタタグを追加。スクリプトはバンドル inline のみ許可し、外部スクリプト・`eval` を禁止
 - `decidePolicyFor(_:decisionHandler:)` で外部ドメインへのナビゲーションをブロック（`about:blank` と `kobaamd-preview.local` のみ許可）
 - Markdown リンクの URL スキームを `http` / `https` / `file` / `mailto` に許可リスト制限（`javascript:` 等を遮断）
 - Mermaid 初期化設定の `securityLevel` を `loose` から `strict` に変更
 
-**WorkspacePreviewHTTPServer の変更（予定、Chromium プレビュー）**:
+**WorkspacePreviewHTTPServer の変更（Chromium プレビュー）**:
 - `NWListener` のバインドアドレスを `0.0.0.0`（全 NIC）から `127.0.0.1`（loopback のみ）に固定
 - リクエストパスのシンボリックリンク解決 + ワークスペースルート外のトラバーサル検証を追加
 
