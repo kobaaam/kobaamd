@@ -8,6 +8,7 @@ Thank you for your interest in contributing!
 git clone https://github.com/kobaaam/kobaamd.git
 cd kobaamd
 ./scripts/hooks/install.sh
+bash scripts/prepare-build.sh   # resolves SPM deps + patches libghostty-spm (required)
 swift build
 ./scripts/post-build.sh
 open .build/kobaamd.app
@@ -20,8 +21,9 @@ open .build/kobaamd.app
 3. Make your changes
 4. Build and test:
    ```bash
+   bash scripts/prepare-build.sh   # resolves SPM deps + patches libghostty-spm
    swift build
-   swift test          # unit tests (uses swift-testing)
+   ./scripts/run-unit-tests.sh     # unit tests (swift-testing; also calls prepare-build.sh)
    ./scripts/post-build.sh && open .build/kobaamd.app
    ```
 5. E2E tests live in `E2ETests/kobaamdE2ETests/` and require the app to be running; run them separately as needed.

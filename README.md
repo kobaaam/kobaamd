@@ -78,6 +78,13 @@ cd kobaamd
 # Set up git hooks (one-time) / git hooks の初期設定（初回のみ）
 ./scripts/hooks/install.sh
 
+# Resolve dependencies and apply kobaamd patches to libghostty-spm
+# (required before every build — patches readViewportText and related APIs
+#  that E1AgentStatusMonitor.swift depends on)
+# 依存関係を解決し libghostty-spm にパッチを当てる
+# （ビルド前に毎回必要 — E1AgentStatusMonitor.swift が依存する readViewportText 等を追加）
+bash scripts/prepare-build.sh
+
 # Build / ビルド
 swift build
 
