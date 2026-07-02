@@ -16,7 +16,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-markdown.git", .upToNextMajor(from: "0.4.0")),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter", revision: "f97df585296977d8fcaf644cbde567151d1367b8"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown", revision: "f969cd3ae3f9fbd4e43205431d0ae286014c05b5"),
-        .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "1.2.0"),
+        .package(url: "https://github.com/kobaaam/libghostty-spm.git", revision: "bde63c9360931f00a69e12524435f0a16a3f0157"),
         .package(url: "https://github.com/swiftlang/swift-testing", from: "0.10.0"),
     ],
     targets: [

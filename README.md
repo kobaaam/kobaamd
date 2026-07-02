@@ -78,12 +78,9 @@ cd kobaamd
 # Set up git hooks (one-time) / git hooks の初期設定（初回のみ）
 ./scripts/hooks/install.sh
 
-# Resolve dependencies and apply kobaamd patches to libghostty-spm
-# (required before every build — patches readViewportText and related APIs
-#  that E1AgentStatusMonitor.swift depends on)
-# 依存関係を解決し libghostty-spm にパッチを当てる
-# （ビルド前に毎回必要 — E1AgentStatusMonitor.swift が依存する readViewportText 等を追加）
-bash scripts/prepare-build.sh
+# Resolve dependencies (optional — swift build also triggers this)
+# 依存関係を解決（任意 — swift build でも自動実行される）
+# bash scripts/prepare-build.sh
 
 # Build / ビルド
 swift build
@@ -124,7 +121,6 @@ If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, 
 ### Release build / リリースビルド
 
 ```bash
-bash scripts/prepare-build.sh   # resolve deps + patch libghostty-spm
 swift build -c release
 ./scripts/post-build.sh release
 open .build/kobaamd.app
