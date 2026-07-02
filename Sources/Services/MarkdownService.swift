@@ -30,6 +30,10 @@ final class MarkdownService {
         // 'unsafe-inline' が必要。callAsyncJavaScript/evaluateJavaScript は WKWebView の
         // user script 扱いでページ CSP の影響を受けないため制限は外部スクリプトのみに効く。
         // connect-src 'none' でデータ流出を遮断。img-src は data:image も許可。
+        // ⚠️ 注意: InlineHTML/HTMLBlock の rawHTML はこの CSP のスキームフィルタ対象外。
+        //    rawHTML 経由の <img onerror=...> 等のインラインイベントハンドラは
+        //    script-src 'unsafe-inline' により現状ブロックされない。
+        //    rawHTML の許可リストサニタイズと script-src の nonce 化は別チケット（バックログ）で対応予定。
         let csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src http: https: data:; connect-src 'none'"
         let head = """
         <!DOCTYPE html>
@@ -255,14 +259,16 @@ final class MarkdownService {
     }
 
     /// リンク href に許可するスキーム: http/https/mailto/# アンカー/相対パス
-    /// 大文字小文字・先頭空白・制御文字での偽装にも対応する。
+    /// 大文字小文字・先頭空白・制御文字・percent-encoding での偽装にも対応する。
     /// 許可スキーム以外（javascript: 等）は "#" に無害化する。
     private func sanitizedLinkURL(_ url: String) -> String {
         // 先頭の空白・制御文字を除去して小文字でスキームを判定する
         let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .unicodeScalars
             .drop(while: { $0.value < 0x20 }) // 制御文字除去
-        let normalized = String(stripped).lowercased()
+        // percent-encoding バイパス対策: %6a%61%76%61%73%63%72%69%70%74%3a... = javascript:
+        let decoded = String(stripped).removingPercentEncoding ?? String(stripped)
+        let normalized = decoded.lowercased()
         let allowedPrefixes = ["http://", "https://", "mailto:", "#", "/", "./", "../"]
         for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
             return stripped.isEmpty ? "#" : String(stripped)
@@ -275,12 +281,14 @@ final class MarkdownService {
     }
 
     /// 画像 src に許可するスキーム: http/https/data:image/相対パス
-    /// javascript: data:text/html 等は無害化する。
+    /// javascript: data:text/html 等は無害化する。percent-encoding バイパスにも対応。
     private func sanitizedImageURL(_ url: String) -> String {
         let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .unicodeScalars
             .drop(while: { $0.value < 0x20 })
-        let normalized = String(stripped).lowercased()
+        // percent-encoding バイパス対策
+        let decoded = String(stripped).removingPercentEncoding ?? String(stripped)
+        let normalized = decoded.lowercased()
         let allowedPrefixes = ["http://", "https://", "data:image/", "/", "./", "../"]
         for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
             return stripped.isEmpty ? "" : String(stripped)

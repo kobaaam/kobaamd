@@ -74,6 +74,15 @@ struct PreviewSecurityTests {
         #expect(html.contains("href=\"#\""))
     }
 
+    @Test("percent-encoding された javascript: リンクも無害化されること")
+    func linkPercentEncodedJavascriptRejected() {
+        // %6a%61%76%61%73%63%72%69%70%74%3a = javascript:
+        let svc = MarkdownService()
+        let html = svc.toBodyHTML("[xss](%6a%61%76%61%73%63%72%69%70%74%3aalert(1))")
+        #expect(!html.lowercased().contains("javascript:"))
+        #expect(html.contains("href=\"#\""))
+    }
+
     // MARK: - URL スキーム許可リスト（画像）
 
     @Test("https 画像は許可されること")
