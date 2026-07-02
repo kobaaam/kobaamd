@@ -77,7 +77,7 @@ struct CSVPreviewView: View {
         withAnimation(.easeInOut(duration: 0.15)) {
             showCopiedFeedback = true
         }
-        Task {
+        Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 秒
             withAnimation(.easeInOut(duration: 0.2)) {
                 showCopiedFeedback = false

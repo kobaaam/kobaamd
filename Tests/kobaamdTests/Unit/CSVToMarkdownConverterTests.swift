@@ -112,4 +112,24 @@ struct CSVToMarkdownConverterTests {
         """
         #expect(result == expected)
     }
+
+    @Test("改行エスケープ：セル内の \\n がスペースに置換されること")
+    func newlineEscape() {
+        // クォートフィールド内改行（CSVParser はそのまま取り込む）を想定
+        let table = makeTable(
+            headers: ["Name", "Note"],
+            rows: [["Alice", "line1\nline2"], ["Bob", "a\r\nb"], ["Carol", "x\ry"]]
+        )
+        let result = CSVToMarkdownConverter.convert(table)
+        // 改行がスペースに変換され、GFM テーブルが壊れないことを検証
+        #expect(result.contains("| Alice | line1 line2 |"))
+        #expect(result.contains("| Bob | a b |"))
+        #expect(result.contains("| Carol | x y |"))
+        // 改行文字が残っていないことを確認
+        #expect(!result.contains("\r\n"))
+        // セパレータ行の改行 \n は残るが、セル内改行は消えている
+        let lines = result.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // ヘッダ行 + セパレータ + 3 データ行 = 5 行
+        #expect(lines.count == 5)
+    }
 }

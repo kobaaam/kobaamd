@@ -56,10 +56,14 @@ enum CSVToMarkdownConverter {
     }
 
     /// セル内の特殊文字をエスケープする。
+    /// - `\r\n`, `\n`, `\r` → ` `（改行を先にスペースへ正規化。GFM テーブルは改行を含むセルを解釈できない）
     /// - `\` → `\\`（バックスラッシュを先にエスケープして二重処理を防ぐ）
     /// - `|` → `\|`
     private static func escape(_ text: String) -> String {
         text
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "|", with: "\\|")
     }
