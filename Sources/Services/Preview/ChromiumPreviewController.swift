@@ -20,6 +20,7 @@ final class ChromiumPreviewController {
 
     func openOrNavigate(to previewURL: URL, in screenFrame: CGRect) {
         guard let browser = installedBrowser else { return }
+        guard screenFrame.width > 1, screenFrame.height > 1 else { return }
         activeBrowser = browser
         if previewIsOpen {
             navigate(to: previewURL, in: screenFrame)
@@ -34,8 +35,10 @@ final class ChromiumPreviewController {
             "--app=\(previewURL.absoluteString)",
             "--user-data-dir=\(profileDirectory.path)",
             "--no-first-run",
+            "--no-default-browser-check",
             "--disable-extensions",
             "--disable-popup-blocking",
+            "--disable-restore-session-state",
         ]
         try? process.run()
 

@@ -199,6 +199,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.set(0.5, forKey: "NSToolTipDelay")
+        Task { @MainActor in
+            ChromiumPreviewController.shared.closePreviewWindow()
+        }
         subscribeToWindowNotifications()
         subscribeToWindowChromeNotifications()
         subscribeToMemoryPressure()

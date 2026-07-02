@@ -68,7 +68,26 @@ struct HTMLPreviewView: View {
     }
 
     private func refreshPreview(forceReload: Bool = false) {
+        guard isHTMLPreviewTarget else {
+            previewHTML = ""
+            previewURL = nil
+            previewError = nil
+            if appState.htmlPreviewEngine == .chromium {
+                ChromiumPreviewController.shared.closePreviewWindow()
+            }
+            return
+        }
+
         previewHTML = appViewModel.resolvedActiveFileContent()
+        guard !previewHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            previewURL = nil
+            previewError = nil
+            if appState.htmlPreviewEngine == .chromium {
+                ChromiumPreviewController.shared.closePreviewWindow()
+            }
+            return
+        }
+
         do {
             let port = try WorkspacePreviewHTTPServer.shared.ensureStarted()
             let materialized = try HTMLPreviewMaterializer.materialize(
@@ -94,6 +113,12 @@ struct HTMLPreviewView: View {
             previewError = error.localizedDescription
             previewURL = nil
         }
+    }
+
+    private var isHTMLPreviewTarget: Bool {
+        guard let url = appViewModel.selectedFileURL else { return false }
+        let ext = url.pathExtension.lowercased()
+        return ext == "html" || ext == "htm"
     }
 }
 
@@ -163,8 +188,11 @@ final class ChromiumHTMLPreviewHostView: NSView {
 
     func refresh() {
         guard let previewURL else { return }
+        guard isPreviewHostVisible else { return }
+
         let controller = ChromiumPreviewController.shared
         let frame = screenFrame()
+        guard frame.width > 1, frame.height > 1 else { return }
 
         let urlChanged = lastPreviewURL != previewURL
         let forceReload = reloadGeneration != lastReloadGeneration
@@ -184,9 +212,11 @@ final class ChromiumHTMLPreviewHostView: NSView {
 
     override func layout() {
         super.layout()
-        guard previewURL != nil,
-              let browser = ChromiumPreviewController.shared.installedBrowser else { return }
-        ChromiumPreviewController.shared.alignFrontWindow(of: browser, to: screenFrame())
+        refresh()
+    }
+
+    private var isPreviewHostVisible: Bool {
+        window != nil && !isHidden && window?.occlusionState.contains(.visible) != false
     }
 
     override func viewDidMoveToWindow() {
