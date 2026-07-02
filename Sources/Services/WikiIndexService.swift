@@ -77,6 +77,9 @@ final class WikiIndexService {
         }
     }
 
+    /// Returns matching index hits for *query*, or `nil` if the index is not ready.
+    /// The FTS index uses the `trigram` tokenizer, so queries shorter than 3 characters
+    /// will return no matches even when the query text appears in indexed files.
     func search(query: String, limit: Int = 100) async -> [Hit]? {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
@@ -372,8 +375,8 @@ final class WikiIndexService {
         return error.localizedDescription
     }
 
-    /// Drops the FTS index and articles table if the stored schema is missing the `body` column or
-    /// uses the `unicode61` tokenizer (which cannot index CJK text).  The next `schemaSQL` run will
+    /// Drops the FTS index and articles table when the stored schema is missing the `body` column
+    /// (old layout that pre-dates the trigram tokenizer migration).  The next `schemaSQL` run will
     /// recreate both tables with the correct layout.
     private nonisolated static func migrateSchemaIfNeeded(db: OpaquePointer?) throws {
         // Check whether the articles table has a body column.
