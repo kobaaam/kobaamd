@@ -214,6 +214,55 @@ final class ChromiumHTMLPreviewHostView: NSView {
     }
 }
 
+// MARK: - Navigation policy pure logic (testable)
+
+/// HTML プレビュー WebView のナビゲーションポリシー判定ロジック。
+///
+/// `LocalhostHTMLWebView.Coordinator` は private なため、
+/// ポリシー判定を `enum` として切り出してユニットテスト可能にする。
+///
+/// ## 設計判断（脅威モデル）
+///
+/// HTML プレビューは JS 有効が必須（CSS アニメーション・React 等の対応のため）。
+/// 一方でプレビュー内のリンクが WebView 内で外部 URL へ遷移すると、
+/// 意図せず外部コンテンツが読み込まれる。
+///
+/// 対策:
+/// - `linkActivated` で外部 URL → `NSWorkspace` でシステムブラウザに委譲して cancel
+/// - 同一 origin（127.0.0.1:<port>）内は allow（相対パスのアセット読み込み・ハッシュ遷移）
+/// - `file:` スキームは cancel（ローカルファイルシステムへのアクセスを遮断）
+/// - JS 起点 / リロードは allow（インタラクティブな HTML が壊れないように）
+enum LocalhostHTMLWebViewCoordinatorPolicy {
+    static func navigationPolicy(
+        for url: URL,
+        navigationType: WKNavigationType,
+        previewURL: URL?
+    ) -> WKNavigationActionPolicy {
+        let scheme = url.scheme?.lowercased() ?? ""
+
+        // about:blank / 空スキームは通す
+        if scheme == "about" || scheme == "" {
+            return .allow
+        }
+
+        // JS 起点やリロードは通す（インタラクティブ HTML 対応）
+        if navigationType == .other || navigationType == .reload {
+            return .allow
+        }
+
+        // 同一 origin（スキーム + ホスト + ポートが一致）内の遷移は allow
+        if let previewURL,
+           url.scheme == previewURL.scheme,
+           url.host == previewURL.host,
+           url.port == previewURL.port {
+            return .allow
+        }
+
+        // linkActivated 含むその他はキャンセル（呼び出し側で外部ブラウザを開く）
+        return .cancel
+    }
+}
+
 // MARK: - WebKit fallback via localhost
 
 private struct LocalhostHTMLWebView: NSViewRepresentable {
@@ -230,6 +279,7 @@ private struct LocalhostHTMLWebView: NSViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
+        webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
         return webView
     }
@@ -244,6 +294,8 @@ private struct LocalhostHTMLWebView: NSViewRepresentable {
 
         coordinator.lastURL = previewURL
         coordinator.lastReloadGeneration = reloadGeneration
+        // 初期ロード時の baseURL（origin 判定に使用）を記録する
+        coordinator.currentPreviewURL = previewURL
 
         if forceReload {
             URLCache.shared.removeAllCachedResponses()
@@ -260,9 +312,42 @@ private struct LocalhostHTMLWebView: NSViewRepresentable {
         webView.load(URLRequest(url: previewURL))
     }
 
-    final class Coordinator {
+    // MARK: - NavigationDelegate
+
+    @MainActor
+    final class Coordinator: NSObject, WKNavigationDelegate {
         var lastURL: URL?
         var lastReloadGeneration: Int = 0
         weak var webView: WKWebView?
+        /// 現在のプレビューの origin（ポリシー判定の基準）
+        var currentPreviewURL: URL?
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+
+            let navType = navigationAction.navigationType
+            let policy = LocalhostHTMLWebViewCoordinatorPolicy.navigationPolicy(
+                for: url,
+                navigationType: navType,
+                previewURL: currentPreviewURL
+            )
+
+            // linkActivated で外部 http/https はシステムブラウザで開く
+            if navType == .linkActivated, policy == .cancel {
+                let scheme = url.scheme?.lowercased() ?? ""
+                if scheme == "http" || scheme == "https" {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+
+            decisionHandler(policy)
+        }
     }
 }
