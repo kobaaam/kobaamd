@@ -32,6 +32,7 @@ jobs:
           ./scripts/run-unit-tests.sh
 
   benchmarks:
+    needs: swift-test
     runs-on: macos-15
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     env:
@@ -44,4 +45,4 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x ./scripts/run-unit-tests.sh
-          ./scripts/run-unit-tests.sh --filter Benchmarks
+          ./scripts/run-unit-tests.sh --filter HighlightBenchmarks
