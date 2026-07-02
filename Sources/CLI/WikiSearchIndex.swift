@@ -50,6 +50,9 @@ final class WikiSearchIndex {
         }
     }
 
+    /// Returns matching index hits for *query*.
+    /// The FTS index uses the `trigram` tokenizer, so queries shorter than 3 characters
+    /// will return no matches even when the query text appears in indexed files.
     func search(query: String, limit: Int) throws -> [Hit] {
         let db = try Self.openDatabase(at: databaseURL)
         defer { sqlite3_close(db) }
@@ -273,8 +276,8 @@ final class WikiSearchIndex {
 
     private static let transientDestructor = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    /// Drops the FTS index and articles table if the stored schema is missing the `body` column or
-    /// uses the `unicode61` tokenizer (which cannot index CJK text).  The next `schemaSQL` run will
+    /// Drops the FTS index and articles table when the stored schema is missing the `body` column
+    /// (old layout that pre-dates the trigram tokenizer migration).  The next `schemaSQL` run will
     /// recreate both tables with the correct layout.
     private static func migrateSchemaIfNeeded(db: OpaquePointer?) throws {
         // Check whether the articles table has a body column.
