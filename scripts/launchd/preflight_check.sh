@@ -23,8 +23,17 @@ cd "$KOBAAMD_DIR"
 # 必要な変数だけ zsh から export 形式で取り出して eval する。
 # PATH は .zprofile / .zshenv で定義されているので zsh -lc で取れる。
 # LINEAR_API_KEY は .zshrc で定義されているので zsh -ic（interactive）で取る。
-eval "$(zsh -lc 'echo "export PATH=\"$PATH\""' 2>/dev/null)" || true
-eval "$(zsh -ic 'echo "export LINEAR_API_KEY=\"${LINEAR_API_KEY:-}\""' 2>/dev/null)" || true
+# printf %q（autopilot.sh と同方式）でシェル特殊文字を安全にクオートする。
+eval "$(zsh -lc 'printf "export PATH=%q\n" "$PATH"' 2>/dev/null)"
+if [ -z "${LINEAR_API_KEY:-}" ]; then
+  _val="$(zsh -ic 'printf "%s" "${LINEAR_API_KEY:-}"' 2>/dev/null || true)"
+  if [ -n "$_val" ]; then
+    export LINEAR_API_KEY="$_val"
+  else
+    echo "[preflight_check] WARNING: LINEAR_API_KEY が未設定。Linear API 呼び出しは失敗します。" >&2
+  fi
+  unset _val
+fi
 
 LQ="$KOBAAMD_DIR/scripts/linear/lq.sh"
 

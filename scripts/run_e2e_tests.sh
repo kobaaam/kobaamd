@@ -168,12 +168,13 @@ log "=== Phase 3: アプリ転送 ==="
 
 # .app を zip で転送（ディレクトリ転送の信頼性向上）
 log ".app バンドルを圧縮中..."
-TMPZIP="/tmp/kobaamd-e2e-$$.zip"
+TMPDIR_ZIP=$(mktemp -d "${TMPDIR:-/tmp}/kobaamd-e2e-XXXXXX")
+TMPZIP="$TMPDIR_ZIP/kobaamd.zip"
 (cd .build && zip -r -q "$TMPZIP" kobaamd.app)
 
 log "VM にアプリを転送中..."
 scp_cmd "$TMPZIP" "$VM_USER@$VM_IP:~/Desktop/kobaamd.zip"
-rm -f "$TMPZIP"
+rm -rf "$TMPDIR_ZIP"
 
 log "VM 内で展開中..."
 ssh_cmd "$VM_IP" "cd ~/Desktop && unzip -o -q kobaamd.zip && rm kobaamd.zip"
@@ -233,10 +234,11 @@ else
     # E2ETests プロジェクトを転送
     if [ -d "$PROJECT_DIR/E2ETests" ]; then
         log "E2ETests プロジェクトを転送中..."
-        TESTZIP="/tmp/kobaamd-e2e-tests-$$.zip"
+        TMPDIR_TESTZIP=$(mktemp -d "${TMPDIR:-/tmp}/kobaamd-e2e-tests-XXXXXX")
+        TESTZIP="$TMPDIR_TESTZIP/E2ETests.zip"
         (cd "$PROJECT_DIR" && zip -r -q "$TESTZIP" E2ETests/)
         scp_cmd "$TESTZIP" "$VM_USER@$VM_IP:~/Desktop/E2ETests.zip"
-        rm -f "$TESTZIP"
+        rm -rf "$TMPDIR_TESTZIP"
         ssh_cmd "$VM_IP" "cd ~/Desktop && unzip -o -q E2ETests.zip && rm E2ETests.zip"
         ok "E2ETests 転送完了"
 
@@ -406,7 +408,8 @@ PROMPT_END
 ENDJSON
 )
 
-        RESULT=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
+        RESULT=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" \
+            -H "x-goog-api-key: $GEMINI_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$REQUEST_JSON" \
             | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","ERROR: No response"))')
