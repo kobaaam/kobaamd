@@ -18,9 +18,15 @@ open .build/kobaamd.app
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature`
 3. Make your changes
-4. Build and test: `swift build && ./scripts/post-build.sh && open .build/kobaamd.app`
-5. Commit with a clear message
-6. Open a Pull Request
+4. Build and test:
+   ```bash
+   swift build
+   ./scripts/run-unit-tests.sh     # unit tests (swift-testing)
+   ./scripts/post-build.sh && open .build/kobaamd.app
+   ```
+5. E2E tests live in `E2ETests/kobaamdE2ETests/` and require the app to be running; run them separately as needed.
+6. Commit with a clear message
+7. Open a Pull Request
 
 ## Code Style
 

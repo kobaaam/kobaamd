@@ -84,6 +84,7 @@ KMD-54 の lint.sh 不在ガードは、以下の場面に転用可能:
 - [[prd-quality-cycle]] — PRD section 8（影響範囲マップ + その他リスク）の品質バー
 - [[autonomous-pipeline-philosophy]] — pipeline_active / weekly の責務分担と人間承認ゲート
 - [[security-hardening]] — shell quoting / set -euo pipefail / trap cleanup の規約
+- [[build-and-test-pipeline]] — `prepare-build.sh` のような依存スクリプトの具体例と、不在時の失敗パターン
 
 ## Sources
 

@@ -5,16 +5,16 @@ import Foundation
 @Suite("WikiIndexService")
 @MainActor
 struct WikiIndexServiceTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
 
+    var tmpDir: URL { workspace.root }
+
     private func write(_ content: String, name: String) throws {
-        try content.write(to: tmpDir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        try workspace.write(content, to: name)
     }
 
     private func waitForReady(_ service: WikiIndexService, attempts: Int = 40) async throws {

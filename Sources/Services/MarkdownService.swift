@@ -7,33 +7,67 @@ final class MarkdownService {
     //
     // mermaid.min.js (3 MB) を含む HTML head 部分の文字列補間が cold start で
     // ~8 秒かかり loading 表示の主因になっていた。head のうち変動するのは
-    // theme.previewCSS のみなので、theme ごとにキャッシュして再利用する。
-    private static var shellHeadCache: [String: String] = [:]
+    // theme.previewCSS のみなので、theme ごとにテンプレートをキャッシュして再利用する。
+    //
+    // KMD-242: nonce 対応のためキャッシュはテンプレート（nonce プレースホルダー入り）を
+    // 保持し、loadHTMLString 呼び出しごとに新しい nonce を差し込む。
+    // nonce 自体はキャッシュキーに含めない。
+    private static var shellHeadTemplateCache: [String: String] = [:]
     private static let shellHeadLock = NSLock()
     /// シェル HTML の構造変更時にインクリメントしてキャッシュを無効化する。
-    private static let shellHeadRevision = 2
+    private static let shellHeadRevision = 4
 
-    private static func shellHead(themeKey: String, previewCSS: String) -> String {
+    /// nonce の placeholder。キャッシュされたテンプレート内に埋め込み、
+    /// 呼び出し時に実際の nonce 値で置換する。
+    private static let noncePlaceholder = "{{NONCE}}"
+
+    // MARK: - Nonce 生成
+
+    /// ロードごとにランダムな nonce（Base64 エンコード、16 バイト）を生成する。
+    /// SecRandomCopyBytes が失敗した場合は UUID ベースのフォールバックを使用する。
+    static func generateNonce() -> String {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        if status == errSecSuccess {
+            return Data(bytes).base64EncodedString()
+        }
+        // フォールバック: UUID 2個連結で 128bit 相当の予測不可能性を確保
+        let fallback = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                     + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        return Data(fallback.utf8).base64EncodedString()
+    }
+
+    // MARK: - Shell head テンプレート構築（キャッシュ）
+
+    private static func shellHeadTemplate(themeKey: String, previewCSS: String) -> String {
         let cacheKey = "\(themeKey)-r\(shellHeadRevision)"
         shellHeadLock.lock()
-        if let cached = shellHeadCache[cacheKey] {
+        if let cached = shellHeadTemplateCache[cacheKey] {
             shellHeadLock.unlock()
             return cached
         }
         shellHeadLock.unlock()
 
-        PerfLogger.begin("MarkdownService.shellHead.build(theme=\(themeKey))")
+        PerfLogger.begin("MarkdownService.shellHeadTemplate.build(theme=\(themeKey))")
+
+        // KMD-242: script-src 'unsafe-inline' を廃止し 'nonce-{{NONCE}}' に変更。
+        // inline script タグすべてに nonce="{{NONCE}}" を付与する。
+        // mermaid バンドル (inline <script nonce=...>) も対象。
+        // callAsyncJavaScript / evaluateJavaScript は WKWebView の user script 扱いで
+        // ページ CSP の影響を受けないためスクロール同期等は引き続き動作する（PR #167 確認済み）。
         let mermaidScript = BundledJS.mermaid.isEmpty
-            ? "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
-            : "<script>\(BundledJS.mermaid)</script>"
-        let head = """
+            ? "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\" nonce=\"\(noncePlaceholder)\"></script>"
+            : "<script nonce=\"\(noncePlaceholder)\">\(BundledJS.mermaid)</script>"
+        let csp = "default-src 'none'; script-src 'nonce-\(noncePlaceholder)'; style-src 'unsafe-inline'; img-src http: https: data:; connect-src 'none'"
+        let template = """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
+            <meta http-equiv="Content-Security-Policy" content="\(csp)">
             <meta name="viewport" content="width=device-width,initial-scale=1">
             \(mermaidScript)
-            <script>
+            <script nonce="\(noncePlaceholder)">
             document.addEventListener('DOMContentLoaded', function() {
               document.querySelectorAll('pre > code.language-mermaid').forEach(function(el) {
                 var div = document.createElement('div');
@@ -42,7 +76,7 @@ final class MarkdownService {
                 el.parentNode.replaceWith(div);
               });
               if (typeof mermaid !== 'undefined') {
-                mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+                mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
                 mermaid.run({ querySelector: '.mermaid' });
               }
             });
@@ -62,12 +96,19 @@ final class MarkdownService {
         <body>
 
         """
-        PerfLogger.end("MarkdownService.shellHead.build(theme=\(themeKey))")
+        PerfLogger.end("MarkdownService.shellHeadTemplate.build(theme=\(themeKey))")
 
         shellHeadLock.lock()
-        shellHeadCache[cacheKey] = head
+        shellHeadTemplateCache[cacheKey] = template
         shellHeadLock.unlock()
-        return head
+        return template
+    }
+
+    /// ロードごとに新しい nonce を差し込んだ shell head を返す。
+    private static func shellHead(themeKey: String, previewCSS: String) -> String {
+        let template = shellHeadTemplate(themeKey: themeKey, previewCSS: previewCSS)
+        let nonce = generateNonce()
+        return template.replacingOccurrences(of: noncePlaceholder, with: nonce)
     }
 
     /// ボディのコンテンツだけ返す（WKWebView の差分更新用）。
@@ -122,12 +163,12 @@ final class MarkdownService {
             let langAttr = codeBlock.language.map { " class=\"language-\(escapeAttr($0))\"" } ?? ""
             return "<pre\(srcAttr(codeBlock))><code\(langAttr)>\(escapeHTML(codeBlock.code))</code></pre>"
         case let link as Link:
-            let dest = escapeAttr(link.destination ?? "")
-            return "<a href=\"\(dest)\">\(renderChildren(of: link))</a>"
+            let dest = sanitizedLinkURL(link.destination ?? "")
+            return "<a href=\"\(escapeAttr(dest))\">\(renderChildren(of: link))</a>"
         case let image as Image:
-            let src = escapeAttr(image.source ?? "")
+            let src = sanitizedImageURL(image.source ?? "")
             let alt = escapeHTML(image.plainText)
-            return "<img src=\"\(src)\" alt=\"\(alt)\">"
+            return "<img src=\"\(escapeAttr(src))\" alt=\"\(alt)\">"
         case let list as UnorderedList:
             return "<ul\(srcAttr(list))>\(renderChildren(of: list))</ul>"
         case let list as OrderedList:
@@ -150,9 +191,11 @@ final class MarkdownService {
         case let table as Table:
             return renderTable(table)
         case let inlineHTML as InlineHTML:
-            return inlineHTML.rawHTML
+            // KMD-242: rawHTML 許可リストサニタイズ。on* 属性・script/iframe 等を除去。
+            return HTMLSanitizer.sanitize(inlineHTML.rawHTML)
         case let htmlBlock as HTMLBlock:
-            return htmlBlock.rawHTML
+            // KMD-242: 同上
+            return HTMLSanitizer.sanitize(htmlBlock.rawHTML)
         default:
             return renderChildren(of: markup)
         }
@@ -245,7 +288,110 @@ final class MarkdownService {
     }
 
     private func renderChildren(of markup: Markup) -> String {
-        markup.children.map { render($0) }.joined()
+        // KMD-242: InlineHTML を含む場合は suppress フィルタを適用する。
+        // swift-markdown は <script>text</script> を3ノード（InlineHTML, Text, InlineHTML）に
+        // 分解するため、テキストノードも suppress 範囲内では出力を抑制する。
+        let children = Array(markup.children)
+        let hasInlineHTML = children.contains { $0 is InlineHTML }
+        if hasInlineHTML {
+            return renderChildrenWithSuppression(children)
+        }
+        return children.map { render($0) }.joined()
+    }
+
+    /// InlineHTML の contentKillerTag 開始/終了タグをステートとして追跡し、
+    /// suppress 状態中のノードを出力しない。
+    private func renderChildrenWithSuppression(_ children: [Markup]) -> String {
+        var result = ""
+        var suppressStack: [String] = []
+
+        for child in children {
+            if let inlineHTML = child as? InlineHTML {
+                let raw = inlineHTML.rawHTML.trimmingCharacters(in: .whitespaces)
+                // 終了タグ判定: </tagname>
+                if raw.hasPrefix("</") {
+                    let tagName = raw.dropFirst(2)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "> \t"))
+                        .lowercased()
+                        .components(separatedBy: .whitespaces).first ?? ""
+                    if !suppressStack.isEmpty, suppressStack.last == tagName {
+                        suppressStack.removeLast()
+                    }
+                    // suppress 中でも suppress 解除後でも終了タグは出力しない（sanitize 経由で決まる）
+                    if suppressStack.isEmpty {
+                        result += HTMLSanitizer.sanitize(inlineHTML.rawHTML)
+                    }
+                    continue
+                }
+                // 開始タグ判定
+                let sanitized = HTMLSanitizer.sanitize(inlineHTML.rawHTML)
+                // contentKillerTag なら suppress スタックに積む
+                let tagName = extractTagName(raw)
+                if HTMLSanitizer.isContentKillerTag(tagName) && !raw.hasSuffix("/>") && !raw.hasSuffix("/ >") {
+                    suppressStack.append(tagName)
+                    // タグ自体も出力しない
+                } else if suppressStack.isEmpty {
+                    result += sanitized
+                }
+            } else if suppressStack.isEmpty {
+                result += render(child)
+            }
+            // suppress 状態中は出力しない
+        }
+
+        return result
+    }
+
+    /// "<tag attrs>" から tag 名を抽出する（< > は除去済みの文字列を受け取る）
+    private func extractTagName(_ tagContent: String) -> String {
+        let trimmed = tagContent
+            .trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+        if let spaceIdx = trimmed.firstIndex(of: " ") {
+            return String(trimmed[..<spaceIdx]).lowercased()
+        }
+        return trimmed.lowercased()
+    }
+
+    /// リンク href に許可するスキーム: http/https/mailto/# アンカー/相対パス
+    /// 大文字小文字・先頭空白・制御文字・percent-encoding での偽装にも対応する。
+    /// 許可スキーム以外（javascript: 等）は "#" に無害化する。
+    private func sanitizedLinkURL(_ url: String) -> String {
+        // 先頭の空白・制御文字を除去して小文字でスキームを判定する
+        let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            .unicodeScalars
+            .drop(while: { $0.value < 0x20 }) // 制御文字除去
+        // percent-encoding バイパス対策: %6a%61%76%61%73%63%72%69%70%74%3a... = javascript:
+        let decoded = String(stripped).removingPercentEncoding ?? String(stripped)
+        let normalized = decoded.lowercased()
+        let allowedPrefixes = ["http://", "https://", "mailto:", "#", "/", "./", "../"]
+        for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
+            return stripped.isEmpty ? "#" : String(stripped)
+        }
+        // スキームを含まない相対パスも許可（scheme-less で : が無いもの）
+        if !normalized.contains(":") {
+            return stripped.isEmpty ? "#" : String(stripped)
+        }
+        return "#"
+    }
+
+    /// 画像 src に許可するスキーム: http/https/data:image/相対パス
+    /// javascript: data:text/html 等は無害化する。percent-encoding バイパスにも対応。
+    private func sanitizedImageURL(_ url: String) -> String {
+        let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            .unicodeScalars
+            .drop(while: { $0.value < 0x20 })
+        // percent-encoding バイパス対策
+        let decoded = String(stripped).removingPercentEncoding ?? String(stripped)
+        let normalized = decoded.lowercased()
+        let allowedPrefixes = ["http://", "https://", "data:image/", "/", "./", "../"]
+        for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
+            return stripped.isEmpty ? "" : String(stripped)
+        }
+        if !normalized.contains(":") {
+            return stripped.isEmpty ? "" : String(stripped)
+        }
+        return ""
     }
 
     private func escapeHTML(_ string: String) -> String {

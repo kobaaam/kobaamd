@@ -5,18 +5,16 @@ import Testing
 
 @Suite("MCP Server")
 struct MCPServerTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
 
+    var tmpDir: URL { workspace.root }
+
     private func createVault(named name: String = "vault") throws -> URL {
-        let vault = tmpDir.appendingPathComponent(name, isDirectory: true)
-        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
-        return vault
+        try workspace.makeDir(name)
     }
 
     private func write(_ content: String, to url: URL) throws {

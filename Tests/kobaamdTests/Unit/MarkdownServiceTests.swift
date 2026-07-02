@@ -90,8 +90,10 @@ struct MarkdownServiceTests {
     @Test("テキスト中の < > がエスケープされること")
     func anglebracketsInTextAreEscaped() {
         let html = svc.toBodyHTML("Use <tag> and > literally")
-        // swift-markdown treats `<tag>` as inline HTML; bare `>` in text is escaped.
-        #expect(html.contains("<tag>"))
+        // KMD-242: swift-markdown は <tag> を InlineHTML として扱う。
+        // HTMLSanitizer の許可リストに含まれないタグは除去されるため
+        // <tag> の内容は出力されない。bare `>` はテキストノードとしてエスケープされる。
+        #expect(!html.contains("<tag>"), "<tag> は許可タグでないため除去されるべき")
         #expect(html.contains("&gt;"))
     }
 
