@@ -112,7 +112,8 @@ acquire_lock
 
 # launchd の最小環境で codex / gh 等が PATH に無い対策
 # bash から zshrc は読めないため、zsh -c で PATH を取得する
-eval "$(zsh -lc 'echo "export PATH=\"$PATH\""' 2>/dev/null)" || true
+# printf %q（autopilot.sh と同方式）でシェル特殊文字を安全にクオートする。
+eval "$(zsh -lc 'printf "export PATH=%q\n" "$PATH"' 2>/dev/null)"
 
 PREFLIGHT_OUT=""
 PREFLIGHT_EXIT=0
