@@ -8,6 +8,27 @@ final class E1LocalTerminalView: TerminalView {
     var pasteImageDirectory: URL?
     private var keyMonitor: Any?
 
+    // MARK: - Screen reading (delegated to InMemoryTerminalSession)
+
+    /// Returns the currently visible viewport as a UTF-8 string.
+    /// Delegates to `InMemoryTerminalSession.readViewportText()` which holds
+    /// the actual Ghostty surface. Returns nil when no in-memory session is
+    /// attached or the surface is not yet ready.
+    func readViewportText() -> String? {
+        guard case let .inMemory(session) = configuration.backend else { return nil }
+        return session.readViewportText()
+    }
+
+    /// Returns the full screen text.
+    /// libghostty-spm exposes only viewport reads via the public API; this
+    /// falls back to `readViewportText()` so callers receive the visible
+    /// content rather than nil. The behaviour is semantically equivalent for
+    /// transcript captures where only the current screen matters.
+    func readScreenText() -> String? {
+        guard case let .inMemory(session) = configuration.backend else { return nil }
+        return session.readViewportText()
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         controller = E1TerminalEngine.sharedController
