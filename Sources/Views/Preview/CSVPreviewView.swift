@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// CSV ファイルのプレビュー View（読み取り専用テーブル表示）。
@@ -7,7 +6,6 @@ import SwiftUI
 struct CSVPreviewView: View {
     @Environment(AppViewModel.self) private var appViewModel
     @State private var csvVM = CSVPreviewViewModel()
-    @State private var showCopiedFeedback = false
 
     var body: some View {
         Group {
@@ -22,10 +20,6 @@ struct CSVPreviewView: View {
                 .background(Color.kobaSurface)
             } else {
                 CSVTableView(table: csvVM.table)
-                    .overlay(alignment: .topTrailing) {
-                        copyButton
-                            .padding(8)
-                    }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -40,48 +34,6 @@ struct CSVPreviewView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .workspaceFilesChanged)) { _ in
             csvVM.updateImmediate(text: appViewModel.resolvedActiveFileContent())
-        }
-    }
-
-    // MARK: - Copy as Markdown button
-
-    private var copyButton: some View {
-        Button(action: copyAsMarkdown) {
-            Text(showCopiedFeedback ? "Copied!" : "Copy as Markdown")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(showCopiedFeedback ? Color.kobaAccent : Color.kobaInk)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.kobaSurface)
-                        .shadow(color: Color.black.opacity(0.12), radius: 2, x: 0, y: 1)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .strokeBorder(Color.kobaLine, lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func copyAsMarkdown() {
-        let markdown = CSVToMarkdownConverter.convert(csvVM.table)
-        guard !markdown.isEmpty else { return }
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(markdown, forType: .string)
-
-        // 一時的に "Copied!" フィードバックを表示
-        withAnimation(.easeInOut(duration: 0.15)) {
-            showCopiedFeedback = true
-        }
-        Task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 秒
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showCopiedFeedback = false
-            }
         }
     }
 }
