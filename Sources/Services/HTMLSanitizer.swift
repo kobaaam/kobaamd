@@ -162,7 +162,7 @@ final class HTMLSanitizer {
 
     private static func tagNameFrom(_ content: String) -> String {
         let trimmed = content.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if let spaceIdx = trimmed.firstIndex(of: " ") {
+        if let spaceIdx = trimmed.firstIndex(where: { $0.isWhitespace }) {
             return String(trimmed[..<spaceIdx]).lowercased()
         }
         return trimmed.lowercased()
@@ -198,7 +198,7 @@ final class HTMLSanitizer {
         let tagName: String
         let attrsStr: String
 
-        if let spaceIdx = parts.firstIndex(of: " ") {
+        if let spaceIdx = parts.firstIndex(where: { $0.isWhitespace }) {
             tagName = String(parts[..<spaceIdx]).lowercased()
             attrsStr = String(parts[parts.index(after: spaceIdx)...])
         } else {

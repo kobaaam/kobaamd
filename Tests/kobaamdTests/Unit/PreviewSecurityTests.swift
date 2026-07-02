@@ -407,6 +407,40 @@ struct PreviewSecurityTests {
         try? FileManager.default.removeItem(at: outside)
     }
 
+    // MARK: - KMD-242 followup: nonce フォールバック・タブ区切りタグ
+
+    @Test("generateNonce は空文字列を返さないこと")
+    func nonceIsNeverEmpty() {
+        // SecRandomCopyBytes 失敗経路を直接テストはできないが、
+        // 通常経路で空文字列が返らないことを確認する
+        let nonce = MarkdownService.generateNonce()
+        #expect(!nonce.isEmpty, "nonce は空であってはならない")
+    }
+
+    @Test("generateNonce の結果は有効な Base64 文字列であること")
+    func nonceIsValidBase64() {
+        let nonce = MarkdownService.generateNonce()
+        // Base64 文字セット: A-Z, a-z, 0-9, +, /, = のみ
+        let base64Chars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+        #expect(nonce.unicodeScalars.allSatisfy { base64Chars.contains($0) },
+                "nonce に Base64 以外の文字が含まれている: \(nonce)")
+    }
+
+    @Test("タブ区切りの許可タグ属性がサニタイズ後も保持されること")
+    func tabSeparatedAttributeIsPreserved() {
+        // <img\tsrc="a.png"> のようにタブで区切られた属性は正当な HTML
+        // firstIndex(of: " ") だと検出されず除去される誤陰性を防ぐ
+        let html = HTMLSanitizer.sanitize("<img\tsrc=\"a.png\">")
+        #expect(html.contains("<img"), "タブ区切り属性のある img タグが除去されてはならない")
+    }
+
+    @Test("タブ区切りの非許可タグは除去されること")
+    func tabSeparatedNonAllowedTagIsRemoved() {
+        let html = HTMLSanitizer.sanitize("<script\ttype=\"text/javascript\">alert(1)</script>")
+        #expect(!html.contains("<script"), "タブ区切りでも script タグは除去されるべき")
+        #expect(!html.contains("alert(1)"), "script の内容テキストも除去されるべき")
+    }
+
     @Test("serve root 内の正規ファイルは prefix チェックを通過すること")
     func normalFilePassesPrefixCheck() throws {
         let root = FileManager.default.temporaryDirectory

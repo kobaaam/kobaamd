@@ -24,10 +24,17 @@ final class MarkdownService {
     // MARK: - Nonce 生成
 
     /// ロードごとにランダムな nonce（Base64 エンコード、16 バイト）を生成する。
+    /// SecRandomCopyBytes が失敗した場合は UUID ベースのフォールバックを使用する。
     static func generateNonce() -> String {
         var bytes = [UInt8](repeating: 0, count: 16)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        return Data(bytes).base64EncodedString()
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        if status == errSecSuccess {
+            return Data(bytes).base64EncodedString()
+        }
+        // フォールバック: UUID 2個連結で 128bit 相当の予測不可能性を確保
+        let fallback = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                     + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        return Data(fallback.utf8).base64EncodedString()
     }
 
     // MARK: - Shell head テンプレート構築（キャッシュ）
