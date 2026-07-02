@@ -169,6 +169,7 @@ log "=== Phase 3: アプリ転送 ==="
 # .app を zip で転送（ディレクトリ転送の信頼性向上）
 log ".app バンドルを圧縮中..."
 TMPDIR_ZIP=$(mktemp -d "${TMPDIR:-/tmp}/kobaamd-e2e-XXXXXX")
+[ -n "$TMPDIR_ZIP" ] || { err "mktemp -d が空文字を返しました（ディスク容量不足等）。中止します。"; exit 1; }
 TMPZIP="$TMPDIR_ZIP/kobaamd.zip"
 (cd .build && zip -r -q "$TMPZIP" kobaamd.app)
 
@@ -235,6 +236,7 @@ else
     if [ -d "$PROJECT_DIR/E2ETests" ]; then
         log "E2ETests プロジェクトを転送中..."
         TMPDIR_TESTZIP=$(mktemp -d "${TMPDIR:-/tmp}/kobaamd-e2e-tests-XXXXXX")
+        [ -n "$TMPDIR_TESTZIP" ] || { err "mktemp -d が空文字を返しました（ディスク容量不足等）。中止します。"; exit 1; }
         TESTZIP="$TMPDIR_TESTZIP/E2ETests.zip"
         (cd "$PROJECT_DIR" && zip -r -q "$TESTZIP" E2ETests/)
         scp_cmd "$TESTZIP" "$VM_USER@$VM_IP:~/Desktop/E2ETests.zip"
