@@ -1,7 +1,7 @@
 ---
 title: セキュリティ・ハードニング（多層防御）
 category: practices
-tags: [security, supply-chain, secrets, pre-commit, pipeline, silent-failure]
+tags: [security, supply-chain, secrets, pre-commit, pipeline, silent-failure, wkwebview, xss]
 sources:
   - docs/adr/0009-security-hardening.md
   - docs/learnings/2026-05-01-KMD-26.md
@@ -9,7 +9,7 @@ sources:
   - docs/learnings/2026-05-06-KMD-144.md
   - docs/learnings/2026-05-08-KMD-151.md
 created: 2026-04-29
-updated: 2026-05-15
+updated: 2026-07-02
 ---
 
 # セキュリティ・ハードニング（多層防御）
@@ -27,7 +27,7 @@ AI 自律パイプラインに固有のリスク（シークレット漏洩、�
 - シークレットパターン検出（`sk-`, `ghp_`, `AKIA`, `xoxb-` 等）
 - 禁止ファイル検出（`.env`, `.pem`, `.key`, `credentials.json` 等）
 
-**`.gitignore`**: シークレット拡張子と `.mcp.json`（OAuth トークン含む）を除外。
+**`.gitignore`**: シークレット拡張子（`.env`, `.pem`, `.key` 等）を除外。なお `.mcp.json` は **tracked**（Git 管理下）であり、中身は公開 Linear MCP エンドポイント URL のみ（秘密情報なし）のため除外対象ではない。
 
 **hooks のバージョン管理**: `scripts/hooks/` に配置、`install.sh` で `.git/hooks/` にシンボリックリンク。新しいクローンでも即セットアップ可能。
 
@@ -58,7 +58,7 @@ OSS ユーザー / 新規参加開発者向けに、現在有効な配布物側�
 | 配布スクリプトの非対称防御解消 | `generate-appcast.sh` の PLACEHOLDER/TODO/空文字拒否 + XML エスケープ | KMD-27 | 有効 |
 | Sparkle.framework のバンドル | `.app/Contents/Frameworks/` への自動コピーと LC_RPATH 確保 | KMD-35 | 有効 |
 | 一時ファイル / unsafeFlags / hooks の軽微修正 | `mkstemp` ベースへの移行など軽微なハードニング | KMD-29 | 有効 |
-| WKWebView XSS 対策 | プレビューレンダラの追加ハードニング | KMD-28 | 検討中 |
+| WKWebView XSS 対策（KMD-28） | 生 HTML パススルー + CSP 不在 + javascript: リンク + Mermaid loose モードの連鎖で悪用可能と 2026-07-02 監査で判明。CSP メタタグ・URL スキーム許可リスト・decidePolicyFor・Mermaid securityLevel strict・127.0.0.1 固定で対応（PR #167、2026-07-02 マージ）。残課題: 生 HTML の許可リストサニタイズと script-src nonce 化はバックログ | KMD-28 | 対応済み（PR #167 マージ。残課題: 生 HTML 許可リストサニタイズと script-src nonce 化はバックログ） |
 | `Process()` 排除 | D2 を WASM 化、Diff を Pure Swift 化して外部バイナリ呼び出しを段階的に削減 | KMD-30 / KMD-31 | 検討中 |
 
 利用者側の検証手順（`codesign --display --verbose=4` / `codesign --verify --deep --strict`）は `README.md` の「Security / 配布物の検証」を参照。リリース担当者向けの鍵生成・appcast 生成手順は [[sparkle-release]] を参照。
@@ -69,6 +69,31 @@ OSS ユーザー / 新規参加開発者向けに、現在有効な配布物側�
 2. `scripts/post-build.sh` の処理順序「Info.plist 上書き → 公開鍵注入 → codesign」を入れ替えない
 3. 解釈系コマンド（`PlistBuddy -c` / `eval` / `bash -c` / `printf`）への外部入力は必ず形式バリデーション + クォートを通す
 4. release ビルドは `KOBAAMD_SU_PUBLIC_ED_KEY` 未設定で `exit 1`（サイレント失敗の禁止）
+
+### 2026-07-02 セキュリティ監査結果
+<!-- llm-context: 2026-07-02 に実施した全 7 領域のセキュリティ監査の知見。対応 PR は #166（scripts/API キー/launchd）と #167（プレビュー硬化）。 -->
+
+全 7 領域の監査を実施し、下記の対応を進めている。
+
+**対応済み（PR #166: scripts・API キー・launchd、2026-07-02 マージ）**:
+- `scripts/` 内の一時ファイル生成を `mktemp` ベースに統一（競合状態・予測可能パス攻撃の排除）
+- Gemini API キーをリクエストボディから HTTP ヘッダー（`x-goog-api-key`）に移動（URL ログへの漏洩防止）
+- launchd `.plist` 内の環境変数展開を `printf %q` で統一（特殊文字によるインジェクション防止）
+
+**対応済み（PR #167: プレビュー硬化、2026-07-02 マージ）**:
+- `WorkspacePreviewHTTPServer` のバインドアドレスを `127.0.0.1` に固定（外部 NIC への意図しない公開を防止）
+- `WorkspacePreviewHTTPServer` にシンボリックリンク解決 + パストラバーサル検証を追加
+- Markdown リンクの URL スキームを許可リスト（`http`, `https`, `file`, `mailto`）で制限
+- `MarkdownWebView` のシェル HTML に CSP メタタグを追加
+- Mermaid の `securityLevel` を `loose` から `strict` に変更（スクリプト注入防止）
+- `MarkdownWebView` の `decidePolicyFor` に外部ナビゲーションブロックを追加
+
+**安全確認済み項目（追加対応不要）**:
+- MCP サーバー（VaultPath の symlink 解決 + prefix 検証）: 既存実装で適切に保護されていることを確認
+- `Process()` 全箇所: `WorktreeService` のハードコードパス + 配列引数渡しにより、シェルインジェクションリスクなしを確認
+
+**残課題（バックログ）**:
+- 生 HTML ファイルの許可リストサニタイズ（`HTMLPreviewView` でのユーザー HTML をサニタイズせず WebView に渡している）
 
 ### AI パイプライン固有のリスク
 
@@ -140,6 +165,8 @@ AI 自律パイプラインで生成されるシェルスクリプトには、�
 - [[dependency-inversion-guard]] — shell quoting / set -euo pipefail / trap cleanup を前提とした依存逆順ガードの shell パターン
 - [[external-teams]] — Sparkle / GitHub / launchd 等の外部依存に対する多層防御の運用集約
 - [[cli-argument-conventions]] — `claude -p` 等の subprocess CLI への引数渡し規約（stdin 経由化 / variadic option 回避 / `printf '%s'` 無害化）。シェル変数クォート規約・入力バリデーション・サイレント失敗予防の延長線上にある防御層
+- [[build-and-test-pipeline]] — `scripts/prepare-build.sh` の運用と、ビルド失敗時の誤診断防止（PR #166 等の改善も含む）
+- [[wkwebview-strategy]] — KMD-28 プレビュー硬化（PR #167）の WKWebView 側の設計詳細
 
 ## Sources
 

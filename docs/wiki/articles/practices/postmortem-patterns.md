@@ -296,6 +296,7 @@ claude -p --allowedTools "Read" "Bash(jq:*)" "$prompt"
 - [[subagent-prompt-design]] — パターン 15 / 16 / 17 の subagent プロンプト設計への反映（KMD-120）
 - [[role-dispatch]] — パターン 20 の shell script 小規模 fix 経路の SSOT（§4 近接ロールの境界）
 - [[cli-argument-conventions]] — パターン 22 の詳細規約 / canonical example / 三層 defense-in-depth（stdin / smoke test / CI guard）
+- [[sparkle-release]] — パターン 8/9（多層防御 + 読み戻し検証）の具体実装
 
 ## Sources
 
