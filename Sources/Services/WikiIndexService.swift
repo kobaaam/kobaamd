@@ -121,6 +121,7 @@ final class WikiIndexService {
         defer { sqlite3_close(db) }
 
         try execute(sql: "PRAGMA journal_mode=WAL;", db: db)
+        try migrateSchemaIfNeeded(db: db)
         try execute(sql: Self.schemaSQL, db: db)
 
         try execute(sql: "BEGIN;", db: db)
@@ -151,7 +152,7 @@ final class WikiIndexService {
         var articleStatement: OpaquePointer?
         defer { sqlite3_finalize(articleStatement) }
         try prepare(
-            sql: "INSERT INTO articles(path, title, mtime) VALUES(?, ?, ?);",
+            sql: "INSERT INTO articles(path, title, body, mtime) VALUES(?, ?, ?, ?);",
             db: db,
             statement: &articleStatement
         )
@@ -190,7 +191,8 @@ final class WikiIndexService {
             sqlite3_clear_bindings(articleStatement)
             try bind(text: fileURL.path, to: 1, statement: articleStatement)
             try bind(text: title, to: 2, statement: articleStatement)
-            try bind(double: mtime, to: 3, statement: articleStatement)
+            try bind(text: body, to: 3, statement: articleStatement)
+            try bind(double: mtime, to: 4, statement: articleStatement)
             try stepDone(statement: articleStatement, db: db)
 
             let rowID = sqlite3_last_insert_rowid(db)
@@ -370,18 +372,43 @@ final class WikiIndexService {
         return error.localizedDescription
     }
 
+    /// Drops the FTS index and articles table if the stored schema is missing the `body` column or
+    /// uses the `unicode61` tokenizer (which cannot index CJK text).  The next `schemaSQL` run will
+    /// recreate both tables with the correct layout.
+    private nonisolated static func migrateSchemaIfNeeded(db: OpaquePointer?) throws {
+        // Check whether the articles table has a body column.
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        let r = sqlite3_prepare_v2(db, "PRAGMA table_info(articles);", -1, &stmt, nil)
+        guard r == SQLITE_OK else { return }
+
+        var hasBodyColumn = false
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let name = sqlite3_column_text(stmt, 1), String(cString: name) == "body" {
+                hasBodyColumn = true
+            }
+        }
+
+        if !hasBodyColumn {
+            // Old schema detected: drop both tables so schemaSQL recreates them cleanly.
+            try execute(sql: "DROP TABLE IF EXISTS articles_fts;", db: db)
+            try execute(sql: "DROP TABLE IF EXISTS articles;", db: db)
+        }
+    }
+
     private static let schemaSQL = """
     CREATE TABLE IF NOT EXISTS articles (
       id INTEGER PRIMARY KEY,
       path TEXT UNIQUE NOT NULL,
       title TEXT,
+      body TEXT,
       mtime REAL NOT NULL
     );
     CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
       title, body,
       content='articles',
       content_rowid='id',
-      tokenize='unicode61'
+      tokenize='trigram'
     );
     """
 }

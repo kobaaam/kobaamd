@@ -202,7 +202,11 @@ final class TodoViewModel {
             forKey: AppState.indexDependencyDirectoriesKey
         )
 
-        for case let url as URL in enumerator {
+        for case let rawURL as URL in enumerator {
+            // Normalize symlink-expanded paths (e.g. /private/var/… → /var/…) so that
+            // fileURL.path.hasPrefix(rootURL.path) comparisons in callers stay consistent.
+            let url = rawURL.standardizedFileURL
+
             processedCount += 1
             if processedCount % 50 == 0 {
                 try Task.checkCancellation()
