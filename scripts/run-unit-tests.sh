@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "[run-unit-tests] prepare build (resolve + libghostty patch)"
+echo "[run-unit-tests] resolve deps"
 bash "$REPO_ROOT/scripts/prepare-build.sh"
 
 echo "[run-unit-tests] swift build"

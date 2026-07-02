@@ -81,7 +81,7 @@ stop_running_target
 
 if [ ! -f "$BUILD_BINARY" ]; then
   echo "[post-build] binary not found at $BUILD_BINARY"
-  echo "[post-build] run: ./scripts/prepare-build.sh && swift build -c $CONFIG"
+  echo "[post-build] run: swift build -c $CONFIG"
   exit 1
 fi
 

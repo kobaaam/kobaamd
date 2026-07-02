@@ -79,7 +79,6 @@ watch_paths=(
   "$REPO_ROOT/Sources"
   "$REPO_ROOT/Package.swift"
   "$REPO_ROOT/Info.plist"
-  "$REPO_ROOT/ThirdParty/libghostty-spm-patches"
 )
 
 fswatch -r -l "$DEBOUNCE_SEC" "${watch_paths[@]}" | while read -r _; do

@@ -66,5 +66,5 @@ E1Terminal|E1AgentStatus|ColorTheme|EnclosedSymbol|CSVParser|BacklinksScanner|Ap
 ## テストの全件実行
 
 ```sh
-bash scripts/prepare-build.sh && swift test --enable-swift-testing --no-parallel
+swift test --enable-swift-testing --no-parallel
 ```

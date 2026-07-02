@@ -47,6 +47,53 @@ Fork に含まれる kobaamd 追加 API（`E1AgentStatusMonitor` が必要とす
 
 これらは `readViewportText` / `readScreenText` を提供する extension で、upstream PR 提出候補として `kobaamd-patches` コミットメッセージに記録してある。
 
+## fork 保守手順
+
+### upstream 新バージョン追随
+
+upstream（Lakr233/libghostty-spm）が新しいタグをリリースした場合:
+
+```bash
+# 1. kobaaam fork を最新の upstream に sync
+cd /path/to/libghostty-fork
+git fetch upstream          # upstream remote がなければ git remote add upstream https://github.com/Lakr233/libghostty-spm.git
+git checkout kobaamd-patches
+git rebase upstream/<new-tag>   # コンフリクトがあれば後述の手順で解消
+
+# 2. rebase が成功したら force push（kobaamd-patches は kobaamd 専用ブランチ）
+git push origin kobaamd-patches --force-with-lease
+
+# 3. 新しい HEAD SHA を控える
+git rev-parse HEAD
+# → <new-sha>
+
+# 4. kobaamd 側の Package.swift を更新
+#    revision: "<new-sha>" に書き換えて swift package resolve を実行
+cd /path/to/kobaamd
+# Package.swift の revision を <new-sha> に変更
+swift package resolve
+
+# 5. クリーンビルドで確認
+rm -rf .build && swift build
+```
+
+### rebase コンフリクトの対応
+
+`kobaamd-patches` が追加するファイルは upstream には存在しないため、通常コンフリクトは発生しない。もし upstream が同名ファイルを追加した場合（= upstream に API がマージされた）は後述の「fork 廃止手順」に進む。それ以外のコンフリクトは diff を見て手動解消してコミットを続行する。
+
+### fork 廃止手順（upstream に API がマージされた場合）
+
+upstream に `readViewportText` / `readScreenText` がマージされた場合は fork を廃止して元の URL に戻す:
+
+```bash
+# Package.swift を元の upstream URL + from バージョン指定に戻す
+# .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "<merged-version>")
+swift package resolve
+rm -rf .build && swift build   # クリーンビルドで確認
+```
+
+fork (`https://github.com/kobaaam/libghostty-spm`) は参照が外れた後も GitHub 上に残るが、kobaamd-patches ブランチは archive しておいてよい。
+
 ## 歴史的経緯（移行前の旧方式 — 参照用）
 
 2026-07-02 (KMD-240) 以前は `.build/checkouts/libghostty-spm/` に対して `scripts/patch-libghostty-spm.sh` でファイルを直接コピーするチェックアウトパッチ方式を採用していた。
