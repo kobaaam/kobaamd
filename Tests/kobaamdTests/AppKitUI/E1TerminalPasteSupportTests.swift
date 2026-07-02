@@ -5,13 +5,13 @@ import Foundation
 
 @Suite("E1TerminalPasteSupport")
 struct E1TerminalPasteSupportTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
+
+    var tmpDir: URL { workspace.root }
 
     @Test("Saved paste images get unique filenames")
     func savedPasteImagesAreUnique() throws {

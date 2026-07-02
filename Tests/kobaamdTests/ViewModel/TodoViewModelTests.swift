@@ -5,13 +5,13 @@ import Foundation
 @Suite("TodoViewModel")
 @MainActor
 struct TodoViewModelTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
+
+    var tmpDir: URL { workspace.root }
 
     private func write(_ content: String, name: String, in dir: URL? = nil) throws -> URL {
         let target = (dir ?? tmpDir).appendingPathComponent(name)

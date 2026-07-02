@@ -5,16 +5,16 @@ import Foundation
 @Suite("SearchViewModel")
 @MainActor
 struct SearchViewModelTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
 
+    var tmpDir: URL { workspace.root }
+
     private func write(_ content: String, name: String) throws {
-        try content.write(to: tmpDir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        try workspace.write(content, to: name)
     }
 
     // Polls until results appear or timeout (~1s). Avoids fragile fixed Task.sleep.
