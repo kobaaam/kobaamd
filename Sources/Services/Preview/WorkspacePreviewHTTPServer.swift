@@ -175,18 +175,11 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
     }
 
     private func response(for request: String) -> Data {
-        guard let requestLine = request.split(separator: "\r\n", maxSplits: 1).first else {
-            return httpResponse(status: 400, body: "Bad Request")
-        }
-        let parts = requestLine.split(separator: " ")
-        guard parts.count >= 2, parts[0] == "GET" else {
-            return httpResponse(status: 405, body: "Method Not Allowed")
-        }
-
-        // Host ヘッダ検証 — DNS rebinding 対策
-        // HTTP/1.1 では Host 必須。欠落または不正 Host は 403。
-        let lines = request.components(separatedBy: "\r\n")
-        let hostHeader = lines.first(where: { $0.lowercased().hasPrefix("host:") })
+        // Host ヘッダ検証を最初に実施 — DNS rebinding 対策。
+        // GET チェックより前に置く: 不正 Host のリクエストはメソッドに関わらず 403 で弾き、
+        // 405 等の内部詳細を一切漏らさない。HTTP/1.1 では Host 必須。
+        let allLines = request.components(separatedBy: "\r\n")
+        let hostHeader = allLines.first(where: { $0.lowercased().hasPrefix("host:") })
         guard let hostHeader else {
             return httpResponse(status: 403, body: "Forbidden: missing Host header")
         }
@@ -195,6 +188,14 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
             .trimmingCharacters(in: .whitespaces)
         guard Self.isAllowedHost(hostValue) else {
             return httpResponse(status: 403, body: "Forbidden: invalid Host")
+        }
+
+        guard let requestLine = request.split(separator: "\r\n", maxSplits: 1).first else {
+            return httpResponse(status: 400, body: "Bad Request")
+        }
+        let parts = requestLine.split(separator: " ")
+        guard parts.count >= 2, parts[0] == "GET" else {
+            return httpResponse(status: 405, body: "Method Not Allowed")
         }
 
         let rawPath = String(parts[1])
