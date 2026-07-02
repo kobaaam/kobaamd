@@ -5,13 +5,13 @@ import Foundation
 @Suite("TodoViewModel")
 @MainActor
 struct TodoViewModelTests {
-    let tmpDir: URL
+    let workspace: TempWorkspace
 
     init() throws {
-        tmpDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        workspace = try TempWorkspace()
     }
+
+    var tmpDir: URL { workspace.root }
 
     private func write(_ content: String, name: String, in dir: URL? = nil) throws -> URL {
         let target = (dir ?? tmpDir).appendingPathComponent(name)
@@ -23,11 +23,8 @@ struct TodoViewModelTests {
         return target
     }
 
-    private func waitForItems(_ vm: TodoViewModel, attempts: Int = 40) async throws {
-        for _ in 0..<attempts {
-            if !vm.items.isEmpty && !vm.isScanning { return }
-            try await Task.sleep(for: .milliseconds(50))
-        }
+    private func waitForItems(_ vm: TodoViewModel) async {
+        await eventually(timeout: .seconds(2)) { !vm.items.isEmpty && !vm.isScanning }
     }
 
     @Test("Parse TODO from inline text (file scope, no fileURL)")
@@ -83,7 +80,7 @@ struct TodoViewModelTests {
         _ = try write("TODO: folder-found\n", name: "x.md")
         vm.updateFolderRoot(tmpDir)
         vm.setScope(.folder)
-        try await waitForItems(vm)
+        await waitForItems(vm)
         #expect(vm.items.contains { $0.text == "folder-found" })
         #expect(!vm.items.contains { $0.text == "file-only" })
 
@@ -124,7 +121,7 @@ struct TodoViewModelTests {
         let vm = TodoViewModel()
         vm.setScope(.folder)
         vm.updateFolderRoot(dirA)
-        try await Task.sleep(for: .milliseconds(900))
+        await waitForItems(vm)
 
         let items = vm.items
         #expect(items.allSatisfy { $0.fileURL?.path.hasPrefix(dirA.path) == true })
@@ -144,12 +141,12 @@ struct TodoViewModelTests {
         let vm = TodoViewModel()
         vm.setScope(.folder)
         vm.updateFolderRoot(dirA)
-        try await Task.sleep(for: .milliseconds(900))
+        await waitForItems(vm)
         let initialItems = vm.items
         #expect(initialItems.contains { $0.text == "A1" })
 
         vm.updateFolderRoot(dirC)
-        try await Task.sleep(for: .milliseconds(900))
+        await eventually(timeout: .seconds(2)) { vm.items.contains { $0.text == "C1" } }
         let nextItems = vm.items
         #expect(nextItems.contains { $0.text == "C1" })
         #expect(!nextItems.contains { $0.text == "A1" })

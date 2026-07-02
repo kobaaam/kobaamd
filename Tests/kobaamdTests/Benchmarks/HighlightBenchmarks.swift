@@ -5,8 +5,9 @@ import Testing
 /// シンプルな性能スモークテスト
 /// - 1000行 / 5000行 Markdown で highlight() を 1 回呼んだ際の時間が一定閾値内に収まることを確認
 /// - 閾値は環境依存なので assert はせず、デバッグ出力のみ（CI で regression を検知する基盤）
+/// - 通常テスト実行では除外。 RUN_BENCHMARKS=1 を環境変数に設定した場合のみ実行。
 @MainActor
-@Suite("HighlightBenchmarks")
+@Suite("HighlightBenchmarks", .enabled(if: ProcessInfo.processInfo.environment["RUN_BENCHMARKS"] != nil))
 struct HighlightBenchmarks {
 
     private func generateMarkdown(lines: Int) -> String {
