@@ -124,6 +124,7 @@ If local ad-hoc rebuilds cause repeated Keychain prompts after saving API keys, 
 ### Release build / リリースビルド
 
 ```bash
+bash scripts/prepare-build.sh   # resolve deps + patch libghostty-spm
 swift build -c release
 ./scripts/post-build.sh release
 open .build/kobaamd.app
