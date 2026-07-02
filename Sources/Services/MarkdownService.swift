@@ -11,7 +11,7 @@ final class MarkdownService {
     private static var shellHeadCache: [String: String] = [:]
     private static let shellHeadLock = NSLock()
     /// シェル HTML の構造変更時にインクリメントしてキャッシュを無効化する。
-    private static let shellHeadRevision = 2
+    private static let shellHeadRevision = 3
 
     private static func shellHead(themeKey: String, previewCSS: String) -> String {
         let cacheKey = "\(themeKey)-r\(shellHeadRevision)"
@@ -26,11 +26,17 @@ final class MarkdownService {
         let mermaidScript = BundledJS.mermaid.isEmpty
             ? "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
             : "<script>\(BundledJS.mermaid)</script>"
+        // CSP: script-src の制限を死守。mermaid はバンドル済み（inline script）なので
+        // 'unsafe-inline' が必要。callAsyncJavaScript/evaluateJavaScript は WKWebView の
+        // user script 扱いでページ CSP の影響を受けないため制限は外部スクリプトのみに効く。
+        // connect-src 'none' でデータ流出を遮断。img-src は data:image も許可。
+        let csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src http: https: data:; connect-src 'none'"
         let head = """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
+            <meta http-equiv="Content-Security-Policy" content="\(csp)">
             <meta name="viewport" content="width=device-width,initial-scale=1">
             \(mermaidScript)
             <script>
@@ -42,7 +48,7 @@ final class MarkdownService {
                 el.parentNode.replaceWith(div);
               });
               if (typeof mermaid !== 'undefined') {
-                mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+                mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
                 mermaid.run({ querySelector: '.mermaid' });
               }
             });
@@ -122,12 +128,12 @@ final class MarkdownService {
             let langAttr = codeBlock.language.map { " class=\"language-\(escapeAttr($0))\"" } ?? ""
             return "<pre\(srcAttr(codeBlock))><code\(langAttr)>\(escapeHTML(codeBlock.code))</code></pre>"
         case let link as Link:
-            let dest = escapeAttr(link.destination ?? "")
-            return "<a href=\"\(dest)\">\(renderChildren(of: link))</a>"
+            let dest = sanitizedLinkURL(link.destination ?? "")
+            return "<a href=\"\(escapeAttr(dest))\">\(renderChildren(of: link))</a>"
         case let image as Image:
-            let src = escapeAttr(image.source ?? "")
+            let src = sanitizedImageURL(image.source ?? "")
             let alt = escapeHTML(image.plainText)
-            return "<img src=\"\(src)\" alt=\"\(alt)\">"
+            return "<img src=\"\(escapeAttr(src))\" alt=\"\(alt)\">"
         case let list as UnorderedList:
             return "<ul\(srcAttr(list))>\(renderChildren(of: list))</ul>"
         case let list as OrderedList:
@@ -246,6 +252,43 @@ final class MarkdownService {
 
     private func renderChildren(of markup: Markup) -> String {
         markup.children.map { render($0) }.joined()
+    }
+
+    /// リンク href に許可するスキーム: http/https/mailto/# アンカー/相対パス
+    /// 大文字小文字・先頭空白・制御文字での偽装にも対応する。
+    /// 許可スキーム以外（javascript: 等）は "#" に無害化する。
+    private func sanitizedLinkURL(_ url: String) -> String {
+        // 先頭の空白・制御文字を除去して小文字でスキームを判定する
+        let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            .unicodeScalars
+            .drop(while: { $0.value < 0x20 }) // 制御文字除去
+        let normalized = String(stripped).lowercased()
+        let allowedPrefixes = ["http://", "https://", "mailto:", "#", "/", "./", "../"]
+        for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
+            return stripped.isEmpty ? "#" : String(stripped)
+        }
+        // スキームを含まない相対パスも許可（scheme-less で : が無いもの）
+        if !normalized.contains(":") {
+            return stripped.isEmpty ? "#" : String(stripped)
+        }
+        return "#"
+    }
+
+    /// 画像 src に許可するスキーム: http/https/data:image/相対パス
+    /// javascript: data:text/html 等は無害化する。
+    private func sanitizedImageURL(_ url: String) -> String {
+        let stripped = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            .unicodeScalars
+            .drop(while: { $0.value < 0x20 })
+        let normalized = String(stripped).lowercased()
+        let allowedPrefixes = ["http://", "https://", "data:image/", "/", "./", "../"]
+        for prefix in allowedPrefixes where normalized.hasPrefix(prefix) {
+            return stripped.isEmpty ? "" : String(stripped)
+        }
+        if !normalized.contains(":") {
+            return stripped.isEmpty ? "" : String(stripped)
+        }
+        return ""
     }
 
     private func escapeHTML(_ string: String) -> String {
