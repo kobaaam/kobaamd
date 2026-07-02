@@ -261,6 +261,34 @@ struct MarkdownWebView: NSViewRepresentable {
             }
         }
 
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            let navType = navigationAction.navigationType
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+            let scheme = url.scheme?.lowercased() ?? ""
+            // 初期ロードおよび about:blank 系は通す
+            if navType == .other || navType == .reload || scheme == "about" || scheme == "" {
+                decisionHandler(.allow)
+                return
+            }
+            // リンクアクティベーション時は外部アプリに委譲してページ内遷移をキャンセル
+            if navType == .linkActivated {
+                if scheme == "http" || scheme == "https" || scheme == "mailto" {
+                    NSWorkspace.shared.open(url)
+                }
+                // それ以外の外部スキームはサイレントにキャンセル
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             PerfLogger.end("WebViewLoad")
             let js = "window.scrollTo(0, \(pendingScrollRatio) * Math.max(document.body.scrollHeight - window.innerHeight, 0));"

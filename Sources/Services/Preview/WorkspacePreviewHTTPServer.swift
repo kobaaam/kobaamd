@@ -42,7 +42,12 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         }
         lock.unlock()
 
-        let listener = try NWListener(using: .tcp, on: .any)
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host("127.0.0.1"),
+            port: .any
+        )
+        let listener = try NWListener(using: parameters)
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection: connection)
         }
@@ -149,16 +154,21 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         let decoded = String(path).removingPercentEncoding ?? String(path)
         let relative = decoded.hasPrefix("/") ? String(decoded.dropFirst()) : decoded
         let candidate = root.appendingPathComponent(relative).standardizedFileURL
-        guard candidate.path.hasPrefix(root.path + "/") || candidate.path == root.path else {
+        // シンボリックリンクを解決してからプレフィックス検証し、
+        // symlink 越えの path traversal を防止する。
+        let resolvedCandidate = candidate.resolvingSymlinksInPath()
+        let resolvedRoot = root.resolvingSymlinksInPath()
+        guard resolvedCandidate.path.hasPrefix(resolvedRoot.path + "/")
+                || resolvedCandidate.path == resolvedRoot.path else {
             return httpResponse(status: 403, body: "Forbidden")
         }
 
-        guard FileManager.default.fileExists(atPath: candidate.path),
-              let data = try? Data(contentsOf: candidate) else {
+        guard FileManager.default.fileExists(atPath: resolvedCandidate.path),
+              let data = try? Data(contentsOf: resolvedCandidate) else {
             return httpResponse(status: 404, body: "Not Found")
         }
 
-        let mime = Self.mimeType(for: candidate.pathExtension)
+        let mime = Self.mimeType(for: resolvedCandidate.pathExtension)
         return httpDataResponse(status: 200, mimeType: mime, data: data)
     }
 
