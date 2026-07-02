@@ -27,7 +27,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Tags sidebar / タグサイドバー** — Browse and filter notes by frontmatter tags / frontmatter タグでノートを一覧・フィルタリング
 - **CSV table preview / CSV テーブルプレビュー** — View CSV files as formatted tables in the preview pane / CSVファイルをプレビューペインで整形テーブル表示
 - **File templates / ファイルテンプレート** — Presets for README, diary, meeting notes, and tech specs (⌘⇧N) / README・日記・議事録・技術仕様の骨格を即挿入（⌘⇧N ピッカー）
-- **Rendered Markdown diff viewer / レンダリング済み Markdown 差分ビューア** — View AI-generated diffs as formatted Markdown with green/red highlights, not raw syntax (⌘⇧D to toggle) / AI 生成差分をレンダリング済み Markdown で緑・赤ハイライト表示（⌘⇧D でトグル）
+- **Rendered Markdown diff viewer / レンダリング済み Markdown 差分ビューア** — View AI-generated diffs as formatted Markdown with green/red highlights, not raw syntax (⌘D) / AI 生成差分をレンダリング済み Markdown で緑・赤ハイライト表示（⌘D）
 - **PDF export / PDF エクスポート** — Export the current file to PDF (⌘⇧P) / 現在のファイルを PDF に書き出し（⌘⇧P）
 - **Chromium browser preview / Chromium ブラウザプレビュー** — Preview pages in a local Chromium instance for full browser fidelity / ローカル Chromium インスタンスでフルブラウザ相当のプレビュー
 - **Wiki search index / Wiki 検索インデックス** — Workspace-wide full-text index with tag awareness / タグ対応のワークスペース横断全文インデックス
@@ -36,7 +36,7 @@ I wanted a simple, fast Markdown editor that felt at home on macOS — one that 
 - **Frontmatter editor / Frontmatter エディタ** — Structured YAML/TOML frontmatter recognized and editable via a dedicated inline panel / YAML/TOML の frontmatter を認識し、専用インラインパネルで編集可能
 - **Backlinks pane / Backlinks ペイン** — See which files link to or mention the current file; convert unlinked mentions to wikilinks / 現在のファイルを参照しているファイルを一覧表示し、unlinked mention を wikilink に変換可能
 - **macOS native** — SwiftUI + AppKit, macOS 14+, Apple Silicon optimized / SwiftUI + AppKit、Apple Silicon 最適化
-- **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled, no CDN required / Mermaid.js・EasyMDE をバンドル
+- **Offline-first / オフライン優先** — Mermaid.js and EasyMDE bundled (CDN fallback only if bundled resources are missing) / Mermaid.js・EasyMDE をバンドル（リソース欠損時のみ CDN フォールバック）
 
 ### E1 shell (Ghostty terminal integration)
 ### E1 シェル（Ghostty ターミナル統合）
@@ -166,9 +166,10 @@ kobaamd/
 │   ├── ViewModels/             # @Observable state — FileTree, Preview, Search, Outline, DiffViewModel,
 │   │                           #   FrontmatterViewModel, BacklinksViewModel, TagsViewModel,
 │   │                           #   QuickOpenViewModel, CSVPreviewViewModel, D2PreviewViewModel
-│   ├── Services/               # FileService, MarkdownService, GitService, BacklinksScanner,
+│   ├── Services/               # FileService, MarkdownService, BacklinksScanner,
 │   │   │                       #   BacklinkContextChecker, WikiIndexService, TreeSitterHighlightService,
-│   │   │                       #   MarkdownFormatterService, WorktreeService
+│   │   │                       #   MarkdownFormatterService, WorktreeService,
+│   │   │                       #   E1AgentStatusMonitor, WorkspaceFSEventWatcher
 │   │   └── Preview/            # ChromiumPreviewController, WorkspacePreviewHTTPServer
 │   └── Resources/              # mermaid.min.js, easymde, AppIcon.icns, templates/
 ├── scripts/
@@ -219,6 +220,7 @@ kobaamd/
 |----------|---------------------|
 | ⌘⌥S | Toggle sidebar / サイドバー表示切替 |
 | ⌘⇧R | Reading mode / 読書モード |
+| ⌘D | Open diff viewer / 差分ビューアを開く |
 | ⌘= | Increase code font size / コードフォントを大きく |
 | ⌘- | Decrease code font size / コードフォントを小さく |
 | ⌘0 | Reset code font size / コードフォントを既定値に戻す |
