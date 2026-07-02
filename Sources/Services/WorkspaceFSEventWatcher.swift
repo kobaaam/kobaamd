@@ -62,7 +62,8 @@ final class WorkspaceFSEventWatcher: @unchecked Sendable {
         stop()
     }
 
-    private func scheduleReload() {
+    // internal for testing (debounce regression guard)
+    func scheduleReload() {
         debounceWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             self?.onChangeHandler?()
