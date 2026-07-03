@@ -21,7 +21,7 @@
         <string>/bin/zsh</string>
         <string>-lc</string>
         <!-- install.sh で 3 つの pipeline jobs を bootstrap、その後 自分自身を bootout して one-shot 化 -->
-        <string>cd "$HOME/atelier/kobaamd" &amp;&amp; ./scripts/launchd/install.sh &gt;&gt; .logs/pipeline_resume.log 2&gt;&amp;1 ; launchctl bootout "gui/$(id -u)/com.kobaamd.pipeline_resume"</string>
+        <string>cd "$HOME/Documents/Claude/Projects/dev/kobaamd" &amp;&amp; ./scripts/launchd/install.sh &gt;&gt; .logs/pipeline_resume.log 2&gt;&amp;1 ; launchctl bootout "gui/$(id -u)/com.kobaamd.pipeline_resume"</string>
     </array>
 
     <key>StartCalendarInterval</key>

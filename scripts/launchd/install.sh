@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # kobaamd 自律パイプライン launchd インストーラ
-# 使い方: cd ~/atelier/kobaamd && ./scripts/launchd/install.sh
+# 使い方: cd ~/Documents/Claude/Projects/dev/kobaamd && ./scripts/launchd/install.sh
 # 冪等: 既に load 済みなら一旦 unload してから再 load
 set -euo pipefail
 
