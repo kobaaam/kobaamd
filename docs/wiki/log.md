@@ -164,3 +164,23 @@ KMD-50 KB2 の残作業として `scripts/wiki/lint.sh --no-llm` の violations 
 - new articles: なし
 - skipped sources（理由付き）:
   - なし
+
+
+## [2026-07-02] Wiki refresh（セキュリティ監査・ビルド手順・ai-service 陳腐化対応）
+
+- sources:
+  - 2026-07-02 セキュリティ監査（全 7 領域）
+  - PR #166（fix: scripts 一時ファイル mktemp 化・Gemini API キーヘッダー移動・launchd printf %q 統一）
+  - PR #167（fix: プレビュー硬化 — 127.0.0.1 固定・symlink check・URL allowlist・CSP・Mermaid strict）
+  - git log / `git show 2111871` による AIService 削除事実の確認
+- updated articles:
+  - articles/components/ai-service.md（削除済みコンポーネントとして frontmatter・本文を全面改訂。コミット 2111871 の削除理由を記録）
+  - articles/practices/security-hardening.md（.mcp.json 記述の誤り訂正・KMD-28 ステータスを「検討中」→「対応済み（一部バックログ残）」・2026-07-02 監査結果節を追加・Related に build-and-test-pipeline と wkwebview-strategy を追加）
+  - articles/architecture/wkwebview-strategy.md（プレビュー硬化 PR #167 の設計判断セクションを追加・Related に security-hardening を追加）
+  - articles/practices/dependency-inversion-guard.md（Related に build-and-test-pipeline を追加）
+  - index.md（ai-service.md の説明を「削除済み」表記に更新・build-and-test-pipeline.md を Practices に追加）
+- new articles:
+  - articles/practices/build-and-test-pipeline.md（正規ビルド手順 prepare-build.sh + libghostty-spm パッチ機構・テスト安定サブセット・2026-07-02 ベースライン 344 tests / 4 failures・誤診断 hotfix PR #165 の教訓）
+- skipped sources（理由付き）:
+  - テスト再構築 PR: 2026-07-02 時点でオープン PR なし。Tests/kobaamdTests/README.md も存在しないため新規記事へのリファレンスのみ記載
+- lint: --no-llm で確認（実行後コミット）

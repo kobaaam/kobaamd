@@ -12,7 +12,8 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
     private var serveRoot: URL?
     private let lock = NSLock()
 
-    private init() {}
+    /// `shared` シングルトン以外のインスタンスはテスト専用。
+    init() {}
 
     var isRunning: Bool {
         lock.lock()
@@ -42,7 +43,12 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         }
         lock.unlock()
 
-        let listener = try NWListener(using: .tcp, on: .any)
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: NWEndpoint.Host("127.0.0.1"),
+            port: .any
+        )
+        let listener = try NWListener(using: parameters)
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection: connection)
         }
@@ -124,7 +130,66 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         }
     }
 
+    // MARK: - Host ヘッダ検証
+
+    /// DNS rebinding 攻撃を防ぐため、リクエストの Host ヘッダが
+    /// 127.0.0.1 / localhost / [::1] のいずれかであることを強制する。
+    /// HTTP/1.0 など Host ヘッダが無い場合も 403 を返す。
+    ///
+    /// 設計判断: サーバーは 127.0.0.1 にのみバインドしているが、
+    /// ブラウザが DNS rebinding で attacker.example.com を 127.0.0.1 に
+    /// 解決した場合、Host ヘッダには "attacker.example.com" が入る。
+    /// この検証でそのリクエストを弾くことで経路を完全に塞ぐ。
+    ///
+    /// ポート一致は検証しない: サーバーは 127.0.0.1 のランダムポートに
+    /// バインドするため、ポートを知っているクライアントは正規のアクセスと見なせる。
+    /// ホスト名の正規化だけで DNS rebinding 対策として十分。
+    static func isAllowedHost(_ host: String) -> Bool {
+        // ポート部分を除去する。
+        // IPv4 / hostname: "127.0.0.1:9000" → lastIndex(":") でポートを切り離す。
+        // IPv6: "[::1]:9000" → "]" の直後の ":PORT" を切り離す。
+        //        "[::1]" はそのまま。
+        let hostWithoutPort: String
+        if host.hasPrefix("[") {
+            // IPv6 ブラケット形式 — "]" 以降のポート部分を除去
+            if let closeBracket = host.lastIndex(of: "]") {
+                let afterBracket = host.index(after: closeBracket)
+                if afterBracket < host.endIndex, host[afterBracket] == ":" {
+                    // "[::1]:port" → "[::1]"
+                    hostWithoutPort = String(host[host.startIndex...closeBracket])
+                } else {
+                    // "[::1]" → そのまま
+                    hostWithoutPort = host
+                }
+            } else {
+                hostWithoutPort = host
+            }
+        } else if let colonIndex = host.lastIndex(of: ":") {
+            // IPv4 / hostname: "127.0.0.1:PORT" or "localhost:PORT"
+            hostWithoutPort = String(host[host.startIndex..<colonIndex])
+        } else {
+            hostWithoutPort = host
+        }
+        let lower = hostWithoutPort.lowercased()
+        return lower == "127.0.0.1" || lower == "localhost" || lower == "[::1]"
+    }
+
     private func response(for request: String) -> Data {
+        // Host ヘッダ検証を最初に実施 — DNS rebinding 対策。
+        // GET チェックより前に置く: 不正 Host のリクエストはメソッドに関わらず 403 で弾き、
+        // 405 等の内部詳細を一切漏らさない。HTTP/1.1 では Host 必須。
+        let allLines = request.components(separatedBy: "\r\n")
+        let hostHeader = allLines.first(where: { $0.lowercased().hasPrefix("host:") })
+        guard let hostHeader else {
+            return httpResponse(status: 403, body: "Forbidden: missing Host header")
+        }
+        let hostValue = hostHeader
+            .dropFirst("host:".count)
+            .trimmingCharacters(in: .whitespaces)
+        guard Self.isAllowedHost(hostValue) else {
+            return httpResponse(status: 403, body: "Forbidden: invalid Host")
+        }
+
         guard let requestLine = request.split(separator: "\r\n", maxSplits: 1).first else {
             return httpResponse(status: 400, body: "Bad Request")
         }
@@ -149,16 +214,21 @@ final class WorkspacePreviewHTTPServer: @unchecked Sendable {
         let decoded = String(path).removingPercentEncoding ?? String(path)
         let relative = decoded.hasPrefix("/") ? String(decoded.dropFirst()) : decoded
         let candidate = root.appendingPathComponent(relative).standardizedFileURL
-        guard candidate.path.hasPrefix(root.path + "/") || candidate.path == root.path else {
+        // シンボリックリンクを解決してからプレフィックス検証し、
+        // symlink 越えの path traversal を防止する。
+        let resolvedCandidate = candidate.resolvingSymlinksInPath()
+        let resolvedRoot = root.resolvingSymlinksInPath()
+        guard resolvedCandidate.path.hasPrefix(resolvedRoot.path + "/")
+                || resolvedCandidate.path == resolvedRoot.path else {
             return httpResponse(status: 403, body: "Forbidden")
         }
 
-        guard FileManager.default.fileExists(atPath: candidate.path),
-              let data = try? Data(contentsOf: candidate) else {
+        guard FileManager.default.fileExists(atPath: resolvedCandidate.path),
+              let data = try? Data(contentsOf: resolvedCandidate) else {
             return httpResponse(status: 404, body: "Not Found")
         }
 
-        let mime = Self.mimeType(for: candidate.pathExtension)
+        let mime = Self.mimeType(for: resolvedCandidate.pathExtension)
         return httpDataResponse(status: 200, mimeType: mime, data: data)
     }
 
@@ -233,6 +303,20 @@ enum PreviewServerError: LocalizedError {
 enum HTMLPreviewMaterializer {
     static let swapFileName = ".kobaamd-preview.html"
 
+    /// プレビューサーバーに渡す serveRoot と相対パスを生成する。
+    ///
+    /// ## 配信範囲の設計判断
+    ///
+    /// serveRoot は常に「対象ファイルが存在するディレクトリ」（fileURL.deletingLastPathComponent()）
+    /// または一時ディレクトリ（fileURL == nil の場合）になる。
+    /// ワークスペースルートや上位ディレクトリが serveRoot になることは **構造上ありえない**。
+    ///
+    /// この設計はディレクトリ配信を維持しつつ配信範囲を最小化する。
+    /// HTML ファイルが同ディレクトリ内の CSS/JS/画像を相対パスで参照するケースを
+    /// 壊さずに、上位ファイルツリーへのアクセスを防止する。
+    ///
+    /// - Note: serveRoot は `WorkspacePreviewHTTPServer` の traversal チェック
+    ///   （symlink 解決 + prefix 検証）と組み合わせて二重に保護される。
     static func materialize(
         fileURL: URL?,
         html: String,
@@ -246,6 +330,7 @@ enum HTMLPreviewMaterializer {
             return (root, "index.html")
         }
 
+        // serveRoot = ファイルの親ディレクトリ（ワークスペースルートより広くならない保証）
         let directory = fileURL.deletingLastPathComponent().standardizedFileURL
         if isDirty {
             let swap = directory.appendingPathComponent(swapFileName)

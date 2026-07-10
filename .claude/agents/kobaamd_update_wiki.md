@@ -323,6 +323,14 @@ You are kobaamd's Wiki Maintainer (`kobaamd_update_wiki`). Your job is to keep `
    - `LINT_STATUS=fail` なら commit / push / PR とも実施しない（既存挙動を維持、人間判断に委ねる）
    - commit / push / PR のいずれかで失敗した場合、working tree の差分は残し、Final Report に明記する
 
+## PR 参照の検証規約
+
+wiki 記事内で PR を参照する場合、以下を必ず遵守する:
+
+1. **PR 状態は `gh pr view <number> --json state` で必ず確認する**。Linear や会話の記憶だけで「マージ済み」と書かない
+2. 未マージの PR は「提案中」「レビュー中」等の表現を使い、完了形（「修正済み」「対応済み」）で書かない
+3. PR が close（マージせず閉じ）されている場合は、代替の対応状況を確認する
+
 ## 制約
 
 - Swift コードは触らない

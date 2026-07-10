@@ -424,6 +424,7 @@ rule_frontmatter_files=0
 rule_orphan_files=0
 rule_broken_link_files=0
 rule_stale_files=0
+rule_deleted_source_refs_files=0
 rule_section_context_attempted=0
 rule_section_context_executed=0
 rule_section_context_skipped=0
@@ -454,6 +455,7 @@ write_report() {
     --argjson rule_orphan_files "$rule_orphan_files" \
     --argjson rule_broken_link_files "$rule_broken_link_files" \
     --argjson rule_stale_files "$rule_stale_files" \
+    --argjson rule_deleted_source_refs_files "$rule_deleted_source_refs_files" \
     --argjson section_attempted "$rule_section_context_attempted" \
     --argjson section_executed "$rule_section_context_executed" \
     --argjson section_skipped "$rule_section_context_skipped" \
@@ -472,6 +474,7 @@ write_report() {
         orphan: {status: "executed", files: $rule_orphan_files},
         broken_link: {status: "executed", files: $rule_broken_link_files},
         stale: {status: "executed", files: $rule_stale_files},
+        deleted_source_refs: {status: "executed", files: $rule_deleted_source_refs_files},
         section_context: {
           status: $section_status,
           reason: (if $section_reason == "" then null else $section_reason end),
@@ -482,7 +485,7 @@ write_report() {
         }
       },
       rules_executed: (
-        ["frontmatter", "orphan", "broken_link", "stale"] +
+        ["frontmatter", "orphan", "broken_link", "stale", "deleted_source_refs"] +
         (if $section_executed > 0 then ["section_context"] else [] end)
       ),
       rules_skipped: (
@@ -716,6 +719,35 @@ check_stale() {
     list=$(printf '%s,' "${newer_sources[@]}" | sed 's/,$//')
     emit "$rel" "stale" null "updated=$updated is ${age_days}d old AND newer sources detected: $list"
   fi
+}
+
+# --- Rule 3b: deleted-source-refs -------------------------------------------
+#
+# Warn when a wiki article references a Sources/ path that no longer exists on
+# disk. This catches articles left stale after source files are deleted (e.g.
+# when a feature is removed). Emits a warning (not an error) to avoid blocking
+# automation on legitimate historical references.
+
+check_deleted_source_refs() {
+  local f="$1"
+  rule_deleted_source_refs_files=$((rule_deleted_source_refs_files + 1))
+  local rel=${f#"$ROOT"/}
+
+  # Extract all Sources/... path-like tokens from the article.
+  # Match bare paths (Sources/Foo/Bar.swift) as well as paths in links or code
+  # spans. Use grep -o to get each match on its own line.
+  local matches
+  matches=$(grep -oE 'Sources/[A-Za-z0-9_./-]+\.[A-Za-z]+' "$f" 2>/dev/null || true)
+  [ -z "$matches" ] && return
+
+  while IFS= read -r src_ref; do
+    [[ -z "$src_ref" ]] && continue
+    local full_path="$ROOT/$src_ref"
+    if [[ ! -f "$full_path" ]]; then
+      # Emit as a warning-level violation with rule name "deleted-source-refs"
+      emit "$rel" "deleted-source-refs" null "referenced source file no longer exists: $src_ref"
+    fi
+  done <<< "$matches"
 }
 
 # --- Rule 4: section-context-missing (Haiku) --------------------------------
@@ -957,6 +989,7 @@ for f in "${target_files[@]}"; do
   check_orphan "$f"
   check_broken_links "$f"
   check_stale "$f"
+  check_deleted_source_refs "$f"
   check_section_context "$f"
 done
 
