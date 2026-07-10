@@ -109,6 +109,25 @@ struct WikiIndexServiceTests {
         #expect(externalHits?.isEmpty == false)
     }
 
+    @Test("Skips oversized files during indexing")
+    func skipsOversizedFiles() async throws {
+        let largePath = tmpDir.appendingPathComponent("huge.md")
+        var data = Data("# Huge\n".utf8)
+        data.append(Data(count: FileService.maxWikiIndexFileBytes + 1))
+        try data.write(to: largePath)
+        try write("小さなキーワード", name: "small.md")
+
+        let service = WikiIndexService()
+        service.setRoot(tmpDir)
+        try await waitForReady(service)
+
+        let largeHits = await service.search(query: "Huge")
+        #expect(largeHits?.isEmpty == true)
+
+        let smallHits = await service.search(query: "小さな")
+        #expect(smallHits?.isEmpty == false)
+    }
+
     @Test("Repeated setRoot while building does not restart")
     func setRootIgnoresDuplicateWhileBuilding() async throws {
         try write("検索対象ワード", name: "note.md")

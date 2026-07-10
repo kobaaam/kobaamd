@@ -30,6 +30,24 @@ final class FileService {
         ".kobaamd-preview.html",
     ]
 
+    /// Wiki 全文インデックスに読み込むファイルの上限（RAM 保護）
+    static let maxWikiIndexFileBytes: Int = 2 * 1024 * 1024
+
+    /// SQLite / transcript 等、インデックス対象外のファイル名
+    static let workspaceIndexExcludedFileNames: Set<String> = [
+        "transcript.log",
+        "index.sqlite",
+        "index.sqlite-shm",
+        "index.sqlite-wal",
+    ]
+
+    /// 全文インデックス走査から除外するファイルか。
+    static func shouldSkipIndexFile(name: String) -> Bool {
+        if workspaceInternalFileNames.contains(name) { return true }
+        if workspaceIndexExcludedFileNames.contains(name) { return true }
+        return false
+    }
+
     /// 依存・ビルド成果物ディレクトリ（`indexDependencyDirectories` が OFF のときスキップ）
     static let dependencyDirectoryNames: Set<String> = [
         "node_modules", "dist", "build", ".git", ".svn", ".hg",
