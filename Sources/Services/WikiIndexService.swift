@@ -41,6 +41,7 @@ final class WikiIndexService {
 
     private let dbQueue = DispatchQueue(label: "WikiIndexService.db")
     private var buildTask: Task<Void, Never>?
+    private let buildCancellation = IndexBuildCancellation()
 
     func setRoot(_ url: URL?, force: Bool = false) {
         if !force, rootURL == url {
@@ -53,6 +54,7 @@ final class WikiIndexService {
         }
 
         buildTask?.cancel()
+        buildCancellation.cancel()
         buildTask = nil
         rootURL = url
 
@@ -62,13 +64,15 @@ final class WikiIndexService {
         }
 
         state = .building
-        buildTask = Task.detached(priority: .utility) { [weak self] in
+        let buildGeneration = buildCancellation.begin()
+        buildTask = Task.detached(priority: .utility) { [weak self, buildCancellation] in
             guard let self else { return }
+            let shouldCancel = { buildCancellation.isCancelled(buildGeneration) }
             do {
                 try await self.runDatabaseOperation {
-                    try Self.rebuildIndex(at: url)
+                    try Self.rebuildIndex(at: url, shouldCancel: shouldCancel)
                 }
-                guard !Task.isCancelled else { return }
+                guard !shouldCancel() else { return }
                 await self.finishBuild(for: url)
             } catch is CancellationError {
             } catch {
@@ -117,8 +121,8 @@ final class WikiIndexService {
         }
     }
 
-    private nonisolated static func rebuildIndex(at rootURL: URL) throws {
-        try Task.checkCancellation()
+    private nonisolated static func rebuildIndex(at rootURL: URL, shouldCancel: @escaping @Sendable () -> Bool = { false }) throws {
+        if shouldCancel() { throw CancellationError() }
         let dbURL = try prepareDatabaseURL(for: rootURL)
         let db = try openDatabase(at: dbURL)
         defer { sqlite3_close(db) }
@@ -131,7 +135,7 @@ final class WikiIndexService {
         do {
             try execute(sql: "INSERT INTO articles_fts(articles_fts) VALUES('delete-all');", db: db)
             try execute(sql: "DELETE FROM articles;", db: db)
-            try indexFiles(in: rootURL, db: db)
+            try indexFiles(in: rootURL, db: db, shouldCancel: shouldCancel)
             try execute(sql: "COMMIT;", db: db)
         } catch {
             try? execute(sql: "ROLLBACK;", db: db)
@@ -139,15 +143,24 @@ final class WikiIndexService {
         }
     }
 
-    private nonisolated static func indexFiles(in rootURL: URL, db: OpaquePointer?) throws {
+    private nonisolated static func indexFiles(
+        in rootURL: URL,
+        db: OpaquePointer?,
+        shouldCancel: @escaping @Sendable () -> Bool
+    ) throws {
         let includeDependencyDirectories = UserDefaults.standard.bool(
             forKey: AppState.indexDependencyDirectoriesKey
         )
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .isDirectoryKey,
+                .contentModificationDateKey,
+                .fileSizeKey,
+            ],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
             throw ServiceError.invalidRoot
         }
@@ -169,44 +182,68 @@ final class WikiIndexService {
         )
 
         for case let fileURL as URL in enumerator {
-            try Task.checkCancellation()
+            if shouldCancel() { throw CancellationError() }
 
-            let values = try? fileURL.resourceValues(
-                forKeys: [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey]
-            )
-            if values?.isDirectory == true {
-                if FileService.shouldSkipDirectory(
-                    name: fileURL.lastPathComponent,
-                    includeDependencyDirectories: includeDependencyDirectories
-                ) {
-                    enumerator.skipDescendants()
+            autoreleasepool {
+                guard let values = try? fileURL.resourceValues(
+                    forKeys: [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey]
+                ) else { return }
+
+                let name = fileURL.lastPathComponent
+                if values.isDirectory == true {
+                    if FileService.shouldSkipDirectory(
+                        name: name,
+                        includeDependencyDirectories: includeDependencyDirectories
+                    ) {
+                        enumerator.skipDescendants()
+                    }
+                    return
                 }
-                continue
+
+                guard values.isRegularFile == true else { return }
+                guard !FileService.shouldSkipIndexFile(name: name) else { return }
+                guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()) else { return }
+
+                let fileSize = values.fileSize ?? 0
+                guard fileSize > 0, fileSize <= FileService.maxWikiIndexFileBytes else { return }
+
+                guard let body = readIndexableText(at: fileURL, expectedSize: fileSize) else { return }
+
+                let title = extractTitle(from: body, fallback: name)
+                let mtime = values.contentModificationDate?.timeIntervalSince1970 ?? 0
+
+                do {
+                    sqlite3_reset(articleStatement)
+                    sqlite3_clear_bindings(articleStatement)
+                    try bind(text: fileURL.path, to: 1, statement: articleStatement)
+                    try bind(text: title, to: 2, statement: articleStatement)
+                    try bind(text: body, to: 3, statement: articleStatement)
+                    try bind(double: mtime, to: 4, statement: articleStatement)
+                    try stepDone(statement: articleStatement, db: db)
+
+                    let rowID = sqlite3_last_insert_rowid(db)
+
+                    sqlite3_reset(ftsStatement)
+                    sqlite3_clear_bindings(ftsStatement)
+                    try bind(int64: rowID, to: 1, statement: ftsStatement)
+                    try bind(text: title, to: 2, statement: ftsStatement)
+                    try bind(text: body, to: 3, statement: ftsStatement)
+                    try stepDone(statement: ftsStatement, db: db)
+                } catch {
+                    // 1 ファイルの失敗でインデックス全体を落とさない
+                }
             }
-            guard values?.isRegularFile == true else { continue }
-            guard FileService.supportedExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
-            guard let body = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
-
-            let title = extractTitle(from: body, fallback: fileURL.lastPathComponent)
-            let mtime = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
-
-            sqlite3_reset(articleStatement)
-            sqlite3_clear_bindings(articleStatement)
-            try bind(text: fileURL.path, to: 1, statement: articleStatement)
-            try bind(text: title, to: 2, statement: articleStatement)
-            try bind(text: body, to: 3, statement: articleStatement)
-            try bind(double: mtime, to: 4, statement: articleStatement)
-            try stepDone(statement: articleStatement, db: db)
-
-            let rowID = sqlite3_last_insert_rowid(db)
-
-            sqlite3_reset(ftsStatement)
-            sqlite3_clear_bindings(ftsStatement)
-            try bind(int64: rowID, to: 1, statement: ftsStatement)
-            try bind(text: title, to: 2, statement: ftsStatement)
-            try bind(text: body, to: 3, statement: ftsStatement)
-            try stepDone(statement: ftsStatement, db: db)
         }
+    }
+
+    /// `String(contentsOf:)` の例外・巨大ファイル読み込みを避けて UTF-8 テキストを取得する。
+    private nonisolated static func readIndexableText(at fileURL: URL, expectedSize: Int) -> String? {
+        guard expectedSize <= FileService.maxWikiIndexFileBytes else { return nil }
+        guard let data = try? Data(
+            contentsOf: fileURL,
+            options: [.mappedIfSafe, .uncached]
+        ), !data.isEmpty else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private nonisolated static func performSearch(rootURL: URL, query: String, limit: Int) throws -> [Hit] {
@@ -363,7 +400,17 @@ final class WikiIndexService {
     }
 
     private nonisolated static func quotedQuery(_ query: String) -> String {
-        let escaped = query.replacingOccurrences(of: "\"", with: "\"\"")
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "\"\"" }
+        // CJK は unicode61 のトークン単位 AND 検索（フレーズ引用だとヒットしないことがある）
+        if trimmed.unicodeScalars.contains(where: { $0.value > 0x7F }) {
+            return trimmed
+                .replacingOccurrences(of: "\"", with: "\"\"")
+                .split(whereSeparator: { $0.isWhitespace })
+                .map(String.init)
+                .joined(separator: " ")
+        }
+        let escaped = trimmed.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""
     }
 
@@ -375,11 +422,38 @@ final class WikiIndexService {
         return error.localizedDescription
     }
 
+    /// db キュー上でも参照できるビルド世代ベースのキャンセル判定。
+    private final class IndexBuildCancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var generation: UInt64 = 0
+        private var cancelledGeneration: UInt64?
+
+        func begin() -> UInt64 {
+            lock.lock()
+            generation += 1
+            let current = generation
+            cancelledGeneration = nil
+            lock.unlock()
+            return current
+        }
+
+        func cancel() {
+            lock.lock()
+            cancelledGeneration = generation
+            lock.unlock()
+        }
+
+        func isCancelled(_ generation: UInt64) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return cancelledGeneration == generation
+        }
+    }
+
     /// Drops the FTS index and articles table when the stored schema is missing the `body` column
     /// (old layout that pre-dates the trigram tokenizer migration).  The next `schemaSQL` run will
     /// recreate both tables with the correct layout.
     private nonisolated static func migrateSchemaIfNeeded(db: OpaquePointer?) throws {
-        // Check whether the articles table has a body column.
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         let r = sqlite3_prepare_v2(db, "PRAGMA table_info(articles);", -1, &stmt, nil)
@@ -393,7 +467,6 @@ final class WikiIndexService {
         }
 
         if !hasBodyColumn {
-            // Old schema detected: drop both tables so schemaSQL recreates them cleanly.
             try execute(sql: "DROP TABLE IF EXISTS articles_fts;", db: db)
             try execute(sql: "DROP TABLE IF EXISTS articles;", db: db)
         }
