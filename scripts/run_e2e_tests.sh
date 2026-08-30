@@ -410,6 +410,8 @@ PROMPT_END
 ENDJSON
 )
 
+        "$PROJECT_DIR/scripts/usage/log.sh" gemini "run_e2e_tests" 0 "e2e_prd_check" || true
+
         RESULT=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             -H "Content-Type: application/json" \

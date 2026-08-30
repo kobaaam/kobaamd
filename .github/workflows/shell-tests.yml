@@ -5,16 +5,22 @@ on:
     paths:
       - '.claude/agents/kobaamd_lint_section_context.md'
       - 'docs/wiki/articles/practices/wiki-reference-policy.md'
+      - 'scripts/run_e2e_tests.sh'
       - 'scripts/hooks/pre-commit'
+      - 'scripts/usage/**'
       - 'scripts/wiki/**'
+      - 'Tests/usage/**'
       - 'Tests/wiki/**'
       - '.github/workflows/shell-tests.yml'
   pull_request:
     paths:
       - '.claude/agents/kobaamd_lint_section_context.md'
       - 'docs/wiki/articles/practices/wiki-reference-policy.md'
+      - 'scripts/run_e2e_tests.sh'
       - 'scripts/hooks/pre-commit'
+      - 'scripts/usage/**'
       - 'scripts/wiki/**'
+      - 'Tests/usage/**'
       - 'Tests/wiki/**'
       - '.github/workflows/shell-tests.yml'
 
@@ -35,6 +41,9 @@ jobs:
 
       - name: Run allowlist drift verification test
         run: bash Tests/wiki/verify-allowlist-drift.sh
+
+      - name: Run usage check smoke test
+        run: bash Tests/usage/check.smoke.sh
 
       - name: Run wiki lint smoke test
         run: bash Tests/wiki/lint.smoke.sh
