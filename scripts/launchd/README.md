@@ -61,7 +61,7 @@ plist 内のパスは `__KOBAAMD_DIR__` プレースホルダで書かれてお�
 ## インストール
 
 ```bash
-cd ~/atelier/kobaamd
+cd ~/Documents/Claude/Projects/dev/kobaamd
 ./scripts/launchd/install.sh
 ```
 
@@ -83,9 +83,9 @@ launchctl start com.kobaamd.pipeline_active
 ## ログ確認
 
 ```bash
-tail -f ~/atelier/kobaamd/.logs/pipeline_active.log
-tail -f ~/atelier/kobaamd/.logs/pipeline_daily.log
-tail -f ~/atelier/kobaamd/.logs/pipeline_weekly.log
+tail -f ~/Documents/Claude/Projects/dev/kobaamd/.logs/pipeline_active.log
+tail -f ~/Documents/Claude/Projects/dev/kobaamd/.logs/pipeline_daily.log
+tail -f ~/Documents/Claude/Projects/dev/kobaamd/.logs/pipeline_weekly.log
 ```
 
 ## 一時停止（個別）
